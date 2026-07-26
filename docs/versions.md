@@ -12,4 +12,5 @@ version, update this file in the same commit.
 | Node.js | 24.14.0 | M1 T1 |
 | Next.js | TBD — set at T4 scaffold | M1 T4 |
 | shadcn/ui | TBD — set at T4 scaffold | M1 T4 |
-| PostgreSQL (pgvector image) | TBD — set at T2 compose entry | M1 T2 |
+| PostgreSQL (pgvector image) | `pgvector/pgvector:pg17` | M1 T2 |
+| api base image | `eclipse-temurin:21.0.11_10-jdk-jammy` (build), `eclipse-temurin:21.0.11_10-jre-jammy` (runtime) | M1 T2 |
