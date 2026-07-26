@@ -3,7 +3,6 @@ package com.ledgerly.api.ledger;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.UUID;
 import javax.sql.DataSource;
@@ -102,73 +101,6 @@ class LedgerBalanceConstraintIT extends AbstractPostgresIT {
       insertEntry(connection, txId, accountC, "CREDIT", 300);
 
       connection.commit();
-    }
-  }
-
-  private UUID insertOrganization(Connection connection) throws SQLException {
-    UUID id = UUID.randomUUID();
-    try (PreparedStatement ps = connection.prepareStatement(
-        "INSERT INTO organization (id, name, base_currency) VALUES (?, ?, 'EUR')")) {
-      ps.setObject(1, id);
-      ps.setString(2, "org-" + id);
-      ps.executeUpdate();
-    }
-    return id;
-  }
-
-  private UUID insertAccount(Connection connection, UUID orgId, String name) throws SQLException {
-    UUID id = UUID.randomUUID();
-    try (PreparedStatement ps = connection.prepareStatement(
-        "INSERT INTO account (id, organization_id, name, account_type, currency) "
-            + "VALUES (?, ?, ?, 'ASSET', 'EUR')")) {
-      ps.setObject(1, id);
-      ps.setObject(2, orgId);
-      ps.setString(3, name + "-" + id);
-      ps.executeUpdate();
-    }
-    return id;
-  }
-
-  private UUID insertTransaction(Connection connection, UUID orgId) throws SQLException {
-    UUID id = UUID.randomUUID();
-    try (PreparedStatement ps = connection.prepareStatement(
-        "INSERT INTO ledger_transaction (id, organization_id, base_currency, posted_at) "
-            + "VALUES (?, ?, 'EUR', now())")) {
-      ps.setObject(1, id);
-      ps.setObject(2, orgId);
-      ps.executeUpdate();
-    }
-    return id;
-  }
-
-  private void insertEntry(
-      Connection connection, UUID txId, UUID accountId, String direction, long amountMinor)
-      throws SQLException {
-    insertEntry(connection, txId, accountId, direction, amountMinor, "EUR");
-  }
-
-  private void insertEntry(
-      Connection connection,
-      UUID txId,
-      UUID accountId,
-      String direction,
-      long amountMinor,
-      String baseCurrency)
-      throws SQLException {
-    try (PreparedStatement ps = connection.prepareStatement(
-        "INSERT INTO ledger_entry "
-            + "(id, transaction_id, account_id, direction, native_amount_minor, "
-            + "native_currency, base_amount_minor, base_currency, fx_rate) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)")) {
-      ps.setObject(1, UUID.randomUUID());
-      ps.setObject(2, txId);
-      ps.setObject(3, accountId);
-      ps.setString(4, direction);
-      ps.setLong(5, amountMinor);
-      ps.setString(6, baseCurrency);
-      ps.setLong(7, amountMinor);
-      ps.setString(8, baseCurrency);
-      ps.executeUpdate();
     }
   }
 }
