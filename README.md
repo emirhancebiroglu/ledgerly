@@ -51,11 +51,13 @@ Full detail: [docs/architecture.md](docs/architecture.md).
 
 | Layer | Technology |
 |---|---|
-| Web | Next.js (App Router), TypeScript, Tailwind, shadcn/ui |
-| API | Java 21 (17 works), Spring Boot 3, Spring Security, Spring Data JPA |
+| Web | Next.js 15, TypeScript 5, Tailwind CSS 4, shadcn/ui |
+| API | Java 21 (Temurin 21.0.11), Spring Boot 3.5, Spring Security, Spring Data JPA |
 | Data | PostgreSQL 16 + pgvector, Flyway migrations |
 | AI | Python 3.12, FastAPI, LangGraph, pgvector retrieval |
 | Infra | Docker Compose (local), GitHub Actions CI, Render (api/ai/db) + Vercel (web) |
+
+Pinned versions: [docs/versions.md](docs/versions.md).
 
 ## Repository layout
 
