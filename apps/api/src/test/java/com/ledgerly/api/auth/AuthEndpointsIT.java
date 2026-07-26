@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -89,8 +90,17 @@ class AuthEndpointsIT extends AbstractPostgresIT {
             .andExpect(status().isUnauthorized())
             .andReturn();
 
-    assertThat(unknownEmailResult.getResponse().getContentAsString())
-        .isEqualTo(wrongPasswordResult.getResponse().getContentAsString());
+    // Bodies must agree on everything except correlationId, which is legitimately unique per
+    // request (T6) — the security property under test is "same detail/status", not a
+    // byte-identical response across two different requests.
+    ObjectNode wrongPasswordBody =
+        (ObjectNode) objectMapper.readTree(wrongPasswordResult.getResponse().getContentAsString());
+    ObjectNode unknownEmailBody =
+        (ObjectNode) objectMapper.readTree(unknownEmailResult.getResponse().getContentAsString());
+    wrongPasswordBody.remove("correlationId");
+    unknownEmailBody.remove("correlationId");
+
+    assertThat(unknownEmailBody).isEqualTo(wrongPasswordBody);
   }
 
   @Test
