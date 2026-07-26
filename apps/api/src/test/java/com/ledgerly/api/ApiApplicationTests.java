@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.ledgerly.api.audit.AuditLogRepository;
 import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
@@ -36,6 +37,7 @@ class ApiApplicationTests {
   @MockitoBean private RefreshTokenRepository refreshTokenRepository;
   @MockitoBean private ExpenseStubRepository expenseStubRepository;
   @MockitoBean private IdempotencyRecordRepository idempotencyRecordRepository;
+  @MockitoBean private AuditLogRepository auditLogRepository;
 
   @Test
   void contextLoads() {}
