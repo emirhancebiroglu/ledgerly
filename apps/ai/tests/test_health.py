@@ -10,7 +10,7 @@ def test_health_returns_200_with_service_and_version():
     assert response.status_code == 200
     body = response.json()
     assert body["service"] == "ai"
-    assert body["status"] == "UP"
+    assert body["status"] == "DELIBERATELY_BROKEN"
     assert "version" in body
 
 

@@ -25,7 +25,7 @@ class ApiApplicationTests {
     mockMvc
         .perform(get("/actuator/health"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status", is("UP")));
+        .andExpect(jsonPath("$.status", is("DELIBERATELY_BROKEN")));
   }
 
   @Test

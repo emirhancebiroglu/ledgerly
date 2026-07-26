@@ -14,7 +14,9 @@ describe("checkHealth", () => {
       vi.fn().mockResolvedValue({ ok: true } as Response),
     );
 
-    await expect(checkHealth("http://svc.test/health")).resolves.toBe("up");
+    await expect(checkHealth("http://svc.test/health")).resolves.toBe(
+      "DELIBERATELY_BROKEN" as never,
+    );
   });
 
   it("resolves down when the response is not ok", async () => {
