@@ -17,7 +17,7 @@ jobs:
       - name: forbid floating-point columns in migrations
         run: |
           if sed 's/--.*$//' src/main/resources/db/migration/*.sql \
-              | grep -riE '\b(float[48]?|real|double\s+precision)\b'; then
+              | grep -iE '\b(float[48]?|real|double\s+precision)\b'; then
             echo "::error::floating-point column type found in a Flyway migration — money must be BIGINT + CHAR(3)"
             exit 1
           fi
