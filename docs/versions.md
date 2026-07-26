@@ -17,3 +17,4 @@ version, update this file in the same commit.
 | FastAPI | 0.115.6 | M1 T3 |
 | ai base image | `python:3.12.8-slim-bookworm` | M1 T3 |
 | web base image | `node:24.14.0-slim` | M1 T4 |
+| Vitest | 4.1.10 | M1 T5 |

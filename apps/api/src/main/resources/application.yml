@@ -7,6 +7,9 @@ management:
     web:
       exposure:
         include: health
+      cors:
+        allowed-origins: http://localhost:3000
+        allowed-methods: GET
   endpoint:
     health:
       show-details: never

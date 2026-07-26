@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     service_name: str = "ai"
     service_version: str = "0.1.0"
     enable_docs: bool = False
+    cors_origins: list[str] = ["http://localhost:3000"]
 
 
 settings = Settings()
