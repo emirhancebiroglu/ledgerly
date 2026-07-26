@@ -3,6 +3,7 @@ package com.ledgerly.api;
 import com.ledgerly.api.auth.CrossOrganizationAccessException;
 import com.ledgerly.api.auth.InvalidCredentialsException;
 import com.ledgerly.api.auth.InvalidRefreshTokenException;
+import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -27,6 +28,11 @@ public class ApiExceptionHandler {
   @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class})
   public ProblemDetail handleUnauthorized(RuntimeException exception) {
     return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
+  }
+
+  @ExceptionHandler(IdempotencyConflictException.class)
+  public ProblemDetail handleIdempotencyConflict(IdempotencyConflictException exception) {
+    return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
   }
 
   @ExceptionHandler(Exception.class)

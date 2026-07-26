@@ -8,6 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
+import com.ledgerly.api.expense.ExpenseStubRepository;
+import com.ledgerly.api.idempotency.IdempotencyRecordRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -32,6 +34,8 @@ class ApiApplicationTests {
   @MockitoBean private AppUserRepository appUserRepository;
   @MockitoBean private OrganizationRepository organizationRepository;
   @MockitoBean private RefreshTokenRepository refreshTokenRepository;
+  @MockitoBean private ExpenseStubRepository expenseStubRepository;
+  @MockitoBean private IdempotencyRecordRepository idempotencyRecordRepository;
 
   @Test
   void contextLoads() {}
