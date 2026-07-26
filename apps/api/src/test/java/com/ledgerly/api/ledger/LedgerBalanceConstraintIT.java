@@ -55,6 +55,37 @@ class LedgerBalanceConstraintIT extends AbstractPostgresIT {
   }
 
   @Test
+  void crossCurrencyEntriesThatNetToZeroAreRejected() throws Exception {
+    try (Connection connection = dataSource.getConnection()) {
+      connection.setAutoCommit(false);
+      UUID orgId = insertOrganization(connection);
+      UUID accountA = insertAccount(connection, orgId, "cash");
+      UUID accountB = insertAccount(connection, orgId, "expense");
+      UUID txId = insertTransaction(connection, orgId);
+
+      // net base amount is zero, but the transaction's base_currency is EUR and this
+      // entry claims USD — must still be rejected
+      insertEntry(connection, txId, accountA, "DEBIT", 1_000, "EUR");
+      insertEntry(connection, txId, accountB, "CREDIT", 1_000, "USD");
+
+      assertThatThrownBy(connection::commit).isInstanceOf(SQLException.class);
+      connection.rollback();
+    }
+  }
+
+  @Test
+  void transactionWithNoEntriesIsRejectedAtCommit() throws Exception {
+    try (Connection connection = dataSource.getConnection()) {
+      connection.setAutoCommit(false);
+      UUID orgId = insertOrganization(connection);
+      insertTransaction(connection, orgId);
+
+      assertThatThrownBy(connection::commit).isInstanceOf(SQLException.class);
+      connection.rollback();
+    }
+  }
+
+  @Test
   void transientlyUnbalancedMidTransactionButBalancedAtCommitSucceeds() throws Exception {
     try (Connection connection = dataSource.getConnection()) {
       connection.setAutoCommit(false);
@@ -113,17 +144,30 @@ class LedgerBalanceConstraintIT extends AbstractPostgresIT {
   private void insertEntry(
       Connection connection, UUID txId, UUID accountId, String direction, long amountMinor)
       throws SQLException {
+    insertEntry(connection, txId, accountId, direction, amountMinor, "EUR");
+  }
+
+  private void insertEntry(
+      Connection connection,
+      UUID txId,
+      UUID accountId,
+      String direction,
+      long amountMinor,
+      String baseCurrency)
+      throws SQLException {
     try (PreparedStatement ps = connection.prepareStatement(
         "INSERT INTO ledger_entry "
             + "(id, transaction_id, account_id, direction, native_amount_minor, "
             + "native_currency, base_amount_minor, base_currency, fx_rate) "
-            + "VALUES (?, ?, ?, ?, ?, 'EUR', ?, 'EUR', 1)")) {
+            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)")) {
       ps.setObject(1, UUID.randomUUID());
       ps.setObject(2, txId);
       ps.setObject(3, accountId);
       ps.setString(4, direction);
       ps.setLong(5, amountMinor);
-      ps.setLong(6, amountMinor);
+      ps.setString(6, baseCurrency);
+      ps.setLong(7, amountMinor);
+      ps.setString(8, baseCurrency);
       ps.executeUpdate();
     }
   }
