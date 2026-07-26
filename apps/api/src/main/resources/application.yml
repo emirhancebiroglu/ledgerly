@@ -1,6 +1,17 @@
 spring:
   application:
     name: api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/ledgerly}
+    username: ${POSTGRES_USER:ledgerly}
+    password: ${POSTGRES_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
 
 management:
   endpoints:

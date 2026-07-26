@@ -11,7 +11,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(
+    properties = {
+      "spring.autoconfigure.exclude="
+          + "org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration,"
+          + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
+          + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration"
+    })
 @AutoConfigureMockMvc
 class ApiApplicationTests {
 

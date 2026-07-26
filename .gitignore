@@ -9,6 +9,7 @@
 target/
 !.mvn/wrapper/maven-wrapper.jar
 *.class
+.jqwik-database
 
 # Python
 __pycache__/
