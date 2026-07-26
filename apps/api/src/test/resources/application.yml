@@ -1,0 +1,3 @@
+ledgerly:
+  auth:
+    jwt-secret: test-only-secret-not-for-production-use-0123456789

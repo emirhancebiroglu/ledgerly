@@ -1,5 +1,7 @@
 package com.ledgerly.api;
 
+import com.ledgerly.api.auth.InvalidCredentialsException;
+import com.ledgerly.api.auth.InvalidRefreshTokenException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -13,6 +15,11 @@ public class ApiExceptionHandler {
   @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
   public ProblemDetail handleNotFound() {
     return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Resource not found");
+  }
+
+  @ExceptionHandler({InvalidCredentialsException.class, InvalidRefreshTokenException.class})
+  public ProblemDetail handleUnauthorized(RuntimeException exception) {
+    return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage());
   }
 
   @ExceptionHandler(Exception.class)
