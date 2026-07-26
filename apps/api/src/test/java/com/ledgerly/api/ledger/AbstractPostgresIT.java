@@ -5,21 +5,28 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+/**
+ * Singleton-container pattern: one Postgres container for the whole JVM, started once and never
+ * stopped by JUnit — Testcontainers' Ryuk sidecar reaps it at JVM exit. Letting {@code
+ * @Testcontainers}/{@code @Container} manage the lifecycle instead starts and stops a fresh
+ * container per test class, which is both slow and, on this machine, prone to connection
+ * timeouts under the resulting churn.
+ */
 @Tag("integration")
-@Testcontainers
 @SpringBootTest
 abstract class AbstractPostgresIT {
 
-  @Container
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"))
           .withDatabaseName("ledgerly_test")
           .withUsername("ledgerly")
           .withPassword("ledgerly");
+
+  static {
+    POSTGRES.start();
+  }
 
   @DynamicPropertySource
   static void datasourceProperties(DynamicPropertyRegistry registry) {

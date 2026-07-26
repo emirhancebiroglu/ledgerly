@@ -50,6 +50,7 @@ class LedgerBalanceConstraintIT extends AbstractPostgresIT {
       insertEntry(connection, txId, accountB, "CREDIT", 900);
 
       assertThatThrownBy(connection::commit).isInstanceOf(SQLException.class);
+      connection.rollback();
     }
   }
 
