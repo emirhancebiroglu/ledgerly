@@ -10,9 +10,10 @@ version, update this file in the same commit.
 | Spring Boot | 3.5.x | M1 T2 |
 | Python | 3.12.0 | M1 T1 |
 | Node.js | 24.14.0 | M1 T1 |
-| Next.js | TBD — set at T4 scaffold | M1 T4 |
-| shadcn/ui | TBD — set at T4 scaffold | M1 T4 |
+| Next.js | 16.2.12 | M1 T4 |
+| shadcn/ui (CLI) | 4.15.0 | M1 T4 |
 | PostgreSQL (pgvector image) | `pgvector/pgvector:pg17` | M1 T2 |
 | api base image | `eclipse-temurin:21.0.11_10-jdk-jammy` (build), `eclipse-temurin:21.0.11_10-jre-jammy` (runtime) | M1 T2 |
 | FastAPI | 0.115.6 | M1 T3 |
 | ai base image | `python:3.12.8-slim-bookworm` | M1 T3 |
+| web base image | `node:24.14.0-slim` | M1 T4 |

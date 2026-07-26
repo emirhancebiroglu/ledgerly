@@ -32,5 +32,15 @@ services:
     ports:
       - "${AI_PORT:-8000}:8000"
 
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+
 volumes:
   postgres-data:
