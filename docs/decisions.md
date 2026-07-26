@@ -5,6 +5,34 @@ that replaced it.
 
 ---
 
+## 2026-07-26 — Java 21 over 17 for `api`
+
+**Context.** The local machine had Temurin 17 installed; the milestone plan hedged "21 preferred,
+17 is fine — no virtual-thread dependency yet." M1 T2 needed `maven.compiler.release` set to one
+value or the other before the first build, not decided by a failing build.
+
+**Decision.** Install Eclipse Temurin 21 alongside 17, and pin `maven.compiler.release=21` in
+`apps/api/pom.xml`.
+
+**Why.** Virtual threads matter for the specific async-LLM-call problem this project already
+anticipates (`api` calling `ai`, `ai` calling an LLM provider, at M4/M5) — blocking I/O over a
+thread-per-request model gets expensive under that pattern, and virtual threads remove the cost of
+matching thread count to concurrent request count. Spring Boot 3.5, the version already chosen for
+this project, primarily targets 21. Render's containerized deploy at M10 carries its own JDK
+regardless, so the local machine's prior default does not constrain the decision.
+
+**Consequence.** `docs/versions.md` pins Java to 21.0.11+10. The M2 consequence: Testcontainers is
+required for integration tests (H2 accepts SQL Postgres rejects, so H2-backed tests would pass and
+production would fail) — datasource and schema work is deferred to M2 regardless of JDK version,
+but the JDK choice is made now so M2 does not inherit an undecided dependency.
+
+**Alternatives rejected.**
+- *Stay on 17* — the machine's existing default, zero-install-cost. Rejected because it forecloses
+  virtual threads for the M4/M5 async-LLM-call path without buying anything in return; Spring Boot
+  3.5 works on 17 but is built with 21 as the primary target.
+
+---
+
 ## 2026-07-26 — Polyglot split: Spring owns money, FastAPI owns agents
 
 **Context.** The project has to demonstrate backend depth, fullstack ability, and AI engineering
