@@ -1,7 +1,9 @@
 package com.ledgerly.api;
 
+import com.ledgerly.api.auth.CrossOrganizationAccessException;
 import com.ledgerly.api.auth.InvalidCredentialsException;
 import com.ledgerly.api.auth.InvalidRefreshTokenException;
+import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -12,7 +14,12 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
-  @ExceptionHandler({NoHandlerFoundException.class, NoResourceFoundException.class})
+  @ExceptionHandler({
+    NoHandlerFoundException.class,
+    NoResourceFoundException.class,
+    NoSuchElementException.class,
+    CrossOrganizationAccessException.class
+  })
   public ProblemDetail handleNotFound() {
     return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Resource not found");
   }
