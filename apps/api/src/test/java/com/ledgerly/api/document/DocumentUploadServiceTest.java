@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.audit.AuditService;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
+import com.ledgerly.api.storage.BlobRollbackCleanup;
 import com.ledgerly.api.storage.StorageClient;
 import com.ledgerly.api.storage.StorageException;
 import java.util.UUID;
@@ -27,6 +28,7 @@ class DocumentUploadServiceTest {
 
   @Mock private DocumentRepository documentRepository;
   @Mock private StorageClient storageClient;
+  @Mock private BlobRollbackCleanup blobRollbackCleanup;
   @Mock private AuditService auditService;
 
   private static final byte[] REAL_PDF =
@@ -36,7 +38,13 @@ class DocumentUploadServiceTest {
   void aStorageFailureBeforeTheRowIsWrittenLeavesNoRowAndPropagates() {
     when(storageClient.store(any())).thenThrow(new StorageException("disk full", null));
     DocumentUploadService service =
-        new DocumentUploadService(documentRepository, storageClient, auditService, new ObjectMapper(), 10_485_760);
+        new DocumentUploadService(
+            documentRepository,
+            storageClient,
+            blobRollbackCleanup,
+            auditService,
+            new ObjectMapper(),
+            10_485_760);
     AuthenticatedPrincipal principal = new AuthenticatedPrincipal(UUID.randomUUID(), UUID.randomUUID());
 
     assertThatThrownBy(() -> service.upload(REAL_PDF, "invoice.pdf", principal))

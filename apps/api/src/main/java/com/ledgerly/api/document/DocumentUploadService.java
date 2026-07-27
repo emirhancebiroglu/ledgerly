@@ -5,17 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.audit.AuditService;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.correlation.CorrelationIds;
+import com.ledgerly.api.storage.BlobRollbackCleanup;
 import com.ledgerly.api.storage.StorageClient;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Accepts an upload: identifies it by its bytes, stores the blob, and records the document.
@@ -29,6 +26,7 @@ public class DocumentUploadService {
 
   private final DocumentRepository documentRepository;
   private final StorageClient storageClient;
+  private final BlobRollbackCleanup blobRollbackCleanup;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
   private final long maxBytes;
@@ -36,11 +34,13 @@ public class DocumentUploadService {
   public DocumentUploadService(
       DocumentRepository documentRepository,
       StorageClient storageClient,
+      BlobRollbackCleanup blobRollbackCleanup,
       AuditService auditService,
       ObjectMapper objectMapper,
       @Value("${ledgerly.document.max-bytes:10485760}") long maxBytes) {
     this.documentRepository = documentRepository;
     this.storageClient = storageClient;
+    this.blobRollbackCleanup = blobRollbackCleanup;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
     this.maxBytes = maxBytes;
@@ -66,18 +66,18 @@ public class DocumentUploadService {
                         "Unsupported document type; expected PDF, JPEG or PNG"));
 
     String storageKey = storageClient.store(content);
-    registerBlobCleanupOnRollback(storageKey);
+    blobRollbackCleanup.registerOnRollback(storageKey);
 
     Document document =
         documentRepository.save(
             new Document(
                 principal.organizationId(),
                 principal.userId(),
-                sanitizeFilename(filename),
+                FilenameSanitizer.sanitize(filename, "document"),
                 detected.mediaType(),
                 content.length,
                 storageKey,
-                sha256Hex(content)));
+                ContentHasher.sha256Hex(content)));
     documentRepository.flush();
 
     auditService.record(
@@ -97,61 +97,7 @@ public class DocumentUploadService {
   public Document findForOrganization(UUID documentId, AuthenticatedPrincipal principal) {
     return documentRepository
         .findByIdAndOrganizationId(documentId, principal.organizationId())
-        .orElseThrow(
-            () -> new java.util.NoSuchElementException("Document not found: " + documentId));
-  }
-
-  /**
-   * Keeps a display name only. The stored name is never used to build a path — the storage key is
-   * the only handle — but a name carrying separators or control characters would still be a hazard
-   * for any downstream consumer that renders or re-serves it.
-   */
-  private String sanitizeFilename(String filename) {
-    if (filename == null || filename.isBlank()) {
-      return "document";
-    }
-    String withoutPath = filename.replaceAll(".*[/\\\\]", "");
-    String cleaned = withoutPath.replaceAll("[\\p{Cntrl}]", "").trim();
-    if (cleaned.isEmpty() || ".".equals(cleaned) || "..".equals(cleaned)) {
-      return "document";
-    }
-    return cleaned.length() > 255 ? cleaned.substring(0, 255) : cleaned;
-  }
-
-  private String sha256Hex(byte[] content) {
-    try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 is required but unavailable", e);
-    }
-  }
-
-  /**
-   * The blob is written before the row that references it commits. If the transaction rolls back
-   * after that write — e.g. the audit insert fails — the blob would otherwise be orphaned forever,
-   * since its key never reaches a committed row and nothing else ever reaps it. Registering the
-   * delete as an after-rollback synchronization means it only fires when the transaction actually
-   * fails, never on a successful commit.
-   *
-   * <p>{@code upload} is always {@code @Transactional}, so a synchronization is always active in
-   * practice — but {@code registerSynchronization} throws {@link IllegalStateException} if it
-   * isn't, which would turn a successful store into a spurious failure. This is purely a guard
-   * against that: outside a transaction there is nothing to roll back, so cleanup is skipped
-   * rather than attempted immediately.
-   */
-  private void registerBlobCleanupOnRollback(String storageKey) {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      return;
-    }
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCompletion(int status) {
-            if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-              storageClient.delete(storageKey);
-            }
-          }
-        });
+        .orElseThrow(() -> new NoSuchElementException("Document not found: " + documentId));
   }
 
   /** Audit payload deliberately excludes the storage key and the document's contents. */

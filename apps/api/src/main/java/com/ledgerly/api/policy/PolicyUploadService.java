@@ -3,15 +3,15 @@ package com.ledgerly.api.policy;
 import com.ledgerly.api.audit.AuditService;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.correlation.CorrelationIds;
+import com.ledgerly.api.document.ContentHasher;
 import com.ledgerly.api.document.DetectedContentType;
 import com.ledgerly.api.document.DocumentTooLargeException;
+import com.ledgerly.api.document.FilenameSanitizer;
 import com.ledgerly.api.document.UnsupportedDocumentTypeException;
+import com.ledgerly.api.storage.BlobRollbackCleanup;
 import com.ledgerly.api.storage.StorageClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -19,8 +19,6 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Accepts a policy document upload, stores the blob, asks `ai` to chunk and embed it, and persists
@@ -35,6 +33,7 @@ public class PolicyUploadService {
   private final PolicyDocumentRepository policyDocumentRepository;
   private final PolicyChunkRepository policyChunkRepository;
   private final StorageClient storageClient;
+  private final BlobRollbackCleanup blobRollbackCleanup;
   private final PolicyEmbeddingClient policyEmbeddingClient;
   private final EmbedPolicyResponseMapper responseMapper;
   private final AuditService auditService;
@@ -45,6 +44,7 @@ public class PolicyUploadService {
       PolicyDocumentRepository policyDocumentRepository,
       PolicyChunkRepository policyChunkRepository,
       StorageClient storageClient,
+      BlobRollbackCleanup blobRollbackCleanup,
       PolicyEmbeddingClient policyEmbeddingClient,
       EmbedPolicyResponseMapper responseMapper,
       AuditService auditService,
@@ -53,6 +53,7 @@ public class PolicyUploadService {
     this.policyDocumentRepository = policyDocumentRepository;
     this.policyChunkRepository = policyChunkRepository;
     this.storageClient = storageClient;
+    this.blobRollbackCleanup = blobRollbackCleanup;
     this.policyEmbeddingClient = policyEmbeddingClient;
     this.responseMapper = responseMapper;
     this.auditService = auditService;
@@ -110,16 +111,16 @@ public class PolicyUploadService {
     }
 
     String storageKey = storageClient.store(content);
-    registerBlobCleanupOnRollback(storageKey);
+    blobRollbackCleanup.registerOnRollback(storageKey);
 
     PolicyDocument document =
         policyDocumentRepository.save(
             new PolicyDocument(
                 principal.organizationId(),
                 principal.userId(),
-                sanitizeFilename(filename),
+                FilenameSanitizer.sanitize(filename, "policy"),
                 storageKey,
-                sha256Hex(content)));
+                ContentHasher.sha256Hex(content)));
     policyDocumentRepository.flush();
 
     auditService.record(
@@ -199,41 +200,6 @@ public class PolicyUploadService {
       result[i] = values.get(i).floatValue();
     }
     return result;
-  }
-
-  private String sanitizeFilename(String filename) {
-    if (filename == null || filename.isBlank()) {
-      return "policy";
-    }
-    String withoutPath = filename.replaceAll(".*[/\\\\]", "");
-    String cleaned = withoutPath.replaceAll("[\\p{Cntrl}]", "").trim();
-    if (cleaned.isEmpty() || ".".equals(cleaned) || "..".equals(cleaned)) {
-      return "policy";
-    }
-    return cleaned.length() > 255 ? cleaned.substring(0, 255) : cleaned;
-  }
-
-  private String sha256Hex(byte[] content) {
-    try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
-    } catch (NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 is required but unavailable", e);
-    }
-  }
-
-  private void registerBlobCleanupOnRollback(String storageKey) {
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      return;
-    }
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCompletion(int status) {
-            if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
-              storageClient.delete(storageKey);
-            }
-          }
-        });
   }
 
   private String auditPayload(PolicyDocument document) {
