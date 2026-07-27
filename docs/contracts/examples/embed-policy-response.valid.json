@@ -1,0 +1,17 @@
+{
+  "policy_document_id": "3d2f7c6a-9b1e-4f3a-8c2d-1a2b3c4d5e6f",
+  "model": "fake-embedding-v1",
+  "embedding_dimensions": 8,
+  "chunks": [
+    {
+      "chunk_index": 0,
+      "chunk_text": "Travel expenses over 500 EUR require manager approval.",
+      "embedding": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    },
+    {
+      "chunk_index": 1,
+      "chunk_text": "Meals are reimbursed up to 50 EUR per day while travelling.",
+      "embedding": [0.2, 0.1, 0.4, 0.3, 0.6, 0.5, 0.8, 0.7]
+    }
+  ]
+}

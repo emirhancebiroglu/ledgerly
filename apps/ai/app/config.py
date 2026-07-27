@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     # PDF providers render PDF pages to PNG first — see app.llm.pdf_to_images.
     llm_supports_native_pdf: bool = False
 
+    # Which EmbeddingClient adapter to use. "litellm" is the real M6 adapter; "fake" keeps a
+    # deterministic stub available for tests and offline runs, same split as llm_provider above.
+    embedding_provider: str = "litellm"
+    embedding_model: str = "anthropic/qwen3.7-plus"
+    embedding_api_key: str | None = None
+    embedding_dimensions: int = 1536
+    embedding_timeout_seconds: float = 30.0
+    embedding_api_base: str | None = "https://opencode.ai/zen/go"
+
 
 settings = Settings()
 
@@ -51,4 +60,10 @@ if settings.llm_provider == "litellm" and not settings.llm_api_key:
     raise RuntimeError(
         "AI_LLM_API_KEY is required when AI_LLM_PROVIDER=litellm. Set it before starting the "
         "service, or set AI_LLM_PROVIDER=fake for a stub run."
+    )
+
+if settings.embedding_provider == "litellm" and not settings.embedding_api_key:
+    raise RuntimeError(
+        "AI_EMBEDDING_API_KEY is required when AI_EMBEDDING_PROVIDER=litellm. Set it before "
+        "starting the service, or set AI_EMBEDDING_PROVIDER=fake for a stub run."
     )

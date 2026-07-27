@@ -1,6 +1,7 @@
 package com.ledgerly.api.document;
 
 import com.ledgerly.api.correlation.CorrelationIdHolder;
+import com.ledgerly.api.expense.ExpensePostingService;
 import com.ledgerly.api.storage.StorageClient;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -19,8 +20,10 @@ import org.springframework.stereotype.Component;
  * open across a network call to a service that might stall is how one slow dependency exhausts the
  * connection pool.
  *
- * <p><strong>No ledger entry is written at M4/M5 — by design.</strong> A valid proposal reaches
- * {@code EXTRACTED} and stops there; posting arrives at M6, behind this same gate.
+ * <p>A proposal that fails validation reaches {@code NEEDS_REVIEW} and stops there — no
+ * categorization call, no ledger entry (M4's trust-boundary gate). A proposal that passes reaches
+ * {@code EXTRACTED} and is handed to {@link ExpensePostingService}, which either posts a balanced
+ * ledger transaction or routes a low-confidence categorization to review (M6 T6/T7).
  */
 @Component
 public class DocumentExtractionWorker {
@@ -32,18 +35,21 @@ public class DocumentExtractionWorker {
   private final ProposalMapper proposalMapper;
   private final ExtractionProposalValidator validator;
   private final DocumentStatusTransitions transitions;
+  private final ExpensePostingService expensePostingService;
 
   public DocumentExtractionWorker(
       StorageClient storageClient,
       ExtractionClient extractionClient,
       ProposalMapper proposalMapper,
       ExtractionProposalValidator validator,
-      DocumentStatusTransitions transitions) {
+      DocumentStatusTransitions transitions,
+      ExpensePostingService expensePostingService) {
     this.storageClient = storageClient;
     this.extractionClient = extractionClient;
     this.proposalMapper = proposalMapper;
     this.validator = validator;
     this.transitions = transitions;
+    this.expensePostingService = expensePostingService;
   }
 
   /**
@@ -94,7 +100,28 @@ public class DocumentExtractionWorker {
     }
 
     ProposalValidationResult validation = validator.validate(proposal);
-    return transitions.recordOutcome(
-        documentId, organizationId, proposalMapper.toJson(proposal), validation);
+    Document outcome =
+        transitions.recordOutcome(
+            documentId, organizationId, proposalMapper.toJson(proposal), validation);
+
+    if (outcome.getStatus() == DocumentStatus.EXTRACTED) {
+      categorizeAndPost(documentId, organizationId, document.getUploadedBy(), proposal);
+    }
+    return outcome;
+  }
+
+  /**
+   * Categorization/posting failures are logged, not fatal to the pipeline run: the document has
+   * already reached its correct terminal status ({@code EXTRACTED}) regardless of whether an
+   * expense could be categorized from it. A future re-processing pass — not built at M6 — would be
+   * the way to retry categorization for a document stuck without an expense.
+   */
+  private void categorizeAndPost(
+      UUID documentId, UUID organizationId, UUID actor, ExtractionProposal proposal) {
+    try {
+      expensePostingService.categorizeAndPost(organizationId, documentId, actor, proposal);
+    } catch (RuntimeException e) {
+      log.warn("Categorization failed for document {}: {}", documentId, e.toString());
+    }
   }
 }
