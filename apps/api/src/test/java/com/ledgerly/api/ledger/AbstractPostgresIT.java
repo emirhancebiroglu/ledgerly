@@ -20,7 +20,7 @@ import org.testcontainers.utility.DockerImageName;
  */
 @Tag("integration")
 @SpringBootTest
-abstract class AbstractPostgresIT {
+public abstract class AbstractPostgresIT {
 
   static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"))
