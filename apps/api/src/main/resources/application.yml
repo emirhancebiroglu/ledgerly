@@ -31,6 +31,12 @@ ledgerly:
     root: ${STORAGE_ROOT:./var/storage}
   document:
     max-bytes: ${DOCUMENT_MAX_BYTES:10485760}
+  extraction:
+    # 1,000,000.00 in minor units. Above this a human signs off, however consistent the
+    # extraction looked — a misplaced decimal is most dangerous when everything else adds up.
+    amount-ceiling-minor: ${EXTRACTION_AMOUNT_CEILING_MINOR:100000000}
+    max-age-years: ${EXTRACTION_MAX_AGE_YEARS:10}
+    max-future-days: ${EXTRACTION_MAX_FUTURE_DAYS:1}
 
 logging:
   pattern:
