@@ -57,12 +57,25 @@ public class ExpenseReviewTransactions {
   }
 
   /**
-   * @param expenseId re-fetched and locked inside this transaction rather than trusting the
-   *     caller's already-loaded {@link Expense} — the NEEDS_REVIEW check in {@link
-   *     Expense#resolve} must run against the current committed row, not a copy that might be
-   *     stale under concurrent approval attempts.
    * @param category the category to post against — the AI's original choice for approve, the
    *     human's replacement for correct.
+   * @throws ExpenseAlreadyResolvedException if the expense was not {@code NEEDS_REVIEW} when
+   *     {@link ExpenseRepository#resolveIfNeedsReview} ran. That single atomic {@code UPDATE ...
+   *     WHERE status = 'NEEDS_REVIEW'}, not the read below, is what makes this safe under
+   *     concurrent approve/correct calls carrying different {@code Idempotency-Key} values (which
+   *     the M3 idempotency filter cannot dedup, since different keys are different claims): only
+   *     one such statement can ever match a given row, so exactly one caller's update takes
+   *     effect no matter how two requests interleave. A read-then-write split — even guarded by
+   *     {@code SELECT ... FOR UPDATE} — does not give this guarantee here, since Hibernate's
+   *     locked read can return a Java object holding the pre-transition status to more than one
+   *     concurrent transaction depending on lock/commit timing; folding the status guard into the
+   *     write itself removes that dependency entirely.
+   *
+   *     <p>The ledger transaction is still built and saved before this check runs. A losing
+   *     caller's transaction row is a harmless orphan — internally balanced, referenced by no
+   *     expense, invisible to any account-balance query — rolled back with the rest of this
+   *     {@code @Transactional} method rather than left behind, since the throw below aborts the
+   *     whole method.
    */
   @Transactional
   public Expense resolve(
@@ -71,9 +84,6 @@ public class ExpenseReviewTransactions {
         expenseRepository
             .findByIdAndOrganizationId(expenseId, organizationId)
             .orElseThrow(() -> new NoSuchElementException("Expense not found: " + expenseId));
-    if (expense.getStatus() != ExpenseStatus.NEEDS_REVIEW) {
-      throw new ExpenseAlreadyResolvedException(expenseId);
-    }
 
     String before = auditPayload(expense);
 
@@ -96,20 +106,29 @@ public class ExpenseReviewTransactions {
                     liabilityAccountId, EntryDirection.CREDIT, amount, amount, BigDecimal.ONE)));
     ledgerTransactionRepository.save(transaction);
 
-    expense.resolve(category.getId(), transaction.id());
-    expenseRepository.flush();
+    int rowsResolved =
+        expenseRepository.resolveIfNeedsReview(
+            expenseId, organizationId, category.getId(), transaction.id());
+    if (rowsResolved == 0) {
+      throw new ExpenseAlreadyResolvedException(expenseId);
+    }
+
+    Expense resolved =
+        expenseRepository
+            .findByIdAndOrganizationId(expenseId, organizationId)
+            .orElseThrow(() -> new NoSuchElementException("Expense not found: " + expenseId));
 
     auditService.record(
         organizationId,
         actor,
         action,
         "expense",
-        expense.getId(),
+        resolved.getId(),
         before,
-        auditPayload(expense),
+        auditPayload(resolved),
         CorrelationIds.current());
 
-    return expense;
+    return resolved;
   }
 
   private String auditPayload(Expense expense) {

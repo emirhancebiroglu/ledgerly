@@ -12,7 +12,13 @@ import com.ledgerly.api.ledger.AbstractPostgresIT;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.crypto.SecretKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -123,6 +129,80 @@ class ExpenseReviewIT extends AbstractPostgresIT {
   }
 
   @Test
+  void concurrentApprovesWithDifferentIdempotencyKeysPostExactlyOnce() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    UUID expenseId = insertNeedsReviewExpense(org, categoryId, "Acme Corp", 5000);
+    // Pre-create both ledger accounts resolve() looks up: this test isolates the concurrency
+    // guarantee on expense resolution itself, not LedgerAccountRepository.findOrCreate's own
+    // separate first-use race (out of scope for this task).
+    String categoryName =
+        jdbcTemplate.queryForObject(
+            "SELECT name FROM category WHERE id = ?", String.class, categoryId);
+    jdbcTemplate.update(
+        "INSERT INTO account (id, organization_id, name, account_type, currency) VALUES (?, ?, ?, 'EXPENSE', 'EUR')",
+        UUID.randomUUID(),
+        org,
+        categoryName);
+    jdbcTemplate.update(
+        "INSERT INTO account (id, organization_id, name, account_type, currency) VALUES (?, ?, 'Accounts Payable', 'LIABILITY', 'EUR')",
+        UUID.randomUUID(),
+        org);
+
+    // Different Idempotency-Key values are different claims as far as the idempotency filter is
+    // concerned — it cannot dedup these. Only the atomic conditional UPDATE inside
+    // ExpenseReviewTransactions.resolve can prevent both racing requests from posting their own
+    // ledger transaction.
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      List<Callable<Integer>> tasks =
+          List.of(
+              () ->
+                  mockMvc
+                      .perform(
+                          post("/api/v1/expenses/" + expenseId + "/approve")
+                              .header("Authorization", "Bearer " + token)
+                              .header("Idempotency-Key", "race-key-a-" + System.nanoTime()))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus(),
+              () ->
+                  mockMvc
+                      .perform(
+                          post("/api/v1/expenses/" + expenseId + "/approve")
+                              .header("Authorization", "Bearer " + token)
+                              .header("Idempotency-Key", "race-key-b-" + System.nanoTime()))
+                      .andReturn()
+                      .getResponse()
+                      .getStatus());
+
+      List<Future<Integer>> futures = executor.invokeAll(tasks);
+      int okCount = 0;
+      int conflictCount = 0;
+      for (Future<Integer> future : futures) {
+        int status = future.get();
+        if (status == 200) {
+          okCount++;
+        } else if (status == 409) {
+          conflictCount++;
+        }
+      }
+
+      assertThat(okCount).isEqualTo(1);
+      assertThat(conflictCount).isEqualTo(1);
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
+
+    Integer transactionCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM ledger_transaction WHERE organization_id = ?", Integer.class, org);
+    assertThat(transactionCount).isEqualTo(1);
+  }
+
+  @Test
   void anotherOrganizationsExpenseReturns404NotAConflict() throws Exception {
     String tokenA = registerAndGetAccessToken();
     String tokenB = registerAndGetAccessToken();
@@ -191,6 +271,33 @@ class ExpenseReviewIT extends AbstractPostgresIT {
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'expense' AND entity_id = ?::uuid "
                 + "AND action = 'APPROVE'",
+            Integer.class,
+            expenseId.toString());
+    assertThat(auditCount).isEqualTo(1);
+  }
+
+  @Test
+  void correctWritesAnAuditRow() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID originalCategory = createCategory(org);
+    UUID correctedCategory = createCategory(org);
+    UUID expenseId = insertNeedsReviewExpense(org, originalCategory, "Acme Corp", 1000);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/correct")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "key-" + System.nanoTime())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(new CorrectExpenseRequest(correctedCategory))))
+        .andExpect(status().isOk());
+
+    Integer auditCount =
+        jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'expense' AND entity_id = ?::uuid "
+                + "AND action = 'CORRECT'",
             Integer.class,
             expenseId.toString());
     assertThat(auditCount).isEqualTo(1);

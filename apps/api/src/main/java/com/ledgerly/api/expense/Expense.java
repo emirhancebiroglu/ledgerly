@@ -37,11 +37,13 @@ public class Expense {
   private String vendor;
 
   /**
-   * Updatable, unlike the rest of this entity's history-of-record fields: a review-queue
-   * resolution (approve keeps the AI's choice, correct replaces it) is the one legitimate
-   * post-creation write, made by {@link ExpenseReviewTransactions}.
+   * {@code updatable = false} here only means Hibernate's entity dirty-checking never writes this
+   * column — it does not stop the schema from changing it. Review-queue resolution (approve keeps
+   * the AI's choice, correct replaces it) changes {@code category_id} via {@link
+   * ExpenseRepository#resolveIfNeedsReview}, a bulk {@code UPDATE} that bypasses the persistence
+   * context entirely, same as every other field this class otherwise never lets Java mutate.
    */
-  @Column(name = "category_id", nullable = false)
+  @Column(name = "category_id", nullable = false, updatable = false)
   private UUID categoryId;
 
   @Column(name = "ledger_transaction_id")
@@ -137,24 +139,6 @@ public class Expense {
         categorizationConfidence,
         citation,
         ExpenseStatus.NEEDS_REVIEW);
-  }
-
-  /**
-   * Resolves a {@code NEEDS_REVIEW} expense to {@code POSTED} against the given category and the
-   * ledger transaction just built for it — a human approval (category unchanged) or correction
-   * (category replaced) from {@link ExpenseReviewTransactions}. Confidence and citation are left
-   * as the AI produced them; they describe what the model proposed, not what the human decided.
-   *
-   * @throws ExpenseAlreadyResolvedException if this expense is not currently {@code NEEDS_REVIEW}
-   *     — the domain enforces "resolved exactly once," not just the service calling it once.
-   */
-  public void resolve(UUID categoryId, UUID ledgerTransactionId) {
-    if (status != ExpenseStatus.NEEDS_REVIEW) {
-      throw new ExpenseAlreadyResolvedException(id);
-    }
-    this.categoryId = categoryId;
-    this.ledgerTransactionId = ledgerTransactionId;
-    this.status = ExpenseStatus.POSTED;
   }
 
   public UUID getId() {
