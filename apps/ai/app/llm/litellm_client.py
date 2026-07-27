@@ -10,9 +10,19 @@ from __future__ import annotations
 import base64
 
 import litellm
-from litellm.exceptions import APIError, RateLimitError, ServiceUnavailableError, Timeout
+from litellm.exceptions import (
+    APIConnectionError,
+    APIError,
+    RateLimitError,
+    ServiceUnavailableError,
+    Timeout,
+)
 
-from app.llm.client import LlmClient, LlmError, VisionPrompt
+from app.llm.client import LlmClient, VisionPrompt
+from app.llm.resilient import NonRetryableLlmError, RetryableLlmError
+
+# Failures worth retrying: the request never reached a stable answer.
+_RETRYABLE_EXCEPTIONS = (Timeout, RateLimitError, ServiceUnavailableError, APIConnectionError)
 
 
 class LiteLlmClient(LlmClient):
@@ -56,14 +66,20 @@ class LiteLlmClient(LlmClient):
                 api_key=self._api_key,
                 timeout=self._timeout_seconds,
             )
-        except (APIError, RateLimitError, ServiceUnavailableError, Timeout) as error:
-            raise LlmError(str(error)) from error
+        except _RETRYABLE_EXCEPTIONS as error:
+            raise RetryableLlmError(str(error)) from error
+        except APIError as error:
+            # A 5xx is transient; a 4xx (bad request, auth, not-found model) will fail identically
+            # on retry.
+            if error.status_code is not None and error.status_code >= 500:
+                raise RetryableLlmError(str(error)) from error
+            raise NonRetryableLlmError(str(error)) from error
         except litellm.exceptions.LiteLLMError as error:
             # Any other LiteLLM-classified failure — still never a provider-specific exception
-            # escaping the port.
-            raise LlmError(str(error)) from error
+            # escaping the port, and not assumed retryable without evidence it's transient.
+            raise NonRetryableLlmError(str(error)) from error
 
         text = response.choices[0].message.content
         if not text:
-            raise LlmError("Model returned an empty response")
+            raise NonRetryableLlmError("Model returned an empty response")
         return text

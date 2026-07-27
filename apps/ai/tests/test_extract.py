@@ -53,9 +53,9 @@ def test_the_fake_llm_client_is_what_produces_the_proposal():
     assert response.json()["model"] == FakeLlmClient.MODEL_NAME
 
 
-def test_no_real_llm_adapter_is_wired_yet():
-    """M4 ships the port and the stub only; the provider decision belongs to M5."""
-    assert settings.llm_provider == "fake"
+def test_the_fake_provider_still_resolves_alongside_the_real_adapter():
+    """M5 wires a real adapter, but `fake` must keep resolving for tests and offline runs."""
+    assert settings.llm_provider == "fake"  # forced by conftest.py for this test process
 
 
 def test_per_field_confidence_is_present_on_every_extracted_field():
