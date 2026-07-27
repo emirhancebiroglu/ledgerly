@@ -4,9 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.audit.AuditService;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
-import com.ledgerly.api.correlation.CorrelationIdHolder;
+import com.ledgerly.api.correlation.CorrelationIds;
 import com.ledgerly.api.storage.StorageClient;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -15,6 +14,8 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * Accepts an upload: identifies it by its bytes, stores the blob, and records the document.
@@ -65,6 +66,7 @@ public class DocumentUploadService {
                         "Unsupported document type; expected PDF, JPEG or PNG"));
 
     String storageKey = storageClient.store(content);
+    registerBlobCleanupOnRollback(storageKey);
 
     Document document =
         documentRepository.save(
@@ -86,7 +88,7 @@ public class DocumentUploadService {
         document.getId(),
         null,
         auditPayload(document),
-        correlationId());
+        CorrelationIds.current());
 
     return document;
   }
@@ -124,6 +126,34 @@ public class DocumentUploadService {
     }
   }
 
+  /**
+   * The blob is written before the row that references it commits. If the transaction rolls back
+   * after that write — e.g. the audit insert fails — the blob would otherwise be orphaned forever,
+   * since its key never reaches a committed row and nothing else ever reaps it. Registering the
+   * delete as an after-rollback synchronization means it only fires when the transaction actually
+   * fails, never on a successful commit.
+   *
+   * <p>{@code upload} is always {@code @Transactional}, so a synchronization is always active in
+   * practice — but {@code registerSynchronization} throws {@link IllegalStateException} if it
+   * isn't, which would turn a successful store into a spurious failure. This is purely a guard
+   * against that: outside a transaction there is nothing to roll back, so cleanup is skipped
+   * rather than attempted immediately.
+   */
+  private void registerBlobCleanupOnRollback(String storageKey) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCompletion(int status) {
+            if (status == TransactionSynchronization.STATUS_ROLLED_BACK) {
+              storageClient.delete(storageKey);
+            }
+          }
+        });
+  }
+
   /** Audit payload deliberately excludes the storage key and the document's contents. */
   private String auditPayload(Document document) {
     try {
@@ -136,18 +166,6 @@ public class DocumentUploadService {
               "status", document.getStatus().name()));
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Failed to serialize document for audit trail", e);
-    }
-  }
-
-  private UUID correlationId() {
-    String current = CorrelationIdHolder.current();
-    if (current == null) {
-      return UUID.randomUUID();
-    }
-    try {
-      return UUID.fromString(current);
-    } catch (IllegalArgumentException notAUuid) {
-      return UUID.nameUUIDFromBytes(current.getBytes(StandardCharsets.UTF_8));
     }
   }
 }

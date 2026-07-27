@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.contracts import EXTRACT_REQUEST_SCHEMA, load_schema
 from app.extraction import ExtractionFailedError, ExtractionService
 from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
 from app.llm.client import LlmClient
@@ -26,8 +27,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Media types `ai` will attempt to read. Mirrors the enum in the shared extract-request schema.
-SUPPORTED_CONTENT_TYPES = frozenset({"application/pdf", "image/jpeg", "image/png"})
+
+def _load_supported_content_types() -> frozenset[str]:
+    """Media types `ai` will attempt to read — read from the shared contract, not restated here."""
+    try:
+        enum = load_schema(EXTRACT_REQUEST_SCHEMA)["properties"]["content_type"]["enum"]
+    except KeyError as error:
+        raise RuntimeError(
+            f"{EXTRACT_REQUEST_SCHEMA} has no properties.content_type.enum — "
+            "cannot derive the accepted media-type list"
+        ) from error
+    return frozenset(enum)
+
+
+SUPPORTED_CONTENT_TYPES = _load_supported_content_types()
 
 
 def get_llm_client() -> LlmClient:

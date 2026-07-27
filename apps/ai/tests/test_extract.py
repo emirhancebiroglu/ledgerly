@@ -1,5 +1,7 @@
 """`POST /extract` — the `ai` side of the M4 contract."""
 
+import importlib
+import json
 import uuid
 
 import pytest
@@ -7,7 +9,7 @@ from fastapi.testclient import TestClient
 from jsonschema import Draft202012Validator
 
 from app.config import settings
-from app.contracts import EXTRACTION_PROPOSAL_SCHEMA, load_schema
+from app.contracts import EXTRACT_REQUEST_SCHEMA, EXTRACTION_PROPOSAL_SCHEMA, contracts_directory, load_schema
 from app.extraction import ExtractionFailedError, ExtractionService
 from app.llm import FakeLlmClient
 from app.llm.client import LlmClient, LlmError, VisionPrompt
@@ -101,6 +103,68 @@ def test_an_unsupported_content_type_returns_422():
     response = post_extract(content_type="application/zip")
 
     assert response.status_code == 422
+
+
+def test_supported_content_types_are_derived_from_the_shared_schema():
+    from app.main import SUPPORTED_CONTENT_TYPES
+
+    assert SUPPORTED_CONTENT_TYPES == {"application/pdf", "image/jpeg", "image/png"}
+
+
+def test_an_html_upload_is_rejected_regardless_of_declared_content_type():
+    response = post_extract(content_type="text/html")
+
+    assert response.status_code == 422
+
+
+def test_the_accepted_set_is_genuinely_read_from_the_schema_not_coincidentally_equal(
+    tmp_path, monkeypatch
+):
+    """Rewrite the on-disk schema to drop PNG and prove `main` actually reads it."""
+    schema_path = contracts_directory() / EXTRACT_REQUEST_SCHEMA
+    original_bytes = schema_path.read_bytes()
+    narrowed = json.loads(original_bytes)
+    narrowed["properties"]["content_type"]["enum"] = ["application/pdf", "image/jpeg"]
+
+    schema_path.write_text(json.dumps(narrowed), encoding="utf-8")
+    try:
+        load_schema.cache_clear()
+        import app.main as main_module
+
+        importlib.reload(main_module)
+
+        assert "image/png" not in main_module.SUPPORTED_CONTENT_TYPES
+
+        reloaded_client = TestClient(main_module.app)
+        response = reloaded_client.post(
+            "/extract",
+            files={"file": ("invoice.png", PDF_BYTES, "image/png")},
+            data={"document_id": str(uuid.uuid4()), "content_type": "image/png"},
+        )
+        assert response.status_code == 422
+    finally:
+        schema_path.write_bytes(original_bytes)
+        load_schema.cache_clear()
+        importlib.reload(main_module)
+
+
+def test_a_schema_missing_the_content_type_enum_fails_loudly_at_import():
+    schema_path = contracts_directory() / EXTRACT_REQUEST_SCHEMA
+    original_bytes = schema_path.read_bytes()
+    broken = json.loads(original_bytes)
+    del broken["properties"]["content_type"]["enum"]
+
+    schema_path.write_text(json.dumps(broken), encoding="utf-8")
+    try:
+        load_schema.cache_clear()
+        import app.main as main_module
+
+        with pytest.raises(RuntimeError, match="content_type.enum"):
+            importlib.reload(main_module)
+    finally:
+        schema_path.write_bytes(original_bytes)
+        load_schema.cache_clear()
+        importlib.reload(main_module)
 
 
 def test_an_oversized_upload_is_rejected_at_the_configured_cap():

@@ -24,4 +24,13 @@ public interface StorageClient {
    * @throws InvalidStorageKeyException if the key is not one this store could have minted
    */
   byte[] read(String key);
+
+  /**
+   * Deletes previously stored content. A no-op, not an error, if nothing exists under the key —
+   * callers use this for best-effort cleanup (e.g. after a rolled-back transaction) where the
+   * blob may never have been reachable in the first place.
+   *
+   * @throws InvalidStorageKeyException if the key is not one this store could have minted
+   */
+  void delete(String key);
 }

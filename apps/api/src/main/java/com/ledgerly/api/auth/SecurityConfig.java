@@ -49,6 +49,13 @@ public class SecurityConfig {
       throws Exception {
     http.csrf(csrf -> csrf.disable())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        // Explicit, not relied on as a framework default: `nosniff` is the control that stops a
+        // polyglot upload (valid magic bytes, HTML payload after the header) from being executed
+        // if a downstream consumer ever renders a stored document inline instead of as an
+        // attachment. `contentTypeOptions` is enabled by default in Spring Security, but pinning
+        // it here means a future security reconfiguration has to deliberately disable it rather
+        // than silently losing it as a side effect of touching unrelated headers.
+        .headers(headers -> headers.contentTypeOptions(contentTypeOptions -> {}))
         // Without this, Spring Security answers an anonymous request to a protected endpoint with
         // 403, which tells a client "you may not" when the truth is "you did not say who you are".
         // A caller holding no credentials needs 401 to know that presenting some would help.

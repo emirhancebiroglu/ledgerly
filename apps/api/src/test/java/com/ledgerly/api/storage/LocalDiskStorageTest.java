@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -136,5 +137,58 @@ class LocalDiskStorageTest {
     // The key is random, not a hash of the content: an attacker who knows the exact bytes still
     // cannot derive the key.
     assertThat(key).isNotEqualTo(UUID.nameUUIDFromBytes(content).toString());
+  }
+
+  @Test
+  void aSuccessfulStoreLeavesExactlyOneFileAndNoTemp() throws IOException {
+    String key = storage.store("bytes".getBytes(StandardCharsets.UTF_8));
+
+    try (Stream<Path> tree = Files.walk(root)) {
+      java.util.List<Path> files = tree.filter(Files::isRegularFile).toList();
+      assertThat(files).hasSize(1);
+      assertThat(files.get(0).getFileName().toString()).isEqualTo(key);
+    }
+    assertThat(countTmpFiles()).isZero();
+  }
+
+  @Test
+  void aWriteFailureLeavesNoTempFileAndStillThrowsStorageException() {
+    String fixedKey = UUID.randomUUID().toString();
+    // The temp file is made read-only the instant after `store` creates it, so the write onto it
+    // fails — this happens strictly after `Files.createTempFile` succeeds, so the `finally`
+    // block's cleanup is genuinely exercised, unlike a collision staged before temp creation.
+    LocalDiskStorage failingStorage =
+        new LocalDiskStorage(root, () -> fixedKey, temp -> temp.toFile().setReadOnly());
+
+    assertThatThrownBy(() -> failingStorage.store("bytes".getBytes(StandardCharsets.UTF_8)))
+        .isInstanceOf(StorageException.class);
+
+    assertThat(countTmpFiles()).isZero();
+  }
+
+  @Test
+  void aMoveFailureLeavesNoTempFileAndStillThrowsStorageException() throws IOException {
+    String fixedKey = UUID.randomUUID().toString();
+    LocalDiskStorage failingStorage = new LocalDiskStorage(root, () -> fixedKey, temp -> {});
+    Path shardDir = root.resolve(fixedKey.substring(0, 2));
+    Files.createDirectories(shardDir);
+    // The move target already exists as a non-empty directory: `Files.move` with
+    // REPLACE_EXISTING fails on every platform in this case, and only after the write succeeded.
+    Path targetAsDir = shardDir.resolve(fixedKey);
+    Files.createDirectories(targetAsDir);
+    Files.writeString(targetAsDir.resolve("occupied"), "blocks replacement");
+
+    assertThatThrownBy(() -> failingStorage.store("bytes".getBytes(StandardCharsets.UTF_8)))
+        .isInstanceOf(StorageException.class);
+
+    assertThat(countTmpFiles()).isZero();
+  }
+
+  private long countTmpFiles() {
+    try (Stream<Path> tree = Files.walk(root)) {
+      return tree.filter(path -> path.toString().endsWith(".tmp")).count();
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 }
