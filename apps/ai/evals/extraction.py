@@ -90,18 +90,29 @@ def print_report(results: list[FixtureResult]) -> bool:
         print(f"{gated_field:>16}", end="")
     print()
 
+    any_group_scored = False
     for group in (*GROUPS, "overall"):
         correct_total = table[group]
         if correct_total[GATED_FIELDS[0]][1] == 0:
             continue
+        any_group_scored = True
         print(f"{group:<12}", end="")
         for gated_field in GATED_FIELDS:
             correct, total = correct_total[gated_field]
             accuracy = correct / total if total else 0.0
             print(f"{correct}/{total} ({accuracy:>5.0%})".rjust(16), end="")
-            if group == "overall" and accuracy < ACCURACY_GATE:
+            # Every group is gated, not just the overall figure — a single weak group (e.g. a
+            # repeated layout dragging down "real") must fail the run even if it's diluted to
+            # above 90% in the combined number.
+            if accuracy < ACCURACY_GATE:
                 gate_passed = False
         print()
+
+    # A run that scored zero fixtures (e.g. invoices/ absent and no public/synthetic present
+    # either) must not pass vacuously — that is "nothing was measured," not "everything passed."
+    if not any_group_scored:
+        gate_passed = False
+        print("No fixtures were scored — failing the gate rather than passing vacuously.")
 
     errors = [r for r in scored if r.error]
     if errors:

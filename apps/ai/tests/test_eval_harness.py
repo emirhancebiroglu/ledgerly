@@ -153,6 +153,35 @@ def test_the_gate_passes_when_accuracy_is_at_or_above_90_percent(tmp_path, capsy
     assert gate_passed is True
 
 
+def test_a_single_weak_group_fails_the_gate_even_when_overall_accuracy_clears_90_percent(tmp_path):
+    """A repeated layout in one group must not be able to hide behind a strong combined number —
+    the gate checks every group present, not just the blended total."""
+    wrong_service = StaticLlmClient(proposal_json(total_minor=99999))  # never matches expected
+    correct_service = StaticLlmClient(proposal_json())
+
+    real_fixtures = [make_fixture(tmp_path / f"real{i}", "real", CORRECT_EXPECTED) for i in range(2)]
+    public_fixtures = [
+        make_fixture(tmp_path / f"public{i}", "public", CORRECT_EXPECTED) for i in range(18)
+    ]
+
+    real_results = [run_fixture(ExtractionService(wrong_service), f) for f in real_fixtures]
+    public_results = [run_fixture(ExtractionService(correct_service), f) for f in public_fixtures]
+
+    table = accuracy_by_group_and_field(real_results + public_results)
+    assert table["overall"]["total_minor"] == (18, 20)  # 90% blended — would pass a naive check
+    assert table["real"]["total_minor"] == (0, 2)  # but real itself is at 0%
+
+    gate_passed = print_report(real_results + public_results)
+
+    assert gate_passed is False
+
+
+def test_a_run_that_scores_zero_fixtures_fails_rather_than_passing_vacuously():
+    gate_passed = print_report([])
+
+    assert gate_passed is False
+
+
 def test_the_report_prints_latency_percentiles(tmp_path, capsys):
     fixtures = [make_fixture(tmp_path / str(i), "real", CORRECT_EXPECTED) for i in range(3)]
     service = ExtractionService(StaticLlmClient(proposal_json()))

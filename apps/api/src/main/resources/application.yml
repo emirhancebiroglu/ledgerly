@@ -37,6 +37,9 @@ ledgerly:
       # markProcessing and the outcome write.
       stuck-after-seconds: ${DOCUMENT_REAPER_STUCK_AFTER_SECONDS:300}
       interval-seconds: ${DOCUMENT_REAPER_INTERVAL_SECONDS:60}
+      # Caps one sweep's candidate SELECT — an outage can strand an unbounded number of documents
+      # in PROCESSING, and this is not obligated to drain all of them in one cycle.
+      batch-size: ${DOCUMENT_REAPER_BATCH_SIZE:500}
   ai:
     base-url: ${AI_BASE_URL:http://localhost:8000}
     # Must clear ai's own LLM call timeout (120s, see apps/ai app/config.py) plus its retries —

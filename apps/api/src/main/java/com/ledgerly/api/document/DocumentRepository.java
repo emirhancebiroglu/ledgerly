@@ -26,9 +26,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
 
   /**
    * The reaper's candidate set. Deliberately not org-scoped, unlike every other query here — a
-   * stuck document is a global operational concern, not a tenant one.
+   * stuck document is a global operational concern, not a tenant one. Paged deliberately, like
+   * {@link #findByOrganizationIdOrderByCreatedAtDesc}: an outage can strand an unbounded number of
+   * documents in {@code PROCESSING}, and one sweep loading every one of them into a {@code List}
+   * would turn a provider outage into a memory spike here too. The fixed-delay schedule drains any
+   * backlog across cycles.
    */
-  List<Document> findByStatusAndUpdatedAtBefore(DocumentStatus status, Instant cutoff);
+  List<Document> findByStatusAndUpdatedAtBefore(
+      DocumentStatus status, Instant cutoff, Pageable pageable);
 
   /**
    * Atomically reclaims one stuck document: the {@code WHERE status = :expectedStatus} makes this

@@ -7,6 +7,9 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -34,16 +37,19 @@ public class DocumentReaper {
   private final DocumentStatusTransitions transitions;
   private final Clock clock;
   private final Duration stuckAfter;
+  private final int batchSize;
 
   public DocumentReaper(
       DocumentRepository documentRepository,
       DocumentStatusTransitions transitions,
       Clock clock,
-      @Value("${ledgerly.document.reaper.stuck-after-seconds:300}") long stuckAfterSeconds) {
+      @Value("${ledgerly.document.reaper.stuck-after-seconds:300}") long stuckAfterSeconds,
+      @Value("${ledgerly.document.reaper.batch-size:500}") int batchSize) {
     this.documentRepository = documentRepository;
     this.transitions = transitions;
     this.clock = clock;
     this.stuckAfter = Duration.ofSeconds(stuckAfterSeconds);
+    this.batchSize = batchSize;
   }
 
   @Scheduled(
@@ -51,8 +57,12 @@ public class DocumentReaper {
       timeUnit = java.util.concurrent.TimeUnit.SECONDS)
   public void reclaimStuckDocuments() {
     Instant cutoff = Instant.now(clock).minus(stuckAfter);
+    // Bounded on purpose: an outage can strand an unbounded number of documents in PROCESSING,
+    // and one sweep is not obligated to drain all of them — the fixed-delay schedule picks up
+    // whatever a batch leaves behind on the next run.
+    Pageable oneBatch = PageRequest.of(0, batchSize, Sort.by("updatedAt").ascending());
     List<Document> candidates =
-        documentRepository.findByStatusAndUpdatedAtBefore(DocumentStatus.PROCESSING, cutoff);
+        documentRepository.findByStatusAndUpdatedAtBefore(DocumentStatus.PROCESSING, cutoff, oneBatch);
 
     for (Document candidate : candidates) {
       boolean reclaimed =

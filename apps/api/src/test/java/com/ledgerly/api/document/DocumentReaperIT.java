@@ -17,6 +17,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
+import org.springframework.test.context.TestPropertySource;
 
 /**
  * T7 — the reaper reclaims a document stuck in {@code PROCESSING}, closing the M4 follow-up: a
@@ -26,6 +27,7 @@ import org.springframework.context.annotation.Primary;
  * so stuck state is fabricated directly via JDBC — the same pattern {@link DocumentSchemaIT} uses.
  */
 @Import(DocumentReaperIT.FixedClockConfig.class)
+@TestPropertySource(properties = "ledgerly.document.reaper.batch-size=3")
 class DocumentReaperIT extends AbstractPostgresIT {
 
   private static final Instant FIXED_NOW = Instant.parse("2026-07-27T12:00:00Z");
@@ -134,6 +136,30 @@ class DocumentReaperIT extends AbstractPostgresIT {
     assertThat(reclaimed).isFalse();
     assertThat(documentRepository.findById(documentId).orElseThrow().getStatus())
         .isEqualTo(DocumentStatus.EXTRACTED);
+  }
+
+  @Test
+  void oneSweepReclaimsAtMostTheConfiguredBatchSize() throws Exception {
+    // batch-size is 3 (see @TestPropertySource); insert 5 stuck documents so one sweep cannot
+    // possibly reclaim all of them if the cap is honored.
+    java.util.List<UUID> documentIds = new java.util.ArrayList<>();
+    try (Connection connection = dataSource.getConnection()) {
+      UUID orgId = insertOrganization(connection);
+      UUID userId = insertAppUser(connection, orgId);
+      for (int i = 0; i < 5; i++) {
+        documentIds.add(insertStuckDocument(connection, orgId, userId, FIXED_NOW.minusSeconds(600)));
+      }
+    }
+
+    reaper.reclaimStuckDocuments();
+
+    long reclaimedCount =
+        documentIds.stream()
+            .map(id -> documentRepository.findById(id).orElseThrow())
+            .filter(d -> d.getStatus() == DocumentStatus.FAILED)
+            .count();
+
+    assertThat(reclaimedCount).isEqualTo(3);
   }
 
   private UUID insertAppUser(Connection connection, UUID orgId) throws SQLException {
