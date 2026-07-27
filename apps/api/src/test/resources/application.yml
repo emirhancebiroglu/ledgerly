@@ -1,3 +1,5 @@
 ledgerly:
   auth:
     jwt-secret: test-only-secret-not-for-production-use-0123456789
+  storage:
+    root: ${java.io.tmpdir}/ledgerly-test-storage
