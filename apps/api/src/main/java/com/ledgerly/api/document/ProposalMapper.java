@@ -3,6 +3,7 @@ package com.ledgerly.api.document;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -35,6 +36,10 @@ public class ProposalMapper {
     this.objectMapper =
         JsonMapper.builder()
             .addModule(new JavaTimeModule())
+            // Jackson's default writes a LocalDate as a numeric array ([2026,7,14]); the shared
+            // contract says an ISO-8601 string. Without this, what api persists and returns fails
+            // the very schema both services are supposed to agree on.
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
             .disable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .withCoercionConfig(

@@ -133,6 +133,22 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <!-- Spring Boot's parent excludes **/*IT.java from surefire, so without failsafe the
+           integration tests never run in a plain `mvn test` — a green build would then say
+           nothing about the ledger-write, tenant-isolation or pipeline assertions, which are
+           exactly the ones that matter. `mvn verify` is the real gate. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>
