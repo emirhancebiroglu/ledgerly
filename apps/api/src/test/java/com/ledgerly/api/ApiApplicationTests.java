@@ -9,6 +9,7 @@ import com.ledgerly.api.audit.AuditLogRepository;
 import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
+import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.document.DocumentRepository;
 import com.ledgerly.api.expense.ExpenseStubRepository;
 import com.ledgerly.api.idempotency.IdempotencyRecordRepository;
@@ -40,6 +41,7 @@ class ApiApplicationTests {
   @MockitoBean private IdempotencyRecordRepository idempotencyRecordRepository;
   @MockitoBean private AuditLogRepository auditLogRepository;
   @MockitoBean private DocumentRepository documentRepository;
+  @MockitoBean private CategoryRepository categoryRepository;
 
   @Test
   void contextLoads() {}
