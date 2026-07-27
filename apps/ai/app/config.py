@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     # available for tests and offline runs.
     llm_provider: str = "litellm"
 
-    # LiteLLM model string. Decided at M5 planning: Gemini 3.6 Flash, GA and native-PDF vision.
-    llm_model: str = "gemini/gemini-3.6-flash"
+    # LiteLLM model string. Gemini (the original M5 Q1 decision) was superseded before the gate
+    # ever ran: its free tier is a hard 20-requests/day account-wide ceiling, confirmed not
+    # preview-model-specific — nowhere near enough for even one eval run. qwen3.7-plus via
+    # OpenCode Go's Anthropic-compatible gateway is the actual deployed default — see decisions.md.
+    llm_model: str = "anthropic/qwen3.7-plus"
 
     # Read directly rather than left to LiteLLM's own env lookup, so a missing key fails at
     # startup with a message naming this service, not on the first request.
@@ -32,15 +35,14 @@ class Settings(BaseSettings):
     llm_circuit_breaker_failure_threshold: int = 5
     llm_circuit_breaker_cooldown_seconds: float = 30.0
 
-    # Set only for an OpenAI-compatible gateway that isn't resolved by LiteLLM's own provider
-    # routing (e.g. OpenCode Go's https://opencode.ai/zen/go/v1). Left unset, LiteLLM routes by
-    # the model string's provider prefix as usual.
-    llm_api_base: str | None = None
+    # OpenCode Go's Anthropic-compatible gateway. Set to None to fall back to LiteLLM's normal
+    # provider-prefix routing (e.g. for gemini/... or any other native-routed model).
+    llm_api_base: str | None = "https://opencode.ai/zen/go"
 
     # Only Gemini's native API accepts a PDF as a `file` content block through LiteLLM; every
-    # OpenAI-compatible gateway tried rejects it. Non-Gemini providers render PDF pages to PNG
-    # first — see app.llm.pdf_to_images.
-    llm_supports_native_pdf: bool = True
+    # other gateway tried (OpenCode Go, every OpenRouter free vision model) rejects it. Non-native-
+    # PDF providers render PDF pages to PNG first — see app.llm.pdf_to_images.
+    llm_supports_native_pdf: bool = False
 
 
 settings = Settings()
