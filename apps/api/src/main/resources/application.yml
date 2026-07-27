@@ -53,6 +53,10 @@ ledgerly:
     amount-ceiling-minor: ${EXTRACTION_AMOUNT_CEILING_MINOR:100000000}
     max-age-years: ${EXTRACTION_MAX_AGE_YEARS:10}
     max-future-days: ${EXTRACTION_MAX_FUTURE_DAYS:1}
+  categorization:
+    # Below this, an expense routes to review instead of posting silently (M6 T7). Mirrors the
+    # extraction self-check gate's 0.7 threshold in apps/ai/app/llm/extraction_graph.py.
+    confidence-threshold: ${CATEGORIZATION_CONFIDENCE_THRESHOLD:0.7}
 
 logging:
   pattern:

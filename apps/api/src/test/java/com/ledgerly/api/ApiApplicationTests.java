@@ -11,8 +11,11 @@ import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
 import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.document.DocumentRepository;
+import com.ledgerly.api.expense.ExpenseRepository;
 import com.ledgerly.api.expense.ExpenseStubRepository;
 import com.ledgerly.api.idempotency.IdempotencyRecordRepository;
+import com.ledgerly.api.ledger.LedgerAccountRepository;
+import com.ledgerly.api.ledger.LedgerTransactionRepository;
 import com.ledgerly.api.policy.PolicyChunkRepository;
 import com.ledgerly.api.policy.PolicyDocumentRepository;
 import org.junit.jupiter.api.Test;
@@ -46,6 +49,9 @@ class ApiApplicationTests {
   @MockitoBean private CategoryRepository categoryRepository;
   @MockitoBean private PolicyDocumentRepository policyDocumentRepository;
   @MockitoBean private PolicyChunkRepository policyChunkRepository;
+  @MockitoBean private ExpenseRepository expenseRepository;
+  @MockitoBean private LedgerAccountRepository ledgerAccountRepository;
+  @MockitoBean private LedgerTransactionRepository ledgerTransactionRepository;
 
   @Test
   void contextLoads() {}
