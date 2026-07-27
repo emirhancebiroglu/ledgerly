@@ -42,18 +42,34 @@ public class LocalDiskStorage implements StorageClient {
 
   @Override
   public String store(byte[] content) {
-    String key = UUID.randomUUID().toString();
+    String key = mintKey();
     Path target = resolve(key);
+    Path temp = null;
     try {
       Files.createDirectories(target.getParent());
       // Write to a temp file and move into place so a reader never observes a partial blob.
-      Path temp = Files.createTempFile(target.getParent(), key, ".tmp");
+      temp = Files.createTempFile(target.getParent(), key, ".tmp");
       Files.write(temp, content);
       Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     } catch (IOException e) {
       throw new StorageException("Failed to store content under key " + key, e);
+    } finally {
+      // A successful move already removed the temp file; deleting again is a harmless no-op. A
+      // write or move failure otherwise leaves it behind forever, since nothing else ever reaps it.
+      if (temp != null) {
+        try {
+          Files.deleteIfExists(temp);
+        } catch (IOException ignored) {
+          // Best-effort cleanup; the original failure is what the caller needs to see.
+        }
+      }
     }
     return key;
+  }
+
+  /** Overridable so a test can pin the key and deterministically force a write/move collision. */
+  protected String mintKey() {
+    return UUID.randomUUID().toString();
   }
 
   @Override
@@ -66,6 +82,16 @@ public class LocalDiskStorage implements StorageClient {
       return Files.readAllBytes(target);
     } catch (IOException e) {
       throw new StorageException("Failed to read content for key " + key, e);
+    }
+  }
+
+  @Override
+  public void delete(String key) {
+    Path target = resolve(key);
+    try {
+      Files.deleteIfExists(target);
+    } catch (IOException e) {
+      throw new StorageException("Failed to delete content for key " + key, e);
     }
   }
 
