@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgerly.dev/contracts/extract-request.schema.json",
+  "title": "ExtractRequest",
+  "description": "The metadata part of `POST /extract`. The document bytes travel as the multipart `file` part; this object is the `metadata` part alongside it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["document_id", "content_type"],
+  "properties": {
+    "document_id": {
+      "description": "The `api`-side document id, echoed back on the proposal so a response can never be mistaken for another document's.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "content_type": {
+      "description": "Media type `api` established by inspecting the bytes — not the type the uploader claimed.",
+      "type": "string",
+      "enum": ["application/pdf", "image/jpeg", "image/png"]
+    },
+    "filename": {
+      "description": "Original filename, for logging and prompt context only. Never used as a path.",
+      "type": ["string", "null"],
+      "maxLength": 255
+    },
+    "base_currency": {
+      "description": "The organization's base currency, as a hint when the document itself is ambiguous.",
+      "type": ["string", "null"],
+      "pattern": "^[A-Z]{3}$"
+    },
+    "correlation_id": {
+      "description": "Correlation id propagated from `api`, so one request is traceable across all three services (architecture C6).",
+      "type": ["string", "null"],
+      "maxLength": 128
+    }
+  }
+}

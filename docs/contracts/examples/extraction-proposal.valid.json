@@ -1,0 +1,29 @@
+{
+  "document_id": "3f1a8c2e-9b4d-4e7a-8f16-2c5d7e9a1b30",
+  "vendor": "Contoso Office Supplies BV",
+  "currency": "EUR",
+  "total_minor": 12100,
+  "tax_minor": 2100,
+  "document_date": "2026-07-14",
+  "lines": [
+    {
+      "description": "A4 paper, 500 sheets",
+      "quantity": 4000,
+      "amount_minor": 4000
+    },
+    {
+      "description": "Toner cartridge, black",
+      "quantity": 1000,
+      "amount_minor": 6000
+    }
+  ],
+  "confidence": {
+    "vendor": 0.94,
+    "currency": 0.99,
+    "total_minor": 0.97,
+    "tax_minor": 0.91,
+    "document_date": 0.96
+  },
+  "model": "fake-llm-v1",
+  "warnings": []
+}

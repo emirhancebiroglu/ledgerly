@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgerly.dev/contracts/extraction-proposal.schema.json",
+  "title": "ExtractionProposal",
+  "description": "What `ai` proposes after reading a document. A proposal is advisory only: `api` validates it and decides whether anything is posted. Nothing here is trusted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "document_id",
+    "currency",
+    "total_minor",
+    "tax_minor",
+    "document_date",
+    "lines",
+    "confidence",
+    "model"
+  ],
+  "properties": {
+    "document_id": {
+      "description": "The `api`-side document this proposal is about; echoed back from the request.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "vendor": {
+      "description": "Vendor name as read off the document. Absent when it could not be read.",
+      "type": ["string", "null"],
+      "maxLength": 512
+    },
+    "currency": {
+      "description": "ISO 4217 alphabetic code. `api` rejects any code outside its own allowed set.",
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "total_minor": {
+      "description": "Document total in minor units. Integer, never a float — see architecture C1.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "tax_minor": {
+      "description": "Tax portion in minor units, already included in `total_minor`.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "document_date": {
+      "description": "Date printed on the document (not the upload date).",
+      "type": "string",
+      "format": "date",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "lines": {
+      "description": "Line items. May be empty when the document has no itemisation; `api` decides whether that is acceptable.",
+      "type": "array",
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/line" }
+    },
+    "confidence": {
+      "description": "Per-field confidence in [0,1]. Every extracted field carries one.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "total_minor", "tax_minor", "document_date"],
+      "properties": {
+        "vendor": { "$ref": "#/$defs/confidenceScore" },
+        "currency": { "$ref": "#/$defs/confidenceScore" },
+        "total_minor": { "$ref": "#/$defs/confidenceScore" },
+        "tax_minor": { "$ref": "#/$defs/confidenceScore" },
+        "document_date": { "$ref": "#/$defs/confidenceScore" }
+      }
+    },
+    "model": {
+      "description": "Which model produced this. `fake-llm-v1` is the M4 stub; a real adapter arrives at M5.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "warnings": {
+      "description": "Non-fatal notes from the extractor, for a human reviewer.",
+      "type": "array",
+      "maxItems": 50,
+      "items": { "type": "string", "maxLength": 512 }
+    }
+  },
+  "$defs": {
+    "confidenceScore": {
+      "description": "A confidence in [0,1]. This is the one place a non-integer is legal — it is not money.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "amount_minor"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "quantity": {
+          "description": "Quantity in thousandths, so 1.5 units is 1500. Integer for the same reason amounts are.",
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "amount_minor": {
+          "description": "Line total in minor units. Integer, never a float.",
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
