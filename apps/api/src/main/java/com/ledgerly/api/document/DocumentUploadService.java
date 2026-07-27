@@ -135,9 +135,9 @@ public class DocumentUploadService {
    *
    * <p>{@code upload} is always {@code @Transactional}, so a synchronization is always active in
    * practice — but {@code registerSynchronization} throws {@link IllegalStateException} if it
-   * isn't, which would turn a successful store into a spurious failure. Falling back to an
-   * immediate best-effort delete keeps that a defensive guard rather than a hard requirement on
-   * the caller always running inside a transaction.
+   * isn't, which would turn a successful store into a spurious failure. This is purely a guard
+   * against that: outside a transaction there is nothing to roll back, so cleanup is skipped
+   * rather than attempted immediately.
    */
   private void registerBlobCleanupOnRollback(String storageKey) {
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
