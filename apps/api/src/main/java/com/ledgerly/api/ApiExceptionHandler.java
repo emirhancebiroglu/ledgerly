@@ -3,6 +3,7 @@ package com.ledgerly.api;
 import com.ledgerly.api.auth.CrossOrganizationAccessException;
 import com.ledgerly.api.auth.InvalidCredentialsException;
 import com.ledgerly.api.auth.InvalidRefreshTokenException;
+import com.ledgerly.api.category.CategoryInUseException;
 import com.ledgerly.api.category.DuplicateCategoryNameException;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
 import com.ledgerly.api.document.DocumentTooLargeException;
@@ -50,6 +51,12 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(DuplicateCategoryNameException.class)
   public ProblemDetail handleDuplicateCategoryName(DuplicateCategoryNameException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
+  }
+
+  @ExceptionHandler(CategoryInUseException.class)
+  public ProblemDetail handleCategoryInUse(CategoryInUseException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
   }

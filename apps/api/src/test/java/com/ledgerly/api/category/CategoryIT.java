@@ -11,10 +11,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.auth.AuthResponse;
 import com.ledgerly.api.auth.RegisterRequest;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
+import java.nio.charset.StandardCharsets;
+import java.util.UUID;
+import javax.crypto.SecretKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -22,8 +28,11 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 class CategoryIT extends AbstractPostgresIT {
 
+  private static final String TEST_JWT_SECRET = "test-only-secret-not-for-production-use-0123456789";
+
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
+  @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
   void aCategoryCanBeCreatedListedAndFetched() throws Exception {
@@ -138,6 +147,39 @@ class CategoryIT extends AbstractPostgresIT {
     mockMvc.perform(get("/api/v1/categories")).andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void deletingACategoryStillReferencedByAnExpenseReturns409() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID orgId = organizationIdOf(token);
+    String categoryId = createAndGetId(token, "Travel");
+    UUID userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM app_user WHERE organization_id = ?", UUID.class, orgId);
+    UUID documentId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO document (id, organization_id, uploaded_by, filename, content_type, "
+            + "size_bytes, storage_key, content_hash, status) "
+            + "VALUES (?, ?, ?, 'invoice.pdf', 'application/pdf', 100, ?, 'hash', 'EXTRACTED')",
+        documentId,
+        orgId,
+        userId,
+        UUID.randomUUID().toString());
+    jdbcTemplate.update(
+        "INSERT INTO expense (organization_id, document_id, category_id, amount_minor, currency, "
+            + "categorization_confidence, status) "
+            + "VALUES (?, ?, ?::uuid, 1000, 'EUR', 0.9, 'NEEDS_REVIEW')",
+        orgId,
+        documentId,
+        categoryId);
+
+    mockMvc
+        .perform(
+            delete("/api/v1/categories/" + categoryId)
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "key-" + System.nanoTime()))
+        .andExpect(status().isConflict());
+  }
+
   private org.springframework.test.web.servlet.ResultActions create(String token, String name)
       throws Exception {
     return mockMvc.perform(
@@ -169,5 +211,11 @@ class CategoryIT extends AbstractPostgresIT {
     return objectMapper
         .readValue(result.getResponse().getContentAsString(), AuthResponse.class)
         .accessToken();
+  }
+
+  private UUID organizationIdOf(String accessToken) {
+    SecretKey key = Keys.hmacShaKeyFor(TEST_JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+    var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(accessToken).getPayload();
+    return UUID.fromString(claims.get("org", String.class));
   }
 }

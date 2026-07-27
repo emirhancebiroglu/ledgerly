@@ -13,6 +13,8 @@ import com.ledgerly.api.auth.RegisterRequest;
 import com.ledgerly.api.category.CategoryRequest;
 import com.ledgerly.api.document.ExtractionClient;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -21,6 +23,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+import javax.crypto.SecretKey;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,6 +59,8 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
   private static final byte[] REAL_PDF =
       ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
 
+  private static final String TEST_JWT_SECRET = "test-only-secret-not-for-production-use-0123456789";
+
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private StubExtractionClient stubExtractionClient;
@@ -72,6 +77,9 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
   void aHighConfidenceCategorizationPostsABalancedLedgerTransaction() throws Exception {
     String token = registerAndGetAccessToken();
     createCategory(token, "Travel");
+    // No policy_chunk rows exist for this org, so retrieval short-circuits to an empty list —
+    // a citation the model claims anyway is not one any real chunk produced, and must be
+    // scrubbed to null rather than trusted verbatim.
     stubCategorizationClient.respondWith(
         documentId -> categorizeResponse(documentId, "Travel", 0.92, "policy excerpt"));
 
@@ -84,10 +92,55 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("POSTED"))
         .andExpect(jsonPath("$.ledgerTransactionId").isNotEmpty())
-        .andExpect(jsonPath("$.citation").value("policy excerpt"));
+        .andExpect(jsonPath("$.citation").doesNotExist());
 
     assertThat(ledgerEntryCountForExpense(expenseId)).isEqualTo(2);
     assertThat(netBalanceForExpense(expenseId)).isZero();
+  }
+
+  @Test
+  void aCitationMatchingARetrievedPolicyChunkIsKept() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID orgId = organizationIdOf(token);
+    createCategory(token, "Travel");
+    insertPolicyChunk(orgId, "Travel expenses over 500 EUR require manager approval.");
+    stubCategorizationClient.respondWith(
+        documentId ->
+            categorizeResponse(
+                documentId,
+                "Travel",
+                0.92,
+                "Travel expenses over 500 EUR require manager approval."));
+
+    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    UUID expenseId = expenseIdForDocument(documentIdOf(uploaded));
+
+    mockMvc
+        .perform(get("/api/v1/expenses/" + expenseId).header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath("$.citation")
+                .value("Travel expenses over 500 EUR require manager approval."));
+  }
+
+  @Test
+  void aCitationNotMatchingAnyRetrievedChunkIsScrubbed() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID orgId = organizationIdOf(token);
+    createCategory(token, "Travel");
+    insertPolicyChunk(orgId, "Travel expenses over 500 EUR require manager approval.");
+    // The model claims a citation that was never among the retrieved chunks.
+    stubCategorizationClient.respondWith(
+        documentId ->
+            categorizeResponse(documentId, "Travel", 0.92, "a policy that does not exist"));
+
+    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    UUID expenseId = expenseIdForDocument(documentIdOf(uploaded));
+
+    mockMvc
+        .perform(get("/api/v1/expenses/" + expenseId).header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.citation").doesNotExist());
   }
 
   @Test
@@ -147,6 +200,50 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new CategoryRequest(name))))
         .andExpect(status().isCreated());
+  }
+
+  private UUID organizationIdOf(String accessToken) {
+    SecretKey key = Keys.hmacShaKeyFor(TEST_JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+    var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(accessToken).getPayload();
+    return UUID.fromString(claims.get("org", String.class));
+  }
+
+  /** Matches {@link StubQueryEmbeddingClient}'s fixed query vector so {@code findNearest} returns it. */
+  private void insertPolicyChunk(UUID organizationId, String chunkText) throws Exception {
+    UUID policyDocumentId = UUID.randomUUID();
+    UUID userId;
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement ps =
+            connection.prepareStatement(
+                "SELECT id FROM app_user WHERE organization_id = ? LIMIT 1")) {
+      ps.setObject(1, organizationId);
+      try (ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        userId = (UUID) rs.getObject("id");
+      }
+    }
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement ps =
+            connection.prepareStatement(
+                "INSERT INTO policy_document (id, organization_id, uploaded_by, filename, "
+                    + "storage_key, content_hash, status) "
+                    + "VALUES (?, ?, ?, 'policy.pdf', ?, 'hash', 'EMBEDDED')")) {
+      ps.setObject(1, policyDocumentId);
+      ps.setObject(2, organizationId);
+      ps.setObject(3, userId);
+      ps.setString(4, UUID.randomUUID().toString());
+      ps.executeUpdate();
+    }
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement ps =
+            connection.prepareStatement(
+                "INSERT INTO policy_chunk (organization_id, policy_document_id, chunk_index, "
+                    + "chunk_text, embedding) VALUES (?, ?, 0, ?, '[0.1,0.2,0.3,0.4]'::vector)")) {
+      ps.setObject(1, organizationId);
+      ps.setObject(2, policyDocumentId);
+      ps.setString(3, chunkText);
+      ps.executeUpdate();
+    }
   }
 
   private long countRows(String table) throws Exception {

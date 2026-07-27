@@ -91,12 +91,36 @@ public class ExpensePostingService {
                     new CategorizationOutcomeException(
                         "ai chose a category outside the given taxonomy: " + response.category()));
 
-    if (response.confidence() < confidenceThreshold) {
+    CategorizeResponse trustedResponse = withTrustedCitation(response, relevantChunks);
+
+    if (trustedResponse.confidence() < confidenceThreshold) {
       return transactions.recordNeedsReview(
-          organizationId, documentId, actor, chosenCategory, proposal, response);
+          organizationId, documentId, actor, chosenCategory, proposal, trustedResponse);
     }
     return transactions.recordPosted(
-        organizationId, documentId, actor, chosenCategory, proposal, response);
+        organizationId, documentId, actor, chosenCategory, proposal, trustedResponse);
+  }
+
+  /**
+   * `ai` is only told not to invent a citation via prompt text — that is not enforcement. A model
+   * that paraphrases or fabricates a policy quote would otherwise have its invention stored as the
+   * ledger-facing justification for a real posted expense. Scrubbing an untraceable citation to
+   * {@code null} rather than failing the whole categorization keeps a genuinely correct category
+   * choice from being discarded over an unrelated citation slip.
+   */
+  private CategorizeResponse withTrustedCitation(
+      CategorizeResponse response, List<PolicyChunk> relevantChunks) {
+    if (response.citation() == null) {
+      return response;
+    }
+    boolean citationIsGenuine =
+        relevantChunks.stream().anyMatch(chunk -> chunk.chunkText().equals(response.citation()));
+    if (citationIsGenuine) {
+      return response;
+    }
+    log.warn("Categorization returned a citation not present in the retrieved policy chunks");
+    return new CategorizeResponse(
+        response.documentId(), response.category(), response.confidence(), null, response.model());
   }
 
   private List<PolicyChunk> retrieveRelevantChunks(

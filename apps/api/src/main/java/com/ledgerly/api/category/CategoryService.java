@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,7 +89,15 @@ public class CategoryService {
     Category category = findForOrganization(id, principal);
     String before = auditPayload(category);
     categoryRepository.delete(category);
-    categoryRepository.flush();
+    try {
+      categoryRepository.flush();
+    } catch (DataIntegrityViolationException e) {
+      // No ON DELETE action on expense.category_id: an expense still referencing this category
+      // is a client-visible conflict, not a server fault. flush() is what actually runs the
+      // DELETE against the database — delete() alone only stages it in the persistence context.
+      throw new CategoryInUseException(
+          "Category cannot be deleted while an expense still references it: " + id);
+    }
 
     auditService.record(
         principal.organizationId(),

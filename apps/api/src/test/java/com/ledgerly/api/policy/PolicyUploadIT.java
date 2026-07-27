@@ -112,6 +112,34 @@ class PolicyUploadIT extends AbstractPostgresIT {
         .andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void anAiFailureLeavesTheDocumentFailedNotStrandedAtPending(
+      @Autowired StubPolicyEmbeddingClient stubClient) throws Exception {
+    stubClient.failWith(() -> new PolicyEmbeddingUnavailableException("simulated ai outage", null));
+    try {
+      String token = registerAndGetAccessToken();
+
+      MvcResult result =
+          upload(token, "policy.pdf", REAL_PDF)
+              .andExpect(status().isCreated())
+              .andExpect(jsonPath("$.status").value("FAILED"))
+              .andReturn();
+
+      String id =
+          objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+      String status =
+          jdbcTemplate.queryForObject(
+              "SELECT status FROM policy_document WHERE id = ?::uuid", String.class, id);
+      String failureReason =
+          jdbcTemplate.queryForObject(
+              "SELECT failure_reason FROM policy_document WHERE id = ?::uuid", String.class, id);
+      assertThat(status).isEqualTo("FAILED");
+      assertThat(failureReason).isNotNull();
+    } finally {
+      stubClient.reset();
+    }
+  }
+
   private org.springframework.test.web.servlet.ResultActions upload(
       String token, String filename, byte[] content) throws Exception {
     return mockMvc.perform(
@@ -145,15 +173,28 @@ class PolicyUploadIT extends AbstractPostgresIT {
     return UUID.fromString(claims.get("org", String.class));
   }
 
-  /** Stands in for `ai`, returning two fixed chunks with tiny deterministic embeddings. */
-  @TestConfiguration
-  static class AcceptingEmbeddingConfig {
+  /**
+   * Stands in for `ai`. Defaults to two fixed chunks with tiny deterministic embeddings;
+   * {@link #failWith} lets a test provoke the failure path deterministically.
+   */
+  static class StubPolicyEmbeddingClient implements PolicyEmbeddingClient {
 
-    @Bean
-    @Primary
-    PolicyEmbeddingClient acceptingPolicyEmbeddingClient() {
-      return (policyDocumentId, content, contentType) ->
-          """
+    private java.util.function.Supplier<RuntimeException> failure;
+
+    void failWith(java.util.function.Supplier<RuntimeException> failure) {
+      this.failure = failure;
+    }
+
+    void reset() {
+      this.failure = null;
+    }
+
+    @Override
+    public String embedPolicy(UUID policyDocumentId, byte[] content, String contentType) {
+      if (failure != null) {
+        throw failure.get();
+      }
+      return """
           {"policy_document_id":"%s","model":"fake-embedding-v1","embedding_dimensions":4,
            "chunks":[
              {"chunk_index":0,"chunk_text":"Travel over 500 EUR needs approval.",
@@ -162,7 +203,17 @@ class PolicyUploadIT extends AbstractPostgresIT {
               "embedding":[0.4,0.3,0.2,0.1]}
            ]}
           """
-              .formatted(policyDocumentId);
+          .formatted(policyDocumentId);
+    }
+  }
+
+  @TestConfiguration
+  static class AcceptingEmbeddingConfig {
+
+    @Bean
+    @Primary
+    StubPolicyEmbeddingClient stubPolicyEmbeddingClient() {
+      return new StubPolicyEmbeddingClient();
     }
   }
 }
