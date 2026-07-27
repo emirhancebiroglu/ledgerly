@@ -31,6 +31,10 @@ services:
     restart: unless-stopped
     ports:
       - "${AI_PORT:-8000}:8000"
+    environment:
+      AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-litellm}
+      AI_LLM_MODEL: ${AI_LLM_MODEL:-gemini/gemini-3.6-flash}
+      AI_LLM_API_KEY: ${AI_LLM_API_KEY:?AI_LLM_API_KEY must be set}
 
   web:
     build:
