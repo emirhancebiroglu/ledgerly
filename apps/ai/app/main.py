@@ -3,7 +3,9 @@ import logging
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
+from app.categorization.categorization import CategorizationFailedError, CategorizationService
 from app.config import settings
 from app.contracts import EMBED_POLICY_REQUEST_SCHEMA, EXTRACT_REQUEST_SCHEMA, load_schema
 from app.embeddings import EmbeddingClient, FakeEmbeddingClient, LiteLlmEmbeddingClient
@@ -101,6 +103,30 @@ def get_policy_embedding_service() -> PolicyEmbeddingService:
     return PolicyEmbeddingService(get_embedding_client())
 
 
+def get_categorization_service() -> CategorizationService:
+    return CategorizationService(get_llm_client())
+
+
+class EmbedQueryRequest(BaseModel):
+    text: str = Field(min_length=1)
+    correlation_id: str | None = None
+
+
+class CategorizeChunk(BaseModel):
+    chunk_text: str = Field(min_length=1)
+
+
+class CategorizeRequestBody(BaseModel):
+    document_id: str
+    vendor: str | None = None
+    currency: str
+    total_minor: int
+    document_date: str | None = None
+    categories: list[str] = Field(min_length=1)
+    policy_chunks: list[CategorizeChunk] = Field(default_factory=list)
+    correlation_id: str | None = None
+
+
 @app.get("/health")
 def health() -> dict:
     return {"service": settings.service_name, "version": settings.service_version, "status": "UP"}
@@ -160,6 +186,47 @@ async def embed_policy(
         return service.embed_policy(policy_document_id, content)
     except (PolicyEmbeddingFailedError, EmptyDocumentError) as error:
         logger.info("Policy embedding failed for document %s: %s", policy_document_id, error)
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/embed-query")
+async def embed_query(
+    body: EmbedQueryRequest, embedding_client: EmbeddingClient = Depends(get_embedding_client)
+) -> dict:
+    """A single embedding vector for `api` to use in a pgvector nearest-neighbor search.
+
+    Uses the same embedding model as `POST /embed-policy`, so the returned vector is directly
+    comparable to `policy_chunk.embedding`.
+    """
+    vectors = embedding_client.embed([body.text])
+    return {
+        "model": embedding_client.model_name,
+        "embedding_dimensions": embedding_client.dimensions,
+        "embedding": vectors[0],
+    }
+
+
+@app.post("/categorize")
+async def categorize(
+    body: CategorizeRequestBody,
+    service: CategorizationService = Depends(get_categorization_service),
+) -> dict:
+    """Extracted fields plus retrieved policy chunks in, a category classification out.
+
+    Advisory only — `api` decides whether confidence clears the posting threshold (M6 T7).
+    """
+    try:
+        return service.categorize(
+            document_id=body.document_id,
+            vendor=body.vendor,
+            currency=body.currency,
+            total_minor=body.total_minor,
+            document_date=body.document_date,
+            categories=body.categories,
+            policy_chunks=[chunk.chunk_text for chunk in body.policy_chunks],
+        )
+    except CategorizationFailedError as error:
+        logger.info("Categorization failed for document %s: %s", body.document_id, error)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 

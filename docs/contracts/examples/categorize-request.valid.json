@@ -1,0 +1,12 @@
+{
+  "document_id": "3d2f7c6a-9b1e-4f3a-8c2d-1a2b3c4d5e6f",
+  "vendor": "Contoso Travel",
+  "currency": "EUR",
+  "total_minor": 60000,
+  "document_date": "2026-07-14",
+  "categories": ["Travel", "Office Supplies", "Meals"],
+  "policy_chunks": [
+    {"chunk_text": "Travel expenses over 500 EUR require manager approval."}
+  ],
+  "correlation_id": "9e8d7c6b-5a4f-3e2d-1c0b-a9b8c7d6e5f4"
+}

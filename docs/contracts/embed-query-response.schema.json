@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgerly.dev/contracts/embed-query-response.schema.json",
+  "title": "EmbedQueryResponse",
+  "description": "What `ai` returns from `POST /embed-query` — a single embedding vector for the query text, using the same embedding model (and therefore the same dimensionality) as `POST /embed-policy`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["model", "embedding_dimensions", "embedding"],
+  "properties": {
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "embedding_dimensions": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "embedding": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    }
+  }
+}
