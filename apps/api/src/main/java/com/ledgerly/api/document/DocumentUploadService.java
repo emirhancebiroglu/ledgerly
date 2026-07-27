@@ -132,8 +132,17 @@ public class DocumentUploadService {
    * since its key never reaches a committed row and nothing else ever reaps it. Registering the
    * delete as an after-rollback synchronization means it only fires when the transaction actually
    * fails, never on a successful commit.
+   *
+   * <p>{@code upload} is always {@code @Transactional}, so a synchronization is always active in
+   * practice — but {@code registerSynchronization} throws {@link IllegalStateException} if it
+   * isn't, which would turn a successful store into a spurious failure. Falling back to an
+   * immediate best-effort delete keeps that a defensive guard rather than a hard requirement on
+   * the caller always running inside a transaction.
    */
   private void registerBlobCleanupOnRollback(String storageKey) {
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      return;
+    }
     TransactionSynchronizationManager.registerSynchronization(
         new TransactionSynchronization() {
           @Override

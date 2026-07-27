@@ -5,7 +5,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -30,9 +33,24 @@ public class LocalDiskStorage implements StorageClient {
       Pattern.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 
   private final Path root;
+  private final Supplier<String> keySupplier;
+  private final Consumer<Path> afterTempFileCreated;
 
+  @Autowired
   public LocalDiskStorage(@Value("${ledgerly.storage.root}") Path root) {
+    this(root, () -> UUID.randomUUID().toString(), temp -> {});
+  }
+
+  /**
+   * Test-only seam: lets a test pin the minted key (to stage a deterministic filesystem
+   * collision) and observe the temp file the instant after it's created (to force a write
+   * failure on it, e.g. by making it read-only) — neither is reachable from production code,
+   * which always uses the single-argument constructor above.
+   */
+  LocalDiskStorage(Path root, Supplier<String> keySupplier, Consumer<Path> afterTempFileCreated) {
     this.root = root.toAbsolutePath().normalize();
+    this.keySupplier = keySupplier;
+    this.afterTempFileCreated = afterTempFileCreated;
     try {
       Files.createDirectories(this.root);
     } catch (IOException e) {
@@ -42,13 +60,14 @@ public class LocalDiskStorage implements StorageClient {
 
   @Override
   public String store(byte[] content) {
-    String key = mintKey();
+    String key = keySupplier.get();
     Path target = resolve(key);
     Path temp = null;
     try {
       Files.createDirectories(target.getParent());
       // Write to a temp file and move into place so a reader never observes a partial blob.
       temp = Files.createTempFile(target.getParent(), key, ".tmp");
+      afterTempFileCreated.accept(temp);
       Files.write(temp, content);
       Files.move(temp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
     } catch (IOException e) {
@@ -58,6 +77,7 @@ public class LocalDiskStorage implements StorageClient {
       // write or move failure otherwise leaves it behind forever, since nothing else ever reaps it.
       if (temp != null) {
         try {
+          temp.toFile().setWritable(true);
           Files.deleteIfExists(temp);
         } catch (IOException ignored) {
           // Best-effort cleanup; the original failure is what the caller needs to see.
@@ -65,11 +85,6 @@ public class LocalDiskStorage implements StorageClient {
       }
     }
     return key;
-  }
-
-  /** Overridable so a test can pin the key and deterministically force a write/move collision. */
-  protected String mintKey() {
-    return UUID.randomUUID().toString();
   }
 
   @Override

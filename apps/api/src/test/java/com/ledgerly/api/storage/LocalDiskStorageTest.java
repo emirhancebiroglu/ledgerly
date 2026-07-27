@@ -154,11 +154,11 @@ class LocalDiskStorageTest {
   @Test
   void aWriteFailureLeavesNoTempFileAndStillThrowsStorageException() {
     String fixedKey = UUID.randomUUID().toString();
-    // The target's shard directory is pre-created as a plain file, so `Files.createDirectories`
-    // for the temp file's parent fails before the write can happen at all.
-    Path shardDir = root.resolve(fixedKey.substring(0, 2));
-    FixedKeyStorage failingStorage = new FixedKeyStorage(root, fixedKey);
-    uncheckedWrite(shardDir, "not a directory".getBytes(StandardCharsets.UTF_8));
+    // The temp file is made read-only the instant after `store` creates it, so the write onto it
+    // fails — this happens strictly after `Files.createTempFile` succeeds, so the `finally`
+    // block's cleanup is genuinely exercised, unlike a collision staged before temp creation.
+    LocalDiskStorage failingStorage =
+        new LocalDiskStorage(root, () -> fixedKey, temp -> temp.toFile().setReadOnly());
 
     assertThatThrownBy(() -> failingStorage.store("bytes".getBytes(StandardCharsets.UTF_8)))
         .isInstanceOf(StorageException.class);
@@ -169,7 +169,7 @@ class LocalDiskStorageTest {
   @Test
   void aMoveFailureLeavesNoTempFileAndStillThrowsStorageException() throws IOException {
     String fixedKey = UUID.randomUUID().toString();
-    FixedKeyStorage failingStorage = new FixedKeyStorage(root, fixedKey);
+    LocalDiskStorage failingStorage = new LocalDiskStorage(root, () -> fixedKey, temp -> {});
     Path shardDir = root.resolve(fixedKey.substring(0, 2));
     Files.createDirectories(shardDir);
     // The move target already exists as a non-empty directory: `Files.move` with
@@ -189,29 +189,6 @@ class LocalDiskStorageTest {
       return tree.filter(path -> path.toString().endsWith(".tmp")).count();
     } catch (IOException e) {
       throw new UncheckedIOException(e);
-    }
-  }
-
-  private static void uncheckedWrite(Path path, byte[] content) {
-    try {
-      Files.write(path, content);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
-  }
-
-  /** Test-only seam: pins the minted key so a specific filesystem collision can be staged. */
-  private static final class FixedKeyStorage extends LocalDiskStorage {
-    private final String fixedKey;
-
-    FixedKeyStorage(Path root, String fixedKey) {
-      super(root);
-      this.fixedKey = fixedKey;
-    }
-
-    @Override
-    protected String mintKey() {
-      return fixedKey;
     }
   }
 }
