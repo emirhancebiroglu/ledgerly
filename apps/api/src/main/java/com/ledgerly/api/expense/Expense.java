@@ -33,6 +33,9 @@ public class Expense {
   @Column(name = "document_id", nullable = false, updatable = false)
   private UUID documentId;
 
+  @Column(updatable = false)
+  private String vendor;
+
   @Column(name = "category_id", nullable = false, updatable = false)
   private UUID categoryId;
 
@@ -63,6 +66,7 @@ public class Expense {
   private Expense(
       UUID organizationId,
       UUID documentId,
+      String vendor,
       UUID categoryId,
       UUID ledgerTransactionId,
       long amountMinor,
@@ -72,6 +76,7 @@ public class Expense {
       ExpenseStatus status) {
     this.organizationId = organizationId;
     this.documentId = documentId;
+    this.vendor = vendor;
     this.categoryId = categoryId;
     this.ledgerTransactionId = ledgerTransactionId;
     this.amountMinor = amountMinor;
@@ -86,6 +91,7 @@ public class Expense {
   public static Expense posted(
       UUID organizationId,
       UUID documentId,
+      String vendor,
       UUID categoryId,
       UUID ledgerTransactionId,
       long amountMinor,
@@ -95,6 +101,7 @@ public class Expense {
     return new Expense(
         organizationId,
         documentId,
+        vendor,
         categoryId,
         ledgerTransactionId,
         amountMinor,
@@ -108,6 +115,7 @@ public class Expense {
   public static Expense needsReview(
       UUID organizationId,
       UUID documentId,
+      String vendor,
       UUID categoryId,
       long amountMinor,
       String currency,
@@ -116,6 +124,7 @@ public class Expense {
     return new Expense(
         organizationId,
         documentId,
+        vendor,
         categoryId,
         null,
         amountMinor,
@@ -135,6 +144,10 @@ public class Expense {
 
   public UUID getDocumentId() {
     return documentId;
+  }
+
+  public String getVendor() {
+    return vendor;
   }
 
   public UUID getCategoryId() {

@@ -8,6 +8,7 @@ import java.util.UUID;
 public record ExpenseResponse(
     UUID id,
     UUID documentId,
+    String vendor,
     UUID categoryId,
     UUID ledgerTransactionId,
     long amountMinor,
@@ -21,6 +22,7 @@ public record ExpenseResponse(
     return new ExpenseResponse(
         expense.getId(),
         expense.getDocumentId(),
+        expense.getVendor(),
         expense.getCategoryId(),
         expense.getLedgerTransactionId(),
         expense.getAmountMinor(),

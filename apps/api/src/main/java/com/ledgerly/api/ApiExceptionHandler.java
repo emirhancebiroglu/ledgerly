@@ -9,6 +9,7 @@ import com.ledgerly.api.correlation.CorrelationIdHolder;
 import com.ledgerly.api.document.DocumentTooLargeException;
 import com.ledgerly.api.document.IllegalDocumentTransitionException;
 import com.ledgerly.api.document.UnsupportedDocumentTypeException;
+import com.ledgerly.api.expense.InvalidExpenseListQueryException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import com.ledgerly.api.policy.IllegalPolicyDocumentTransitionException;
 import java.util.NoSuchElementException;
@@ -41,6 +42,12 @@ public class ApiExceptionHandler {
   public ProblemDetail handleUnauthorized(RuntimeException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidExpenseListQueryException.class)
+  public ProblemDetail handleInvalidExpenseListQuery(InvalidExpenseListQueryException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
   }
 
   @ExceptionHandler(IdempotencyConflictException.class)
