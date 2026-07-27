@@ -28,19 +28,26 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
- * The whole M4 pipeline through the real endpoints: upload → `ai` → validate → status.
+ * The whole M5 pipeline through the real endpoints: upload → `ai` → validate → status.
  *
  * <p>The `ai` call is the one thing stubbed, via the {@link ExtractionClient} port. That is
  * deliberate: the failure modes that matter most here — a timeout, a mismatched proposal, an
  * arithmetically broken one — are the ones that cannot be provoked reliably against a live service.
+ *
+ * <p>Extraction runs {@code @Async} in production so the request thread returns immediately with
+ * {@code PROCESSING}; these tests care about the terminal outcome, so {@link
+ * SynchronousAsyncConfig} overrides the executor to run on the calling thread instead of polling.
  */
 @AutoConfigureMockMvc
-@Import(DocumentStatusPipelineIT.StubExtractionConfig.class)
+@Import({DocumentStatusPipelineIT.StubExtractionConfig.class, DocumentStatusPipelineIT.SynchronousAsyncConfig.class})
+@org.springframework.test.context.TestPropertySource(
+    properties = "spring.main.allow-bean-definition-overriding=true")
 class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
   private static final byte[] REAL_PDF =
@@ -321,6 +328,25 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     @Primary
     StubExtractionClient stubExtractionClient() {
       return new StubExtractionClient();
+    }
+  }
+
+  /**
+   * Runs {@code @Async} work on the calling thread instead of a pool thread, so a test can assert
+   * the terminal status in the same HTTP response without polling or sleeping.
+   */
+  @TestConfiguration
+  static class SynchronousAsyncConfig implements AsyncConfigurer {
+
+    @Bean(com.ledgerly.api.AsyncConfig.DOCUMENT_PROCESSING_EXECUTOR)
+    @Primary
+    java.util.concurrent.Executor documentProcessingExecutor() {
+      return new org.springframework.core.task.SyncTaskExecutor();
+    }
+
+    @Override
+    public java.util.concurrent.Executor getAsyncExecutor() {
+      return documentProcessingExecutor();
     }
   }
 }
