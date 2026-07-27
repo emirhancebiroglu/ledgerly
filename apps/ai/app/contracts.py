@@ -51,3 +51,5 @@ def load_example(name: str) -> dict[str, Any]:
 
 EXTRACTION_PROPOSAL_SCHEMA = "extraction-proposal.schema.json"
 EXTRACT_REQUEST_SCHEMA = "extract-request.schema.json"
+EMBED_POLICY_REQUEST_SCHEMA = "embed-policy-request.schema.json"
+EMBED_POLICY_RESPONSE_SCHEMA = "embed-policy-response.schema.json"

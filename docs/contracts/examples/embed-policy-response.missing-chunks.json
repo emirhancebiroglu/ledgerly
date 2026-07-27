@@ -1,0 +1,5 @@
+{
+  "policy_document_id": "3d2f7c6a-9b1e-4f3a-8c2d-1a2b3c4d5e6f",
+  "model": "fake-embedding-v1",
+  "embedding_dimensions": 8
+}

@@ -5,3 +5,4 @@
 import os
 
 os.environ.setdefault("AI_LLM_PROVIDER", "fake")
+os.environ.setdefault("AI_EMBEDDING_PROVIDER", "fake")

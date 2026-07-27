@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgerly.dev/contracts/embed-policy-request.schema.json",
+  "title": "EmbedPolicyRequest",
+  "description": "The metadata part of `POST /embed-policy`. The document bytes travel as the multipart `file` part; this object is the `metadata` part alongside it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["policy_document_id", "content_type"],
+  "properties": {
+    "policy_document_id": {
+      "description": "The `api`-side policy document id, echoed back on every chunk so a response can never be mistaken for another document's.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "content_type": {
+      "description": "Media type `api` established by inspecting the bytes — not the type the uploader claimed.",
+      "type": "string",
+      "enum": ["application/pdf"]
+    },
+    "correlation_id": {
+      "description": "Correlation id propagated from `api`, so one request is traceable across all three services (architecture C6).",
+      "type": ["string", "null"],
+      "maxLength": 128
+    }
+  }
+}

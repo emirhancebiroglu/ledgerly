@@ -5,10 +5,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.contracts import EXTRACT_REQUEST_SCHEMA, load_schema
+from app.contracts import EMBED_POLICY_REQUEST_SCHEMA, EXTRACT_REQUEST_SCHEMA, load_schema
+from app.embeddings import EmbeddingClient, FakeEmbeddingClient, LiteLlmEmbeddingClient
 from app.extraction import ExtractionFailedError, ExtractionService
 from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
 from app.llm.client import LlmClient
+from app.policy.chunking import EmptyDocumentError
+from app.policy.embedding import PolicyEmbeddingFailedError, PolicyEmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +43,19 @@ def _load_supported_content_types() -> frozenset[str]:
     return frozenset(enum)
 
 
+def _load_supported_policy_content_types() -> frozenset[str]:
+    try:
+        enum = load_schema(EMBED_POLICY_REQUEST_SCHEMA)["properties"]["content_type"]["enum"]
+    except KeyError as error:
+        raise RuntimeError(
+            f"{EMBED_POLICY_REQUEST_SCHEMA} has no properties.content_type.enum — "
+            "cannot derive the accepted media-type list"
+        ) from error
+    return frozenset(enum)
+
+
 SUPPORTED_CONTENT_TYPES = _load_supported_content_types()
+SUPPORTED_POLICY_CONTENT_TYPES = _load_supported_policy_content_types()
 
 
 def get_llm_client() -> LlmClient:
@@ -66,6 +81,24 @@ def get_llm_client() -> LlmClient:
 
 def get_extraction_service() -> ExtractionService:
     return ExtractionService(get_llm_client())
+
+
+def get_embedding_client() -> EmbeddingClient:
+    if settings.embedding_provider == "fake":
+        return FakeEmbeddingClient()
+    if settings.embedding_provider == "litellm":
+        return LiteLlmEmbeddingClient(
+            model=settings.embedding_model,
+            api_key=settings.embedding_api_key,
+            dimensions=settings.embedding_dimensions,
+            timeout_seconds=settings.embedding_timeout_seconds,
+            api_base=settings.embedding_api_base,
+        )
+    raise RuntimeError(f"Unknown embedding provider: {settings.embedding_provider}")
+
+
+def get_policy_embedding_service() -> PolicyEmbeddingService:
+    return PolicyEmbeddingService(get_embedding_client())
 
 
 @app.get("/health")
@@ -100,6 +133,33 @@ async def extract(
         # A document this service cannot read is a bad request, not a server fault: returning 500
         # would tell `api` to retry something that will fail identically every time.
         logger.info("Extraction failed for document %s: %s", document_id, error)
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/embed-policy")
+async def embed_policy(
+    file: UploadFile = File(...),
+    policy_document_id: str = Form(...),
+    content_type: str = Form(...),
+    correlation_id: str | None = Form(default=None),
+    service: PolicyEmbeddingService = Depends(get_policy_embedding_service),
+) -> dict:
+    """Policy document bytes in, a schema-valid ``EmbedPolicyResponse`` out.
+
+    `api` persists the returned chunks as `policy_chunk` rows with pgvector embeddings.
+    """
+    if content_type not in SUPPORTED_POLICY_CONTENT_TYPES:
+        raise HTTPException(status_code=422, detail="Unsupported policy document content type")
+
+    content = await file.read()
+
+    if len(content) > settings.max_document_bytes:
+        raise HTTPException(status_code=413, detail="Document exceeds the maximum accepted size")
+
+    try:
+        return service.embed_policy(policy_document_id, content)
+    except (PolicyEmbeddingFailedError, EmptyDocumentError) as error:
+        logger.info("Policy embedding failed for document %s: %s", policy_document_id, error)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 

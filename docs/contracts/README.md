@@ -9,6 +9,8 @@ fails that side's contract test.
 |---|---|
 | `extract-request.schema.json` | The `metadata` part of `POST /extract` on `ai`. Bytes travel as the multipart `file` part. |
 | `extraction-proposal.schema.json` | What `ai` returns. Advisory only — `api` validates it before anything is posted. |
+| `embed-policy-request.schema.json` | The `metadata` part of `POST /embed-policy` on `ai`. Bytes travel as the multipart `file` part. |
+| `embed-policy-response.schema.json` | What `ai` returns — a policy document split into chunks with embeddings. `api` persists these as `policy_chunk` rows. |
 
 `examples/` holds golden fixtures used by the contract tests on both sides:
 
@@ -18,6 +20,9 @@ fails that side's contract test.
 | `extraction-proposal.missing-total.json` | validates red — `total_minor` is required |
 | `extraction-proposal.float-amount.json` | validates red — money is an integer of minor units |
 | `extract-request.valid.json` | validates green |
+| `embed-policy-request.valid.json` | validates green |
+| `embed-policy-response.valid.json` | validates green |
+| `embed-policy-response.missing-chunks.json` | validates red — `chunks` is required |
 
 ## Why money is an integer here
 
