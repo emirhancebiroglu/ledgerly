@@ -1,0 +1,207 @@
+"""`POST /extract` — the `ai` side of the M4 contract."""
+
+import uuid
+
+import pytest
+from fastapi.testclient import TestClient
+from jsonschema import Draft202012Validator
+
+from app.config import settings
+from app.contracts import EXTRACTION_PROPOSAL_SCHEMA, load_schema
+from app.extraction import ExtractionFailedError, ExtractionService
+from app.llm import FakeLlmClient
+from app.llm.client import LlmClient, LlmError, VisionPrompt
+from app.main import app
+
+client = TestClient(app)
+
+# Minimal but plausible PDF bytes — comfortably over the stub's readability floor.
+PDF_BYTES = b"%PDF-1.7\n" + b"0" * 512 + b"\n%%EOF\n"
+
+
+def post_extract(content: bytes = PDF_BYTES, content_type: str = "application/pdf", **overrides):
+    data = {
+        "document_id": overrides.pop("document_id", str(uuid.uuid4())),
+        "content_type": content_type,
+    }
+    data.update(overrides)
+    return client.post(
+        "/extract",
+        files={"file": ("invoice.pdf", content, content_type)},
+        data=data,
+    )
+
+
+def test_multipart_upload_returns_200_with_a_schema_valid_body():
+    response = post_extract()
+
+    assert response.status_code == 200
+    Draft202012Validator(load_schema(EXTRACTION_PROPOSAL_SCHEMA)).validate(response.json())
+
+
+def test_the_proposal_echoes_the_document_id_it_was_asked_about():
+    document_id = str(uuid.uuid4())
+
+    response = post_extract(document_id=document_id)
+
+    assert response.json()["document_id"] == document_id
+
+
+def test_the_fake_llm_client_is_what_produces_the_proposal():
+    response = post_extract()
+
+    assert response.json()["model"] == FakeLlmClient.MODEL_NAME
+
+
+def test_no_real_llm_adapter_is_wired_yet():
+    """M4 ships the port and the stub only; the provider decision belongs to M5."""
+    assert settings.llm_provider == "fake"
+
+
+def test_per_field_confidence_is_present_on_every_extracted_field():
+    confidence = post_extract().json()["confidence"]
+
+    for field in ("vendor", "currency", "total_minor", "tax_minor", "document_date"):
+        assert field in confidence, f"missing confidence for {field}"
+        assert 0.0 <= confidence[field] <= 1.0
+
+
+def test_every_monetary_value_in_the_response_is_an_integer():
+    body = post_extract().json()
+
+    assert isinstance(body["total_minor"], int) and not isinstance(body["total_minor"], bool)
+    assert isinstance(body["tax_minor"], int)
+    for line in body["lines"]:
+        assert isinstance(line["amount_minor"], int)
+
+
+def test_identical_bytes_produce_an_identical_proposal():
+    document_id = str(uuid.uuid4())
+
+    first = post_extract(document_id=document_id).json()
+    second = post_extract(document_id=document_id).json()
+
+    assert first == second
+
+
+def test_an_empty_upload_returns_422_not_500():
+    response = post_extract(content=b"")
+
+    assert response.status_code == 422
+    assert "detail" in response.json()
+
+
+def test_a_non_document_upload_returns_422_not_500():
+    response = post_extract(content=b"hi")
+
+    assert response.status_code == 422
+
+
+def test_an_unsupported_content_type_returns_422():
+    response = post_extract(content_type="application/zip")
+
+    assert response.status_code == 422
+
+
+def test_an_oversized_upload_is_rejected_at_the_configured_cap():
+    oversized = b"%PDF-1.7\n" + b"0" * (settings.max_document_bytes + 1)
+
+    response = post_extract(content=oversized)
+
+    assert response.status_code == 413
+
+
+def test_an_upload_at_exactly_the_cap_is_accepted():
+    at_cap = b"%PDF-1.7" + b"0" * (settings.max_document_bytes - 8)
+    assert len(at_cap) == settings.max_document_bytes
+
+    response = post_extract(content=at_cap)
+
+    assert response.status_code == 200
+
+
+def test_a_model_returning_non_json_surfaces_as_extraction_failure_not_a_crash():
+    class NonJsonLlmClient(LlmClient):
+        @property
+        def model_name(self) -> str:
+            return "broken-v1"
+
+        def complete(self, prompt: str) -> str:
+            return "not json"
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            return "definitely not json"
+
+    service = ExtractionService(NonJsonLlmClient())
+
+    with pytest.raises(ExtractionFailedError):
+        service.extract(str(uuid.uuid4()), PDF_BYTES, "application/pdf")
+
+
+def test_a_model_returning_a_schema_invalid_proposal_is_refused():
+    class FloatAmountLlmClient(LlmClient):
+        @property
+        def model_name(self) -> str:
+            return "floaty-v1"
+
+        def complete(self, prompt: str) -> str:
+            return "{}"
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            # A float amount is exactly what the schema exists to stop.
+            return (
+                '{"vendor":"V","currency":"EUR","total_minor":121.5,"tax_minor":21,'
+                '"document_date":"2026-07-14","lines":[],'
+                '"confidence":{"currency":1,"total_minor":1,"tax_minor":1,"document_date":1}}'
+            )
+
+    service = ExtractionService(FloatAmountLlmClient())
+
+    with pytest.raises(ExtractionFailedError):
+        service.extract(str(uuid.uuid4()), PDF_BYTES, "application/pdf")
+
+
+def test_a_failing_model_surfaces_as_extraction_failure():
+    class FailingLlmClient(LlmClient):
+        @property
+        def model_name(self) -> str:
+            return "failing-v1"
+
+        def complete(self, prompt: str) -> str:
+            raise LlmError("upstream down")
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            raise LlmError("upstream down")
+
+    service = ExtractionService(FailingLlmClient())
+
+    with pytest.raises(ExtractionFailedError):
+        service.extract(str(uuid.uuid4()), PDF_BYTES, "application/pdf")
+
+
+def test_the_model_cannot_choose_the_document_id_or_the_model_name():
+    class LyingLlmClient(LlmClient):
+        @property
+        def model_name(self) -> str:
+            return "honest-v1"
+
+        def complete(self, prompt: str) -> str:
+            return "{}"
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            return (
+                '{"document_id":"00000000-0000-0000-0000-000000000000",'
+                '"model":"claims-to-be-something-else",'
+                '"vendor":"V","currency":"EUR","total_minor":121,"tax_minor":21,'
+                '"document_date":"2026-07-14","lines":[],'
+                '"confidence":{"currency":1,"total_minor":1,"tax_minor":1,"document_date":1}}'
+            )
+
+    real_document_id = str(uuid.uuid4())
+
+    proposal = ExtractionService(LyingLlmClient()).extract(
+        real_document_id, PDF_BYTES, "application/pdf"
+    )
+
+    assert proposal["document_id"] == real_document_id
+    assert proposal["model"] == "honest-v1"

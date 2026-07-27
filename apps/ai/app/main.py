@@ -1,8 +1,15 @@
-from fastapi import FastAPI, Request
+import logging
+
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.extraction import ExtractionFailedError, ExtractionService
+from app.llm import FakeLlmClient
+from app.llm.client import LlmClient
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title=settings.service_name,
@@ -15,14 +22,62 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+# Media types `ai` will attempt to read. Mirrors the enum in the shared extract-request schema.
+SUPPORTED_CONTENT_TYPES = frozenset({"application/pdf", "image/jpeg", "image/png"})
+
+
+def get_llm_client() -> LlmClient:
+    """Adapter selection lives here so a provider change is configuration, not code.
+
+    Only the stub exists at M4; a real adapter is added at M5 alongside the eval harness that
+    decides which provider to use.
+    """
+    if settings.llm_provider == "fake":
+        return FakeLlmClient()
+    raise RuntimeError(f"Unknown LLM provider: {settings.llm_provider}")
+
+
+def get_extraction_service() -> ExtractionService:
+    return ExtractionService(get_llm_client())
 
 
 @app.get("/health")
 def health() -> dict:
     return {"service": settings.service_name, "version": settings.service_version, "status": "UP"}
+
+
+@app.post("/extract")
+async def extract(
+    file: UploadFile = File(...),
+    document_id: str = Form(...),
+    content_type: str = Form(...),
+    correlation_id: str | None = Form(default=None),
+    service: ExtractionService = Depends(get_extraction_service),
+) -> dict:
+    """Document bytes in, a schema-valid ``ExtractionProposal`` out.
+
+    The proposal is advisory. `api` validates it against its own rules and decides whether anything
+    is posted — see ``docs/architecture.md`` constraint C5.
+    """
+    if content_type not in SUPPORTED_CONTENT_TYPES:
+        raise HTTPException(status_code=422, detail="Unsupported document content type")
+
+    content = await file.read()
+
+    if len(content) > settings.max_document_bytes:
+        raise HTTPException(status_code=413, detail="Document exceeds the maximum accepted size")
+
+    try:
+        return service.extract(document_id, content, content_type)
+    except ExtractionFailedError as error:
+        # A document this service cannot read is a bad request, not a server fault: returning 500
+        # would tell `api` to retry something that will fail identically every time.
+        logger.info("Extraction failed for document %s: %s", document_id, error)
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.exception_handler(404)
