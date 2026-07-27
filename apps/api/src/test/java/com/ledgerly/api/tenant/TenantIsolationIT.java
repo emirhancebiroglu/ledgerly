@@ -75,7 +75,11 @@ class TenantIsolationIT extends AbstractPostgresIT {
             .signWith(Keys.hmacShaKeyFor("a-completely-different-attacker-controlled-secret-key".getBytes(StandardCharsets.UTF_8)))
             .compact();
 
-    postExpense(forgedToken, new CreateExpenseRequest(1500, "EUR")).andExpect(status().isForbidden());
+    // 401, not 403: a token whose signature does not verify never established an identity at all,
+    // so the honest answer is "who are you?" rather than "you may not". The org claim inside it is
+    // never even read.
+    postExpense(forgedToken, new CreateExpenseRequest(1500, "EUR"))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

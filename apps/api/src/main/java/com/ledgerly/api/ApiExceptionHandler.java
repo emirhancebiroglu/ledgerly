@@ -4,12 +4,16 @@ import com.ledgerly.api.auth.CrossOrganizationAccessException;
 import com.ledgerly.api.auth.InvalidCredentialsException;
 import com.ledgerly.api.auth.InvalidRefreshTokenException;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
+import com.ledgerly.api.document.DocumentTooLargeException;
+import com.ledgerly.api.document.IllegalDocumentTransitionException;
+import com.ledgerly.api.document.UnsupportedDocumentTypeException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import java.util.NoSuchElementException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -34,6 +38,27 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(IdempotencyConflictException.class)
   public ProblemDetail handleIdempotencyConflict(IdempotencyConflictException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
+  }
+
+  @ExceptionHandler(UnsupportedDocumentTypeException.class)
+  public ProblemDetail handleUnsupportedDocumentType(UnsupportedDocumentTypeException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(
+            HttpStatus.UNSUPPORTED_MEDIA_TYPE, exception.getMessage()));
+  }
+
+  @ExceptionHandler({DocumentTooLargeException.class, MaxUploadSizeExceededException.class})
+  public ProblemDetail handleDocumentTooLarge() {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(
+            HttpStatus.PAYLOAD_TOO_LARGE, "Document exceeds the maximum accepted size"));
+  }
+
+  @ExceptionHandler(IllegalDocumentTransitionException.class)
+  public ProblemDetail handleIllegalDocumentTransition(
+      IllegalDocumentTransitionException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
   }
