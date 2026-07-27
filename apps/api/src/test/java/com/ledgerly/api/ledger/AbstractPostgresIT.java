@@ -23,7 +23,8 @@ import org.testcontainers.utility.DockerImageName;
 public abstract class AbstractPostgresIT {
 
   static final PostgreSQLContainer<?> POSTGRES =
-      new PostgreSQLContainer<>(DockerImageName.parse("postgres:17"))
+      new PostgreSQLContainer<>(
+              DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"))
           .withDatabaseName("ledgerly_test")
           .withUsername("ledgerly")
           .withPassword("ledgerly");

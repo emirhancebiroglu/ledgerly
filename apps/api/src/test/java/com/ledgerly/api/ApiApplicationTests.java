@@ -13,6 +13,8 @@ import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.document.DocumentRepository;
 import com.ledgerly.api.expense.ExpenseStubRepository;
 import com.ledgerly.api.idempotency.IdempotencyRecordRepository;
+import com.ledgerly.api.policy.PolicyChunkRepository;
+import com.ledgerly.api.policy.PolicyDocumentRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -42,6 +44,8 @@ class ApiApplicationTests {
   @MockitoBean private AuditLogRepository auditLogRepository;
   @MockitoBean private DocumentRepository documentRepository;
   @MockitoBean private CategoryRepository categoryRepository;
+  @MockitoBean private PolicyDocumentRepository policyDocumentRepository;
+  @MockitoBean private PolicyChunkRepository policyChunkRepository;
 
   @Test
   void contextLoads() {}
