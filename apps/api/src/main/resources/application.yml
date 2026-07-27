@@ -11,6 +11,12 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: validate
+  servlet:
+    multipart:
+      # Above ledgerly.document.max-bytes on purpose, so the application's own 413 with a usable
+      # message wins rather than the container rejecting first with a generic error.
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:12MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:12MB}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -20,6 +26,20 @@ ledgerly:
     jwt-secret: ${JWT_SECRET}
     access-token-ttl-minutes: ${JWT_ACCESS_TOKEN_TTL_MINUTES:15}
     refresh-token-ttl-days: ${JWT_REFRESH_TOKEN_TTL_DAYS:30}
+  storage:
+    # Deliberately outside any web-served directory; nothing serves static files from disk.
+    root: ${STORAGE_ROOT:./var/storage}
+  document:
+    max-bytes: ${DOCUMENT_MAX_BYTES:10485760}
+  ai:
+    base-url: ${AI_BASE_URL:http://localhost:8000}
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+  extraction:
+    # 1,000,000.00 in minor units. Above this a human signs off, however consistent the
+    # extraction looked — a misplaced decimal is most dangerous when everything else adds up.
+    amount-ceiling-minor: ${EXTRACTION_AMOUNT_CEILING_MINOR:100000000}
+    max-age-years: ${EXTRACTION_MAX_AGE_YEARS:10}
+    max-future-days: ${EXTRACTION_MAX_FUTURE_DAYS:1}
 
 logging:
   pattern:

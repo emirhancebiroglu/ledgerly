@@ -9,6 +9,7 @@ import com.ledgerly.api.audit.AuditLogRepository;
 import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
+import com.ledgerly.api.document.DocumentRepository;
 import com.ledgerly.api.expense.ExpenseStubRepository;
 import com.ledgerly.api.idempotency.IdempotencyRecordRepository;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,7 @@ class ApiApplicationTests {
   @MockitoBean private ExpenseStubRepository expenseStubRepository;
   @MockitoBean private IdempotencyRecordRepository idempotencyRecordRepository;
   @MockitoBean private AuditLogRepository auditLogRepository;
+  @MockitoBean private DocumentRepository documentRepository;
 
   @Test
   void contextLoads() {}
@@ -67,9 +69,10 @@ class ApiApplicationTests {
 
   @Test
   void unauthenticatedRequestToUnknownRouteIsRejectedBeforeRouting() throws Exception {
-    // Security fails closed: an unmapped route on a protected path is rejected at the
-    // filter chain, before Spring MVC gets a chance to report 404 vs 403.
-    mockMvc.perform(get("/does-not-exist")).andExpect(status().isForbidden());
+    // Security fails closed: an unmapped route on a protected path is rejected at the filter
+    // chain, before Spring MVC gets a chance to answer 404 — so the response never reveals which
+    // routes exist. 401 rather than 403 because the caller presented no credentials at all.
+    mockMvc.perform(get("/does-not-exist")).andExpect(status().isUnauthorized());
   }
 
   @Test

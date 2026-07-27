@@ -1,3 +1,12 @@
 ledgerly:
   auth:
     jwt-secret: test-only-secret-not-for-production-use-0123456789
+  storage:
+    root: ${java.io.tmpdir}/ledgerly-test-storage
+  document:
+    # Small on purpose: the over-cap test builds a buffer of this size, and 10MB per run is waste.
+    max-bytes: 65536
+  ai:
+    # Tests replace the ExtractionClient bean; nothing should reach this address.
+    base-url: http://localhost:59999
+    timeout-seconds: 2

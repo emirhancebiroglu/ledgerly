@@ -23,6 +23,7 @@
     <testcontainers.version>1.21.4</testcontainers.version>
     <jqwik.version>1.9.1</jqwik.version>
     <jjwt.version>0.12.6</jjwt.version>
+    <json-schema-validator.version>1.5.6</json-schema-validator.version>
   </properties>
 
   <dependencies>
@@ -103,6 +104,14 @@
       <version>${jqwik.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Contract tests validate against docs/contracts/ directly; the schemas are never
+         hand-copied into Java, so this stays test-scoped. -->
+    <dependency>
+      <groupId>com.networknt</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>${json-schema-validator.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <dependencyManagement>
@@ -123,6 +132,22 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!-- Spring Boot's parent excludes **/*IT.java from surefire, so without failsafe the
+           integration tests never run in a plain `mvn test` — a green build would then say
+           nothing about the ledger-write, tenant-isolation or pipeline assertions, which are
+           exactly the ones that matter. `mvn verify` is the real gate. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

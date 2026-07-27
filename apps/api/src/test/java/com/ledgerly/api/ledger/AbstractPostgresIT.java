@@ -39,7 +39,7 @@ public abstract class AbstractPostgresIT {
     registry.add("spring.datasource.password", POSTGRES::getPassword);
   }
 
-  UUID insertOrganization(Connection connection) throws SQLException {
+  protected UUID insertOrganization(Connection connection) throws SQLException {
     UUID id = UUID.randomUUID();
     try (PreparedStatement ps = connection.prepareStatement(
         "INSERT INTO organization (id, name, base_currency) VALUES (?, ?, 'EUR')")) {
