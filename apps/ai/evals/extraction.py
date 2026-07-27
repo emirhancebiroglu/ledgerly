@@ -13,37 +13,18 @@ without the private fixture set, scored only on the fixtures actually present.
 
 from __future__ import annotations
 
+import os
 import statistics
 import sys
 import time
 from dataclasses import dataclass, field
 
-from app.config import settings
 from app.extraction import ExtractionFailedError, ExtractionService
-from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
-from app.llm.client import LlmClient
+from app.main import get_llm_client as build_llm_client
 from evals.fixtures_loader import GROUPS, Fixture, load_fixtures
 
 GATED_FIELDS = ("currency", "total_minor", "document_date")
 ACCURACY_GATE = 0.90
-
-
-def build_llm_client() -> LlmClient:
-    if settings.llm_provider == "fake":
-        return FakeLlmClient()
-    if settings.llm_provider == "litellm":
-        inner = LiteLlmClient(
-            model=settings.llm_model,
-            api_key=settings.llm_api_key,
-            timeout_seconds=settings.llm_timeout_seconds,
-        )
-        return ResilientLlmClient(
-            inner,
-            max_retries=settings.llm_max_retries,
-            failure_threshold=settings.llm_circuit_breaker_failure_threshold,
-            cooldown_seconds=settings.llm_circuit_breaker_cooldown_seconds,
-        )
-    raise RuntimeError(f"Unknown LLM provider: {settings.llm_provider}")
 
 
 @dataclass
@@ -138,9 +119,18 @@ def print_report(results: list[FixtureResult]) -> bool:
 
 
 def main() -> int:
+    # A free-tier provider key is rate-limited well below what 20 back-to-back calls need; a paid
+    # tier needs none of this. Opt-in via env rather than hardcoded, since the harness itself must
+    # stay fast for CI and for the fake-provider unit tests.
+    pace_seconds = float(os.environ.get("EVAL_PACE_SECONDS", "0"))
+
     fixtures = load_fixtures()
     service = ExtractionService(build_llm_client())
-    results = [run_fixture(service, fixture) for fixture in fixtures]
+    results = []
+    for index, fixture in enumerate(fixtures):
+        if index > 0 and pace_seconds > 0:
+            time.sleep(pace_seconds)
+        results.append(run_fixture(service, fixture))
     gate_passed = print_report(results)
     return 0 if gate_passed else 1
 

@@ -1,5 +1,5 @@
 {
-  "source": "invoices/62753890815077.Pdf",
+  "source": "invoices/62753442010956.Pdf",
   "content_type": "application/pdf",
   "layout_note": "D-Market/hepsiburada charger invoice, same template as 07 but Sipariş Tarihi (03.05.2025) and Düzenleme Tarihi (05.05.2025) genuinely differ -- the real four-candidate ambiguity this layout family exists to test. document_date must be Düzenleme Tarihi (05.05.2025), not Sipariş Tarihi. Also has a discount line between the item total and the taxed subtotal.",
   "expected": {

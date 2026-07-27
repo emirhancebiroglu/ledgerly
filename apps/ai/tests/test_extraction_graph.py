@@ -200,3 +200,21 @@ def test_a_model_error_on_the_self_check_keeps_the_original_extraction():
 
 def test_confidence_threshold_is_a_module_constant_not_a_magic_number():
     assert 0.0 < CONFIDENCE_THRESHOLD < 1.0
+
+
+def test_a_markdown_json_fence_around_the_response_is_stripped():
+    fenced = "```json\n" + proposal() + "\n```"
+    client = ScriptedLlmClient([fenced])
+
+    result = run(client)
+
+    assert result["extracted"]["total_minor"] == 1210
+
+
+def test_a_markdown_fence_without_the_json_language_tag_is_also_stripped():
+    fenced = "```\n" + proposal() + "\n```"
+    client = ScriptedLlmClient([fenced])
+
+    result = run(client)
+
+    assert result["extracted"]["total_minor"] == 1210

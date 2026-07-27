@@ -39,7 +39,11 @@ ledgerly:
       interval-seconds: ${DOCUMENT_REAPER_INTERVAL_SECONDS:60}
   ai:
     base-url: ${AI_BASE_URL:http://localhost:8000}
-    timeout-seconds: ${AI_TIMEOUT_SECONDS:30}
+    # Must clear ai's own LLM call timeout (120s, see apps/ai app/config.py) plus its retries —
+    # a real vision model call saw p95 latency around 90s during the M5 gate run. Extraction now
+    # runs off the request thread (T7), so this only bounds one async worker call, not an HTTP
+    # request a user is waiting on.
+    timeout-seconds: ${AI_TIMEOUT_SECONDS:150}
   extraction:
     # 1,000,000.00 in minor units. Above this a human signs off, however consistent the
     # extraction looked — a misplaced decimal is most dangerous when everything else adds up.

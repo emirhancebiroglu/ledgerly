@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -49,6 +50,16 @@ class GraphState(TypedDict):
     self_checked_fields: list[str]
 
 
+_MARKDOWN_JSON_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+
+
+def _strip_markdown_fence(raw: str) -> str:
+    """Models are told not to wrap JSON in a code fence but sometimes do anyway; strip one if
+    present rather than failing the whole extraction over formatting."""
+    match = _MARKDOWN_JSON_FENCE.match(raw.strip())
+    return match.group(1) if match else raw
+
+
 def _low_confidence_fields(extracted: dict) -> list[str]:
     confidence = extracted.get("confidence", {})
     return [
@@ -72,7 +83,7 @@ def build_extraction_graph(llm_client: LlmClient):
             raise ExtractionFailedError(str(error)) from error
 
         try:
-            extracted = json.loads(raw)
+            extracted = json.loads(_strip_markdown_fence(raw))
         except json.JSONDecodeError as error:
             raise ExtractionFailedError("Model returned output that is not valid JSON") from error
 
@@ -103,7 +114,7 @@ def build_extraction_graph(llm_client: LlmClient):
             return {**state, "self_check_ran": True, "self_checked_fields": low_confidence}
 
         try:
-            corrected = json.loads(raw)
+            corrected = json.loads(_strip_markdown_fence(raw))
         except json.JSONDecodeError:
             logger.info("Self-check returned non-JSON, keeping the original extraction")
             return {**state, "self_check_ran": True, "self_checked_fields": low_confidence}

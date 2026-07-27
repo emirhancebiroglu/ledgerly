@@ -24,10 +24,23 @@ class Settings(BaseSettings):
     # startup with a message naming this service, not on the first request.
     llm_api_key: str | None = None
 
-    llm_timeout_seconds: float = 30.0
+    # 30s was too tight in practice — the M5 gate run against a real vision model saw p95 latency
+    # of ~90s per call. A false timeout is indistinguishable from a real one downstream (both
+    # retry, both can open the circuit breaker), so the timeout has to clear real p95, not p50.
+    llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 2
     llm_circuit_breaker_failure_threshold: int = 5
     llm_circuit_breaker_cooldown_seconds: float = 30.0
+
+    # Set only for an OpenAI-compatible gateway that isn't resolved by LiteLLM's own provider
+    # routing (e.g. OpenCode Go's https://opencode.ai/zen/go/v1). Left unset, LiteLLM routes by
+    # the model string's provider prefix as usual.
+    llm_api_base: str | None = None
+
+    # Only Gemini's native API accepts a PDF as a `file` content block through LiteLLM; every
+    # OpenAI-compatible gateway tried rejects it. Non-Gemini providers render PDF pages to PNG
+    # first — see app.llm.pdf_to_images.
+    llm_supports_native_pdf: bool = True
 
 
 settings = Settings()

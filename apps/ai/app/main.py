@@ -39,6 +39,8 @@ def get_llm_client() -> LlmClient:
             model=settings.llm_model,
             api_key=settings.llm_api_key,
             timeout_seconds=settings.llm_timeout_seconds,
+            api_base=settings.llm_api_base,
+            supports_native_pdf=settings.llm_supports_native_pdf,
         )
         return ResilientLlmClient(
             inner,
