@@ -27,11 +27,9 @@ public class DocumentController {
   }
 
   /**
-   * Uploads a document and processes it before responding.
-   *
-   * <p>Synchronous at M4: the stub answers instantly, so the caller sees a terminal status without
-   * polling. Whether this moves off-thread is decided at M5 from observed latency (architecture
-   * Q3) — the status lifecycle already models the asynchronous case.
+   * Uploads a document and returns immediately once it is marked {@code PROCESSING} — the `ai`
+   * call runs off the request thread (architecture Q3, decided at M5). A client polls
+   * {@code GET /api/v1/documents/{id}} for the terminal status.
    */
   @PostMapping("/api/v1/documents")
   @ResponseStatus(HttpStatus.CREATED)
@@ -42,7 +40,7 @@ public class DocumentController {
     Document uploaded =
         documentUploadService.upload(file.getBytes(), file.getOriginalFilename(), principal);
     return DocumentResponse.from(
-        documentProcessingService.process(uploaded.getId(), principal.organizationId()));
+        documentProcessingService.beginProcessing(uploaded.getId(), principal.organizationId()));
   }
 
   @GetMapping("/api/v1/documents/{id}")

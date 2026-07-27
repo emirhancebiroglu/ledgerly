@@ -31,6 +31,14 @@ services:
     restart: unless-stopped
     ports:
       - "${AI_PORT:-8000}:8000"
+    environment:
+      AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-litellm}
+      AI_LLM_API_KEY: ${AI_LLM_API_KEY:?AI_LLM_API_KEY must be set}
+    # AI_LLM_MODEL / AI_LLM_API_BASE / AI_LLM_SUPPORTS_NATIVE_PDF are deliberately not set here —
+    # Settings' own defaults (app/config.py) are the single source of truth, so this file cannot
+    # drift out of sync with them the way it did when the Q1 provider changed mid-milestone. To
+    # override any of them for a deployment, add an env_file or pass -e on the CLI; do not hardcode
+    # a duplicate default in this compose file again.
 
   web:
     build:

@@ -8,21 +8,49 @@ amount ceiling are `api`'s call, at the trust boundary described in ``docs/archi
 
 from __future__ import annotations
 
-import json
 import logging
 
 from jsonschema import Draft202012Validator
 
 from app.contracts import EXTRACTION_PROPOSAL_SCHEMA, load_schema
-from app.llm.client import LlmClient, LlmError, VisionPrompt
+from app.llm.client import LlmClient
+from app.llm.extraction_graph import ExtractionFailedError as GraphExtractionFailedError
+from app.llm.extraction_graph import run_extraction_graph
 
 logger = logging.getLogger(__name__)
 
-EXTRACTION_INSTRUCTION = (
-    "Extract the vendor, currency, document date, tax and total from this document. "
-    "Report every monetary amount in minor units as an integer. "
-    "Report a confidence in [0,1] for each field."
-)
+EXTRACTION_INSTRUCTION = """\
+Read this document and return ONLY a single JSON object — no markdown code fences, no \
+commentary before or after — matching exactly this shape:
+
+{
+  "vendor": "<name as printed, or null if unreadable>",
+  "currency": "<ISO 4217 alphabetic code, e.g. TRY, USD, EUR, GBP, MYR — never a symbol like $ or a \
+local abbreviation like TL>",
+  "total_minor": <integer, the final payable amount in minor units (cents/kuruş), e.g. 12.10 -> \
+1210. Never a float.>,
+  "tax_minor": <integer, the tax portion already included in total_minor, in minor units. Never a \
+float. 0 if the document is genuinely tax-exempt, never omitted.>,
+  "document_date": "<YYYY-MM-DD — the date the document was ISSUED or CUT, e.g. \\"Fatura Tarihi\\" \
+or \\"Invoice Date\\". NEVER the due date, order date, dispatch date or upload date, even if a \
+label like \\"Sipariş Tarihi\\" or \\"Son Ödeme Tarihi\\" is more prominent on the page.>",
+  "lines": [
+    {"description": "<line text>", "quantity": <integer, thousandths — so 1.5 units is 1500>, \
+"amount_minor": <integer, minor units>}
+  ],
+  "confidence": {
+    "vendor": <float 0-1>,
+    "currency": <float 0-1>,
+    "total_minor": <float 0-1>,
+    "tax_minor": <float 0-1>,
+    "document_date": <float 0-1>
+  }
+}
+
+"lines" may be an empty array if the document has no itemisation. Every amount is an integer in \
+minor units — never a float anywhere. A refund or credit note has a negative total_minor and \
+tax_minor, with every line amount_minor also negative.\
+"""
 
 
 class ExtractionFailedError(RuntimeError):
@@ -44,20 +72,19 @@ class ExtractionService:
             parse error instead of surfacing it here, where the cause is known.
         """
         try:
-            raw = self._llm_client.complete_vision(
-                VisionPrompt(
-                    instruction=EXTRACTION_INSTRUCTION,
-                    content=content,
-                    content_type=content_type,
-                )
+            result = run_extraction_graph(
+                self._llm_client, EXTRACTION_INSTRUCTION, content, content_type
             )
-        except LlmError as error:
+        except GraphExtractionFailedError as error:
             raise ExtractionFailedError(str(error)) from error
 
-        try:
-            extracted = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise ExtractionFailedError("Model returned output that is not valid JSON") from error
+        extracted = result["extracted"]
+        if result["self_checked_fields"]:
+            logger.info(
+                "Self-check ran for document %s on fields: %s",
+                document_id,
+                ", ".join(result["self_checked_fields"]),
+            )
 
         proposal = {
             **extracted,

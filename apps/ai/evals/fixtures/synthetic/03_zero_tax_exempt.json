@@ -1,0 +1,24 @@
+{
+  "source": "apps/ai/evals/fixtures/synthetic/03_zero_tax_exempt.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Synthetic edge case: explicitly tax-exempt sale, so tax_minor is genuinely 0 rather than an unread field -- distinguishes 'exempt' from 'model missed it', paired with fixture 01_sroie_yongfatt.json in the public group which hits the same zero-tax case from a real document. Non-TRY currency (CAD).",
+  "expected": {
+    "vendor": "SUNRISE MEDICAL SUPPLIES INC",
+    "currency": "CAD",
+    "total_minor": 11100,
+    "tax_minor": 0,
+    "document_date": "2026-05-02",
+    "lines": [
+      {
+        "description": "First Aid Kit, Large",
+        "quantity": 2000,
+        "amount_minor": 8400
+      },
+      {
+        "description": "Sterile Gauze Pack (10x)",
+        "quantity": 3000,
+        "amount_minor": 2700
+      }
+    ]
+  }
+}

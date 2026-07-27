@@ -1,0 +1,19 @@
+{
+  "source": "invoices/EMP2025000000482.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Emre Sevda E-Ticaret (Trendyol marketplace) invoice. Tarih (issue), Sipariş Tarihi (order) and Son Ödeme Tarihi (due) all fall on the same day here -- document_date must still be Tarih specifically, not incidentally correct because the dates coincide.",
+  "expected": {
+    "vendor": "Emre Sevda E-Ticaret",
+    "currency": "TRY",
+    "total_minor": 57516,
+    "tax_minor": 9586,
+    "document_date": "2025-12-04",
+    "lines": [
+      {
+        "description": "X-626 Motosiklet Bisiklet Telefon Tutucu Gidon ve Ayna Bağlantılı Motor Tutacağı Scooter 12-24W Hızlı Şarj",
+        "quantity": 1000,
+        "amount_minor": 47930
+      }
+    ]
+  }
+}

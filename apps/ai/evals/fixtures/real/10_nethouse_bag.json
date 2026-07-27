@@ -1,0 +1,19 @@
+{
+  "source": "invoices/redirect.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Nethouse (Trendyol Nethouse marketplace) laptop bag invoice. Fatura Tarihi, Düzenleme Tarihi and Sipariş Tarihi are all 01-11-2023 -- the same coincidental-same-day case as fixture 09, on a different vendor template, confirming the rule generalises rather than being fit to one layout.",
+  "expected": {
+    "vendor": "NETHOUSE BİLGİSAYAR SİSTEMLERİ PAZ.SAN.VE TİC.LTD.ŞTİ.",
+    "currency": "TRY",
+    "total_minor": 39900,
+    "tax_minor": 3627,
+    "document_date": "2023-11-01",
+    "lines": [
+      {
+        "description": "LENOVO GX40Q17231 CASE 15.6 TOPLOADER T210 NOTEBOOK ÇANTASI GREY-ROW",
+        "quantity": 1000,
+        "amount_minor": 36273
+      }
+    ]
+  }
+}

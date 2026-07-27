@@ -1,5 +1,6 @@
 package com.ledgerly.api.document;
 
+import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -60,5 +61,19 @@ public class DocumentStatusTransitions {
     return documentRepository
         .findByIdAndOrganizationId(documentId, organizationId)
         .orElseThrow(() -> new NoSuchElementException("Document not found: " + documentId));
+  }
+
+  /**
+   * One document, one transaction — used by {@link DocumentReaper} so a crash partway through a
+   * sweep leaves every already-reclaimed document reclaimed, not rolled back as a batch.
+   *
+   * @return true if this call actually reclaimed the row (see {@link
+   *     DocumentRepository#reclaimStuckDocument} for why a race can legitimately return false)
+   */
+  @Transactional
+  public boolean reclaimStuckDocument(UUID documentId, Instant cutoff, Instant now, String reason) {
+    return documentRepository.reclaimStuckDocument(
+            documentId, DocumentStatus.PROCESSING, cutoff, now, reason)
+        > 0;
   }
 }

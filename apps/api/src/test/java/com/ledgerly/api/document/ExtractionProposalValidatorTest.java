@@ -80,9 +80,13 @@ class ExtractionProposalValidatorTest {
   }
 
   @Test
-  void rejectsNegativeAmounts() {
+  void rejectsATotalTaxSignMismatch() {
     assertThat(validator.validate(proposal().taxMinor(-1).totalMinor(9999).build()).isValid())
         .isFalse();
+  }
+
+  @Test
+  void rejectsALineWhoseSignDisagreesWithTheTotal() {
     assertThat(
             validator
                 .validate(
@@ -92,6 +96,34 @@ class ExtractionProposalValidatorTest {
                         .build())
                 .isValid())
         .isFalse();
+  }
+
+  @Test
+  void acceptsAConsistentRefundWhereEverythingIsNegative() {
+    ProposalValidationResult result =
+        validator.validate(
+            proposal()
+                .lines(List.of(new ExtractionProposal.Line("refund", 1000L, -5000L)))
+                .taxMinor(-100)
+                .totalMinor(-5100)
+                .build());
+
+    assertThat(result.isValid()).isTrue();
+  }
+
+  @Test
+  void rejectsARefundCeilingByMagnitudeNotSign() {
+    long overCeilingNegative = -(CEILING_MINOR + 1);
+    ProposalValidationResult result =
+        validator.validate(
+            proposal()
+                .lines(List.of(new ExtractionProposal.Line("big refund", 1000L, overCeilingNegative)))
+                .taxMinor(0)
+                .totalMinor(overCeilingNegative)
+                .build());
+
+    assertThat(result.isValid()).isFalse();
+    assertThat(result.summary()).contains("ceiling");
   }
 
   @Test

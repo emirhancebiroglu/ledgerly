@@ -1,0 +1,29 @@
+{
+  "source": "apps/ai/evals/fixtures/public/04_sroie_banhmicafe.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SROIE (public dataset) restaurant receipt, Malaysia. Three line items, a service charge and GST both broken out separately, and rounding adjustment applied to reach the final TOTAL.",
+  "expected": {
+    "vendor": "Banh Mi Cafe",
+    "currency": "MYR",
+    "total_minor": 2325,
+    "tax_minor": 131,
+    "document_date": "2017-10-29",
+    "lines": [
+      {
+        "description": "205 Sweet & Sour Pork Ribs",
+        "quantity": 1000,
+        "amount_minor": 990
+      },
+      {
+        "description": "217 Stuff Meat Tau Fu",
+        "quantity": 1000,
+        "amount_minor": 990
+      },
+      {
+        "description": "605 Vietnamese Iced Tea",
+        "quantity": 1000,
+        "amount_minor": 150
+      }
+    ]
+  }
+}

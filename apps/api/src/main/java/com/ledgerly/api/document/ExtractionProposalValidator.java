@@ -78,20 +78,29 @@ public class ExtractionProposalValidator {
    * The books balance or the proposal does not pass. An off-by-one-minor-unit discrepancy is a
    * failure exactly like any other: a cent that cannot be accounted for is a cent that will have to
    * be reconciled by hand later.
+   *
+   * <p>A credit note or refund is a legitimate document — its total, tax and every line are
+   * negative together. What is never legal is a mix: a positive total built from a negative line,
+   * or a negative total with a positive tax. Sign consistency is enforced instead of a blanket
+   * non-negativity check.
    */
   private void checkArithmetic(ExtractionProposal proposal, List<String> violations) {
     if (proposal.lines() == null || proposal.lines().isEmpty()) {
       violations.add("Proposal has no line items to reconcile against the total");
       return;
     }
-    if (proposal.taxMinor() < 0) {
-      violations.add("Tax is negative: " + proposal.taxMinor());
+    boolean isRefund = proposal.totalMinor() < 0;
+    if (isRefund && proposal.taxMinor() > 0) {
+      violations.add("Total is negative but tax is positive: " + proposal.taxMinor());
     }
-    if (proposal.totalMinor() < 0) {
-      violations.add("Total is negative: " + proposal.totalMinor());
+    if (!isRefund && proposal.taxMinor() < 0) {
+      violations.add("Tax is negative but total is not: " + proposal.taxMinor());
     }
-    if (proposal.lines().stream().anyMatch(line -> line.amountMinor() < 0)) {
-      violations.add("A line amount is negative");
+    boolean lineSignMismatch =
+        proposal.lines().stream()
+            .anyMatch(line -> isRefund ? line.amountMinor() > 0 : line.amountMinor() < 0);
+    if (lineSignMismatch) {
+      violations.add("A line amount's sign is inconsistent with the total");
     }
 
     long expected;
@@ -135,10 +144,11 @@ public class ExtractionProposalValidator {
   /**
    * An amount over the organization's ceiling routes to a human even when everything else about the
    * proposal is consistent — a plausible-looking extraction is exactly how a misplaced decimal gets
-   * posted without anyone noticing.
+   * posted without anyone noticing. Checked by magnitude: a refund of -999,999,999 minor units is
+   * exactly as implausible as a sale of +999,999,999, and a total-only check would let it through.
    */
   private void checkCeiling(ExtractionProposal proposal, List<String> violations) {
-    if (proposal.totalMinor() > amountCeilingMinor) {
+    if (Math.abs(proposal.totalMinor()) > amountCeilingMinor) {
       violations.add(
           "Total %d exceeds the organization ceiling of %d minor units"
               .formatted(proposal.totalMinor(), amountCeilingMinor));

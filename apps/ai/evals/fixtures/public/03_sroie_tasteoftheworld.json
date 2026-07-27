@@ -1,0 +1,19 @@
+{
+  "source": "apps/ai/evals/fixtures/public/03_sroie_tasteoftheworld.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SROIE (public dataset) restaurant receipt, Malaysia. Has both a service charge (6% GST on top of it) and the item total; the GST Summary table's Tax(RM) column (3.63) is the actual tax portion, not the service charge itself, which is a separate line.",
+  "expected": {
+    "vendor": "Taste Of The World Sdn Bhd",
+    "currency": "MYR",
+    "total_minor": 6415,
+    "tax_minor": 363,
+    "document_date": "2018-03-05",
+    "lines": [
+      {
+        "description": "S Tiger Bucket",
+        "quantity": 1000,
+        "amount_minor": 5830
+      }
+    ]
+  }
+}

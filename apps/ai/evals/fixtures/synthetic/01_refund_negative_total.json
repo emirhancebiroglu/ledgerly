@@ -1,0 +1,24 @@
+{
+  "source": "apps/ai/evals/fixtures/synthetic/01_refund_negative_total.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Synthetic edge case: a credit note with a negative total. No real dataset reliably provides this. Currency is GBP, not TRY, so the currency field is exercised here too.",
+  "expected": {
+    "vendor": "GLOBEX RETAIL LTD",
+    "currency": "GBP",
+    "total_minor": -2849,
+    "tax_minor": 0,
+    "document_date": "2026-03-14",
+    "lines": [
+      {
+        "description": "Refund: Wireless Mouse",
+        "quantity": 1000,
+        "amount_minor": -1999
+      },
+      {
+        "description": "Refund: USB-C Cable",
+        "quantity": 1000,
+        "amount_minor": -850
+      }
+    ]
+  }
+}

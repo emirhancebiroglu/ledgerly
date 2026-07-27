@@ -32,14 +32,12 @@
       "pattern": "^[A-Z]{3}$"
     },
     "total_minor": {
-      "description": "Document total in minor units. Integer, never a float — see architecture C1.",
-      "type": "integer",
-      "minimum": 0
+      "description": "Document total in minor units. Integer, never a float — see architecture C1. Negative for a credit note or refund.",
+      "type": "integer"
     },
     "tax_minor": {
-      "description": "Tax portion in minor units, already included in `total_minor`.",
-      "type": "integer",
-      "minimum": 0
+      "description": "Tax portion in minor units, already included in `total_minor`. Negative when total_minor is negative (a refunded tax), never negative on its own.",
+      "type": "integer"
     },
     "document_date": {
       "description": "Date printed on the document (not the upload date).",

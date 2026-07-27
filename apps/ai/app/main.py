@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.extraction import ExtractionFailedError, ExtractionService
-from app.llm import FakeLlmClient
+from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
 from app.llm.client import LlmClient
 
 logger = logging.getLogger(__name__)
@@ -31,13 +31,23 @@ SUPPORTED_CONTENT_TYPES = frozenset({"application/pdf", "image/jpeg", "image/png
 
 
 def get_llm_client() -> LlmClient:
-    """Adapter selection lives here so a provider change is configuration, not code.
-
-    Only the stub exists at M4; a real adapter is added at M5 alongside the eval harness that
-    decides which provider to use.
-    """
+    """Adapter selection lives here so a provider change is configuration, not code."""
     if settings.llm_provider == "fake":
         return FakeLlmClient()
+    if settings.llm_provider == "litellm":
+        inner = LiteLlmClient(
+            model=settings.llm_model,
+            api_key=settings.llm_api_key,
+            timeout_seconds=settings.llm_timeout_seconds,
+            api_base=settings.llm_api_base,
+            supports_native_pdf=settings.llm_supports_native_pdf,
+        )
+        return ResilientLlmClient(
+            inner,
+            max_retries=settings.llm_max_retries,
+            failure_threshold=settings.llm_circuit_breaker_failure_threshold,
+            cooldown_seconds=settings.llm_circuit_breaker_cooldown_seconds,
+        )
     raise RuntimeError(f"Unknown LLM provider: {settings.llm_provider}")
 
 

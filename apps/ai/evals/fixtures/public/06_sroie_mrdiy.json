@@ -1,0 +1,29 @@
+{
+  "source": "apps/ai/evals/fixtures/public/06_sroie_mrdiy.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SROIE (public dataset) retail receipt, Malaysia. Two-digit year date format (17-03-18) -- must still normalise to full ISO 2018-03-17. Noisy scan with skew and stray marks, three line items.",
+  "expected": {
+    "vendor": "MR. D.I.Y. (M) SDN BHD",
+    "currency": "MYR",
+    "total_minor": 4290,
+    "tax_minor": 243,
+    "document_date": "2018-03-17",
+    "lines": [
+      {
+        "description": "STUDENT SOCKS 3PCS BK",
+        "quantity": 1000,
+        "amount_minor": 950
+      },
+      {
+        "description": "BELT 5202-3#*VS",
+        "quantity": 1000,
+        "amount_minor": 2290
+      },
+      {
+        "description": "PVC MAN PPER 969 (BK)",
+        "quantity": 1000,
+        "amount_minor": 1050
+      }
+    ]
+  }
+}

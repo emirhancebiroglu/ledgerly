@@ -1,0 +1,19 @@
+{
+  "source": "invoices/62753890410872.Pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Boranet (Hepsiburada Hepsifatura) CPU fan invoice. Fatura Tarihi carries a timestamp (23-09-2025 18:49) rather than a bare date -- document_date must still normalise to the date-only ISO form.",
+  "expected": {
+    "vendor": "BURAK ÖZBOLAT",
+    "currency": "TRY",
+    "total_minor": 78900,
+    "tax_minor": 13150,
+    "document_date": "2025-09-23",
+    "lines": [
+      {
+        "description": "Strong M4-12XPRO 12CM Rainbow 4 Bakır Borulu 135W 4 Pin Intel/amd Kule Tipi Işlemci Cpu Fan",
+        "quantity": 1000,
+        "amount_minor": 65750
+      }
+    ]
+  }
+}

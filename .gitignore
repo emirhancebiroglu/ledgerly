@@ -48,6 +48,7 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Real invoices for the M5 eval set — personal financial documents, never committed
+# Real invoices for the M5 eval set — personal financial documents, never committed.
+# Their expected-output fixtures under apps/ai/evals/fixtures/real/ reference these by path and
+# are committed normally; only the source documents themselves stay local.
 invoices/
-apps/ai/evals/fixtures/real/

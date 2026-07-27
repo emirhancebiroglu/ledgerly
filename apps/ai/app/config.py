@@ -13,9 +13,42 @@ class Settings(BaseSettings):
     # validated anything, even though today it has exactly one.
     max_document_bytes: int = 10 * 1024 * 1024
 
-    # Which LlmClient adapter to use. Only "fake" exists at M4; the provider decision is deferred
-    # to M5, where the eval harness can measure candidates instead of guessing.
-    llm_provider: str = "fake"
+    # Which LlmClient adapter to use. "litellm" is the real M5 adapter; "fake" keeps the M4 stub
+    # available for tests and offline runs.
+    llm_provider: str = "litellm"
+
+    # LiteLLM model string. Gemini (the original M5 Q1 decision) was superseded before the gate
+    # ever ran: its free tier is a hard 20-requests/day account-wide ceiling, confirmed not
+    # preview-model-specific — nowhere near enough for even one eval run. qwen3.7-plus via
+    # OpenCode Go's Anthropic-compatible gateway is the actual deployed default — see decisions.md.
+    llm_model: str = "anthropic/qwen3.7-plus"
+
+    # Read directly rather than left to LiteLLM's own env lookup, so a missing key fails at
+    # startup with a message naming this service, not on the first request.
+    llm_api_key: str | None = None
+
+    # 30s was too tight in practice — the M5 gate run against a real vision model saw p95 latency
+    # of ~90s per call. A false timeout is indistinguishable from a real one downstream (both
+    # retry, both can open the circuit breaker), so the timeout has to clear real p95, not p50.
+    llm_timeout_seconds: float = 120.0
+    llm_max_retries: int = 2
+    llm_circuit_breaker_failure_threshold: int = 5
+    llm_circuit_breaker_cooldown_seconds: float = 30.0
+
+    # OpenCode Go's Anthropic-compatible gateway. Set to None to fall back to LiteLLM's normal
+    # provider-prefix routing (e.g. for gemini/... or any other native-routed model).
+    llm_api_base: str | None = "https://opencode.ai/zen/go"
+
+    # Only Gemini's native API accepts a PDF as a `file` content block through LiteLLM; every
+    # other gateway tried (OpenCode Go, every OpenRouter free vision model) rejects it. Non-native-
+    # PDF providers render PDF pages to PNG first — see app.llm.pdf_to_images.
+    llm_supports_native_pdf: bool = False
 
 
 settings = Settings()
+
+if settings.llm_provider == "litellm" and not settings.llm_api_key:
+    raise RuntimeError(
+        "AI_LLM_API_KEY is required when AI_LLM_PROVIDER=litellm. Set it before starting the "
+        "service, or set AI_LLM_PROVIDER=fake for a stub run."
+    )

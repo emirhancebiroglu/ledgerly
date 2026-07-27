@@ -1,0 +1,19 @@
+{
+  "source": "apps/ai/evals/fixtures/public/01_sroie_yongfatt.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SROIE (public dataset) receipt, Malaysia. Only one date candidate (Date field) -- no ambiguity, unlike the Turkish e-arşiv layouts. GST rate is 0% here (SR tax code at 0%), so tax is genuinely zero, not missing.",
+  "expected": {
+    "vendor": "YONGFATT ENTERPRISE",
+    "currency": "MYR",
+    "total_minor": 8090,
+    "tax_minor": 0,
+    "document_date": "2018-12-25",
+    "lines": [
+      {
+        "description": "E8318 ELEGANT SCH TR BAG 15",
+        "quantity": 1000,
+        "amount_minor": 8091
+      }
+    ]
+  }
+}
