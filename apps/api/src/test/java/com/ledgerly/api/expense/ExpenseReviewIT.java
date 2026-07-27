@@ -134,9 +134,9 @@ class ExpenseReviewIT extends AbstractPostgresIT {
     UUID org = organizationIdOf(token);
     UUID categoryId = createCategory(org);
     UUID expenseId = insertNeedsReviewExpense(org, categoryId, "Acme Corp", 5000);
-    // Pre-create both ledger accounts resolve() looks up: this test isolates the concurrency
-    // guarantee on expense resolution itself, not LedgerAccountRepository.findOrCreate's own
-    // separate first-use race (out of scope for this task).
+    // Pre-create both ledger accounts resolve() looks up so this test isolates the concurrency
+    // guarantee on expense resolution itself from LedgerAccountRepository.findOrCreate's own
+    // first-use race, which is real and separately covered by LedgerAccountRepositoryIT.
     String categoryName =
         jdbcTemplate.queryForObject(
             "SELECT name FROM category WHERE id = ?", String.class, categoryId);

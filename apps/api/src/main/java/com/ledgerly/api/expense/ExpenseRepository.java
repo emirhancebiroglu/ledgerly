@@ -17,13 +17,15 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
    * Resolves a {@code NEEDS_REVIEW} expense to {@code POSTED} in one atomic statement, returning
    * the number of rows changed (0 or 1). This is what actually prevents two concurrent
    * resolutions (approve/correct hit with different {@code Idempotency-Key} values, which the M3
-   * idempotency filter cannot dedup) from both posting a ledger transaction: a read-then-write
-   * split — even one guarded by {@code SELECT ... FOR UPDATE} — leaves a window where both
-   * requests' row lock is granted in sequence but each still observes the pre-transition status
-   * in its already-fetched Java object, so both proceed. Folding the {@code WHERE status =
-   * 'NEEDS_REVIEW'} guard into the {@code UPDATE} itself closes that window regardless of lock
-   * timing: only the first writer's statement can match the row, and the second gets 0 rows back
-   * no matter how the two transactions interleaved.
+   * idempotency filter cannot dedup) from both posting a ledger transaction. An earlier version
+   * used {@code SELECT ... FOR UPDATE} plus a separate in-memory status check instead; a
+   * concurrency test proved that insufficient — not because the lock itself failed to serialize
+   * the two transactions, but because the status check ran against a Java object already held in
+   * the caller's persistence context, not a value read fresh after the lock was granted. Folding
+   * {@code WHERE status = 'NEEDS_REVIEW'} into the {@code UPDATE} itself removes that dependency
+   * entirely: Postgres re-evaluates the whole {@code WHERE} clause against the row's committed
+   * state before a blocked writer proceeds, so only the first writer's statement can ever match,
+   * and the second gets 0 rows back no matter how the two transactions interleaved.
    *
    * <p>{@code clearAutomatically}: the caller loads this same {@code Expense} both before and
    * after this call, and a bulk {@code UPDATE} bypasses Hibernate's persistence context — without

@@ -2,7 +2,6 @@ package com.ledgerly.api.ledger;
 
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -37,34 +36,33 @@ public class LedgerAccountRepository {
    * general-ledger account to post against — proper double-entry bookkeeping requires the
    * category to be a first-class ledger dimension, not sidecar metadata on the expense row.
    *
-   * <p>Races the unique {@code (organization_id, name)} constraint on concurrent first-use: the
-   * loser's insert fails with {@link DuplicateKeyException}, caught here and turned into a
-   * lookup of the row the winner just committed, rather than a 500.
+   * <p>Races the unique {@code (organization_id, name)} constraint on concurrent first-use via
+   * {@code ON CONFLICT ... DO NOTHING} rather than catching {@link DuplicateKeyException}: in
+   * Postgres, a failed statement aborts the entire enclosing transaction (this runs inside the
+   * caller's {@code @Transactional}), so every statement after a caught constraint violation —
+   * including the recovery lookup — would itself fail with "current transaction is aborted."
+   * {@code ON CONFLICT} never raises, so the transaction stays usable and the lookup after it is
+   * unconditional.
    */
   public UUID findOrCreate(UUID organizationId, String name, String accountType, String currency) {
     return findIdByOrganizationAndName(organizationId, name)
-        .orElseGet(() -> insertOrRaceLookup(organizationId, name, accountType, currency));
+        .orElseGet(() -> insertIgnoringConflictThenLookup(organizationId, name, accountType, currency));
   }
 
-  private UUID insertOrRaceLookup(
+  private UUID insertIgnoringConflictThenLookup(
       UUID organizationId, String name, String accountType, String currency) {
-    UUID id = UUID.randomUUID();
-    try {
-      jdbcTemplate.update(
-          "INSERT INTO account (id, organization_id, name, account_type, currency) "
-              + "VALUES (?, ?, ?, ?, ?)",
-          id,
-          organizationId,
-          name,
-          accountType,
-          currency);
-      return id;
-    } catch (DuplicateKeyException e) {
-      return findIdByOrganizationAndName(organizationId, name)
-          .orElseThrow(
-              () ->
-                  new IllegalStateException(
-                      "Account insert raced but no row is visible for " + name, e));
-    }
+    jdbcTemplate.update(
+        "INSERT INTO account (id, organization_id, name, account_type, currency) "
+            + "VALUES (?, ?, ?, ?, ?) ON CONFLICT (organization_id, name) DO NOTHING",
+        UUID.randomUUID(),
+        organizationId,
+        name,
+        accountType,
+        currency);
+    return findIdByOrganizationAndName(organizationId, name)
+        .orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "Account insert-or-lookup found no row for " + name));
   }
 }

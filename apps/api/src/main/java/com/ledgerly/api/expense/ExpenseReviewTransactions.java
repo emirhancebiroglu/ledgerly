@@ -65,17 +65,21 @@ public class ExpenseReviewTransactions {
    *     concurrent approve/correct calls carrying different {@code Idempotency-Key} values (which
    *     the M3 idempotency filter cannot dedup, since different keys are different claims): only
    *     one such statement can ever match a given row, so exactly one caller's update takes
-   *     effect no matter how two requests interleave. A read-then-write split — even guarded by
-   *     {@code SELECT ... FOR UPDATE} — does not give this guarantee here, since Hibernate's
-   *     locked read can return a Java object holding the pre-transition status to more than one
-   *     concurrent transaction depending on lock/commit timing; folding the status guard into the
-   *     write itself removes that dependency entirely.
+   *     effect no matter how two requests interleave — Postgres re-evaluates the {@code WHERE}
+   *     against the freshly committed row before a blocked writer proceeds. A prior version of
+   *     this method used {@code SELECT ... FOR UPDATE} plus an in-memory status check instead,
+   *     and a real concurrency test proved that insufficient: the check ran against an {@code
+   *     Expense} instance already resident in this method's persistence context from the read
+   *     below, not a fresh read, so the lock alone did not stop two callers from both seeing
+   *     {@code NEEDS_REVIEW}. Folding the guard into the write itself removes any dependency on
+   *     persistence-context freshness.
    *
-   *     <p>The ledger transaction is still built and saved before this check runs. A losing
-   *     caller's transaction row is a harmless orphan — internally balanced, referenced by no
-   *     expense, invisible to any account-balance query — rolled back with the rest of this
-   *     {@code @Transactional} method rather than left behind, since the throw below aborts the
-   *     whole method.
+   *     <p>The ledger transaction is still built and saved before this check runs. That INSERT is
+   *     not optional to roll back on a loss — a committed, unreferenced transaction row is a real
+   *     row {@code ledger_entry}'s deferred balance trigger and any account-balance query would
+   *     see, not a cosmetic loose end — so it depends on this whole method staying
+   *     {@code @Transactional} and {@link ExpenseAlreadyResolvedException} staying unchecked, so
+   *     Spring's default rollback rule actually fires.
    */
   @Transactional
   public Expense resolve(
