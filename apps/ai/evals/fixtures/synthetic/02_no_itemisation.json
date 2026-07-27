@@ -1,0 +1,13 @@
+{
+  "source": "apps/ai/evals/fixtures/synthetic/02_no_itemisation.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Synthetic edge case: no line items at all, just a total and an included-VAT figure -- the schema allows an empty lines array for exactly this case (api decides separately whether that's acceptable to post).",
+  "expected": {
+    "vendor": "QUICKSTOP CONVENIENCE STORE",
+    "currency": "EUR",
+    "total_minor": 640,
+    "tax_minor": 53,
+    "document_date": "2026-01-09",
+    "lines": []
+  }
+}

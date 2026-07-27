@@ -1,0 +1,19 @@
+{
+  "source": "apps/ai/evals/fixtures/public/05_sroie_ginkee.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SROIE (public dataset) hardware store receipt, Malaysia. Low-resolution scan with a stamp partially obscuring a column -- exercises noisy/degraded scan quality alongside the cleaner samples in this group.",
+  "expected": {
+    "vendor": "SYARIKAT PERNIAGAAN GIN KEE",
+    "currency": "MYR",
+    "total_minor": 636,
+    "tax_minor": 36,
+    "document_date": "2018-01-13",
+    "lines": [
+      {
+        "description": "1432 GLOVE 1200 (PER PAIR)",
+        "quantity": 3000,
+        "amount_minor": 636
+      }
+    ]
+  }
+}

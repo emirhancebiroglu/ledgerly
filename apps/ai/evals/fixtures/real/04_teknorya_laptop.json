@@ -1,0 +1,19 @@
+{
+  "source": "invoices/62150721713173.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Teknorya (Hepsiburada Hepsifatura marketplace) laptop invoice. Only one date field present, Fatura Tarihi -- no due date, no separate order date printed on this layout, so no ambiguity to resolve here.",
+  "expected": {
+    "vendor": "TEKNORYA BİLİŞİM HİZMETLERİ SANAYİ VE TİCARET A.Ş.",
+    "currency": "TRY",
+    "total_minor": 1599899,
+    "tax_minor": 244052,
+    "document_date": "2022-10-22",
+    "lines": [
+      {
+        "description": "108262 - NB ACER NITRO 5 NH.QBAEY.002 R5-5600H/8/512GB/RTX3050-4GB/144Hz/15.6/FHD/DOS - SN: NHQBAEY00220317C2E3400",
+        "quantity": 1000,
+        "amount_minor": 1355847
+      }
+    ]
+  }
+}

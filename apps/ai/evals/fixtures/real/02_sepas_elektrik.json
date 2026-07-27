@@ -1,0 +1,19 @@
+{
+  "source": "invoices/fatura (2).pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SEPAŞ electricity bill. Multiple date candidates: Fatura Tarihi (issue, top-right block), Son Ödeme tarihi (due), Okuma Günü range (meter reading period). document_date must be Fatura Tarihi. Total after government subsidy discount is the final 'Ödenecek Tutar', distinct from the pre-discount 'Fatura Tutarı'.",
+  "expected": {
+    "vendor": "SAKARYA ELEKTRİK PERAKENDE SATIŞ A.Ş.",
+    "currency": "TRY",
+    "total_minor": 49000,
+    "tax_minor": 4448,
+    "document_date": "2026-04-25",
+    "lines": [
+      {
+        "description": "Enerji Tüketim Bedeli K1 (Tüm Zaman)",
+        "quantity": 158460,
+        "amount_minor": 44088
+      }
+    ]
+  }
+}

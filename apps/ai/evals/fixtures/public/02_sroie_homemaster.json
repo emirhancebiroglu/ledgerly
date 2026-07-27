@@ -1,0 +1,19 @@
+{
+  "source": "apps/ai/evals/fixtures/public/02_sroie_homemaster.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "SROIE (public dataset) receipt, Malaysia. GST clearly broken out in the summary table (6% on RM15.00 = RM0.90).",
+  "expected": {
+    "vendor": "HOME MASTER HARDWARE & ELECTRICAL",
+    "currency": "MYR",
+    "total_minor": 1590,
+    "tax_minor": 90,
+    "document_date": "2017-12-22",
+    "lines": [
+      {
+        "description": "24MMx7Y M.ONE TAPE",
+        "quantity": 1000,
+        "amount_minor": 1590
+      }
+    ]
+  }
+}

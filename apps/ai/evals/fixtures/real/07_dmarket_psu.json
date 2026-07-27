@@ -1,0 +1,19 @@
+{
+  "source": "invoices/62753442010956.Pdf",
+  "content_type": "application/pdf",
+  "layout_note": "D-Market/hepsiburada PSU invoice. Düzenleme Tarihi and Sipariş Tarihi are both 23.09.2025 here, but the layout still carries 3 date fields (Sipariş, Düzenleme, Gönderim) -- document_date must be Düzenleme Tarihi specifically, not Gönderim (dispatch) or Sipariş (order).",
+  "expected": {
+    "vendor": "D-MARKET ELEKTRONİK HİZMETLER VE TİCARET A.Ş.",
+    "currency": "TRY",
+    "total_minor": 219900,
+    "tax_minor": 36650,
+    "document_date": "2025-09-23",
+    "lines": [
+      {
+        "description": "Power Boost BST-ATX650B Glacier 650W 80+ Bronze Modüler 12cmFanlı ATX",
+        "quantity": 1000,
+        "amount_minor": 183250
+      }
+    ]
+  }
+}

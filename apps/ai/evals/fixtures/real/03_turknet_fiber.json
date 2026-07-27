@@ -1,0 +1,29 @@
+{
+  "source": "invoices/90079990.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "TurkNet fiber ISP invoice. Date candidates: Fatura Kesim Tarihi (issue), Son Ödeme Tarihi (due), Fatura Dönemi (service period range), Sonraki Fatura Kesim Tarihi (next issue). document_date must be Fatura Kesim Tarihi. Has a one-off installation fee and a negative discount line alongside the recurring line.",
+  "expected": {
+    "vendor": "TurkNet",
+    "currency": "TRY",
+    "total_minor": 108377,
+    "tax_minor": 20651,
+    "document_date": "2025-01-27",
+    "lines": [
+      {
+        "description": "Özgür İletişim Fiber 100",
+        "quantity": 1000,
+        "amount_minor": 49990
+      },
+      {
+        "description": "Nakil Kurulum Ücreti (09/01/2025)",
+        "quantity": 1000,
+        "amount_minor": 60000
+      },
+      {
+        "description": "Diger Indirimler",
+        "quantity": 1000,
+        "amount_minor": -1613
+      }
+    ]
+  }
+}

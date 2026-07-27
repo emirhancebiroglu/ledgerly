@@ -1,0 +1,19 @@
+{
+  "source": "invoices/prod_2026-07_c8f53a07-289b-4ec4-aa70-cb5d4c274671.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "FRV Dış Ticaret (Trendyol marketplace) watch invoice. Fatura Tarihi (22-06-2026) genuinely differs from Sipariş Tarihi (20-06-2026) -- the other real case (alongside fixture 08) of the four-candidate ambiguity resolving to the issue date, not the order date.",
+  "expected": {
+    "vendor": "FRV DIŞ TİCARET ANONİM ŞİRKETİ",
+    "currency": "TRY",
+    "total_minor": 337000,
+    "tax_minor": 56167,
+    "document_date": "2026-06-22",
+    "lines": [
+      {
+        "description": "Casio MTP-1374D-1AVDF Kol Saati",
+        "quantity": 1000,
+        "amount_minor": 280833
+      }
+    ]
+  }
+}

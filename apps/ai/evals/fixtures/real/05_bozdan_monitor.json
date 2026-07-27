@@ -1,0 +1,19 @@
+{
+  "source": "invoices/62753839166101.Pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Bozdan (Hepsiburada Hepsifatura) monitor invoice. Fatura Tarihi and Düzenleme Tarihi are identical here (09-09-2025), unlike the D-Market layouts where they diverge -- confirms document_date should track Fatura/Düzenleme Tarihi, not Sipariş Tarihi, even when they happen to coincide.",
+  "expected": {
+    "vendor": "BOZDAN BİLGİSAYAR TEKNOLOJİ TİCARET LTD. ŞTİ.",
+    "currency": "TRY",
+    "total_minor": 478308,
+    "tax_minor": 79718,
+    "document_date": "2025-09-09",
+    "lines": [
+      {
+        "description": "KTC H27T27 27\" 100 Hz 7 ms (HDMI + Display Port) 2560×1440 Freesync WQHD IPS Flat Monitör",
+        "quantity": 1000,
+        "amount_minor": 398590
+      }
+    ]
+  }
+}

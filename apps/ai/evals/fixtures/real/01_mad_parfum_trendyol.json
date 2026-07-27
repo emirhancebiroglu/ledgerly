@@ -1,0 +1,19 @@
+{
+  "source": "invoices/fatura.pdf",
+  "content_type": "application/pdf",
+  "layout_note": "Trendyol marketplace e-arşiv (MAD PARFUM KOZMETİK). Four date candidates: Tarih (issue), Son Ödeme Tarihi (due), Fatura Ref order date, Belge Tarihi (barcode doc). document_date must be Tarih, the issue date.",
+  "expected": {
+    "vendor": "MAD PARFUM KOZMETİK SAN.TİC.A.Ş.",
+    "currency": "TRY",
+    "total_minor": 99990,
+    "tax_minor": 16665,
+    "document_date": "2025-04-21",
+    "lines": [
+      {
+        "description": "Bruno Exotic 100 ml Unisex Parfüm",
+        "quantity": 1000,
+        "amount_minor": 83325
+      }
+    ]
+  }
+}
