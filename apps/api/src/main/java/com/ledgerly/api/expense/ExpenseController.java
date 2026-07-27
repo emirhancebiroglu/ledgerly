@@ -43,8 +43,12 @@ public class ExpenseController {
   /**
    * Filter/sort/search over the caller's org. {@code sort} is {@code (date|amount),(asc|desc)},
    * e.g. {@code amount,desc}; defaults to {@code date,desc}. An unrecognized {@code status} or
-   * {@code sort} value is a 400, not a silently-ignored parameter or a 500 from an invalid
-   * {@code ORDER BY} column.
+   * {@code sort} value, a negative {@code page}, or a non-positive {@code size} is a 400, not a
+   * silently-ignored parameter or a 500 from an invalid {@code ORDER BY} column or page request.
+   *
+   * <p>{@code search} matches against {@code vendor}; an expense posted before the V13 migration
+   * has no vendor backfilled (its vendor lived only in {@code document.proposal} JSONB, never a
+   * queryable column) and so is unreachable via {@code search} until re-posted.
    */
   @GetMapping("/api/v1/expenses")
   public List<ExpenseResponse> list(

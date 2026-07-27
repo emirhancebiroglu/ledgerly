@@ -155,6 +155,43 @@ class ExpenseListIT extends AbstractPostgresIT {
     mockMvc.perform(get("/api/v1/expenses")).andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void negativePageReturns400NotServerError() throws Exception {
+    String token = registerAndGetAccessToken();
+
+    mockMvc
+        .perform(get("/api/v1/expenses").param("page", "-1").header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void nonPositiveSizeReturns400NotASilentDefault() throws Exception {
+    String token = registerAndGetAccessToken();
+
+    mockMvc
+        .perform(get("/api/v1/expenses").param("size", "0").header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest());
+
+    mockMvc
+        .perform(get("/api/v1/expenses").param("size", "-5").header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void sizeIsClampedToTheMaximumPageSize() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    String category = createCategory(org);
+    for (int i = 0; i < 5; i++) {
+      insertExpense(org, category, "Vendor " + i, 1000 + i, "POSTED");
+    }
+
+    mockMvc
+        .perform(get("/api/v1/expenses").param("size", "100000").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(5));
+  }
+
   private void insertExpense(
       UUID orgId, String categoryId, String vendor, long amountMinor, String status) {
     UUID userId =

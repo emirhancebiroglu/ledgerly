@@ -33,7 +33,7 @@ public class ExpenseService {
   @Transactional(readOnly = true)
   public List<Expense> list(
       ExpenseListQuery query, int page, int size, AuthenticatedPrincipal principal) {
-    Pageable pageable = PageRequest.of(page, boundedSize(size), sortFor(query));
+    Pageable pageable = PageRequest.of(validatedPage(page), validatedSize(size), sortFor(query));
     UUID organizationId = principal.organizationId();
 
     if (query.status() != null && query.search() != null) {
@@ -51,9 +51,16 @@ public class ExpenseService {
     return expenseRepository.findByOrganizationId(organizationId, pageable);
   }
 
-  private int boundedSize(int size) {
+  private int validatedPage(int page) {
+    if (page < 0) {
+      throw new InvalidExpenseListQueryException("page must not be negative: " + page);
+    }
+    return page;
+  }
+
+  private int validatedSize(int size) {
     if (size <= 0) {
-      return 20;
+      throw new InvalidExpenseListQueryException("size must be positive: " + size);
     }
     return Math.min(size, MAX_PAGE_SIZE);
   }
