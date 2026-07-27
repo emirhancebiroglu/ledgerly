@@ -19,10 +19,15 @@ public class ExpenseController {
 
   private final ExpenseStubService expenseStubService;
   private final ExpenseService expenseService;
+  private final ExpenseReviewService expenseReviewService;
 
-  public ExpenseController(ExpenseStubService expenseStubService, ExpenseService expenseService) {
+  public ExpenseController(
+      ExpenseStubService expenseStubService,
+      ExpenseService expenseService,
+      ExpenseReviewService expenseReviewService) {
     this.expenseStubService = expenseStubService;
     this.expenseService = expenseService;
+    this.expenseReviewService = expenseReviewService;
   }
 
   @PostMapping("/api/v1/expenses")
@@ -62,5 +67,30 @@ public class ExpenseController {
     return expenseService.list(query, page, size, principal).stream()
         .map(ExpenseResponse::from)
         .toList();
+  }
+
+  /**
+   * Approve a review-queue item using the category the AI already chose — posts the balanced
+   * ledger transaction that categorization withheld. 409 if the expense is not currently {@code
+   * NEEDS_REVIEW} (already approved/corrected, including via a replayed request outside the
+   * {@code Idempotency-Key} window).
+   */
+  @PostMapping("/api/v1/expenses/{id}/approve")
+  public ExpenseResponse approve(
+      @PathVariable UUID id, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
+    return ExpenseResponse.from(expenseReviewService.approve(id, principal));
+  }
+
+  /**
+   * Resolve a review-queue item into a different category than the AI chose, then post. Same 409
+   * semantics as {@link #approve}.
+   */
+  @PostMapping("/api/v1/expenses/{id}/correct")
+  public ExpenseResponse correct(
+      @PathVariable UUID id,
+      @Valid @RequestBody CorrectExpenseRequest request,
+      @AuthenticationPrincipal AuthenticatedPrincipal principal) {
+    return ExpenseResponse.from(
+        expenseReviewService.correct(id, request.categoryId(), principal));
   }
 }

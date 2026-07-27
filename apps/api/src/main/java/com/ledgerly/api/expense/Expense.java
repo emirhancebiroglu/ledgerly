@@ -36,7 +36,12 @@ public class Expense {
   @Column(updatable = false)
   private String vendor;
 
-  @Column(name = "category_id", nullable = false, updatable = false)
+  /**
+   * Updatable, unlike the rest of this entity's history-of-record fields: a review-queue
+   * resolution (approve keeps the AI's choice, correct replaces it) is the one legitimate
+   * post-creation write, made by {@link ExpenseReviewTransactions}.
+   */
+  @Column(name = "category_id", nullable = false)
   private UUID categoryId;
 
   @Column(name = "ledger_transaction_id")
@@ -132,6 +137,24 @@ public class Expense {
         categorizationConfidence,
         citation,
         ExpenseStatus.NEEDS_REVIEW);
+  }
+
+  /**
+   * Resolves a {@code NEEDS_REVIEW} expense to {@code POSTED} against the given category and the
+   * ledger transaction just built for it — a human approval (category unchanged) or correction
+   * (category replaced) from {@link ExpenseReviewTransactions}. Confidence and citation are left
+   * as the AI produced them; they describe what the model proposed, not what the human decided.
+   *
+   * @throws ExpenseAlreadyResolvedException if this expense is not currently {@code NEEDS_REVIEW}
+   *     — the domain enforces "resolved exactly once," not just the service calling it once.
+   */
+  public void resolve(UUID categoryId, UUID ledgerTransactionId) {
+    if (status != ExpenseStatus.NEEDS_REVIEW) {
+      throw new ExpenseAlreadyResolvedException(id);
+    }
+    this.categoryId = categoryId;
+    this.ledgerTransactionId = ledgerTransactionId;
+    this.status = ExpenseStatus.POSTED;
   }
 
   public UUID getId() {
