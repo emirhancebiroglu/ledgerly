@@ -8,13 +8,14 @@ amount ceiling are `api`'s call, at the trust boundary described in ``docs/archi
 
 from __future__ import annotations
 
-import json
 import logging
 
 from jsonschema import Draft202012Validator
 
 from app.contracts import EXTRACTION_PROPOSAL_SCHEMA, load_schema
-from app.llm.client import LlmClient, LlmError, VisionPrompt
+from app.llm.client import LlmClient
+from app.llm.extraction_graph import ExtractionFailedError as GraphExtractionFailedError
+from app.llm.extraction_graph import run_extraction_graph
 
 logger = logging.getLogger(__name__)
 
@@ -44,20 +45,19 @@ class ExtractionService:
             parse error instead of surfacing it here, where the cause is known.
         """
         try:
-            raw = self._llm_client.complete_vision(
-                VisionPrompt(
-                    instruction=EXTRACTION_INSTRUCTION,
-                    content=content,
-                    content_type=content_type,
-                )
+            result = run_extraction_graph(
+                self._llm_client, EXTRACTION_INSTRUCTION, content, content_type
             )
-        except LlmError as error:
+        except GraphExtractionFailedError as error:
             raise ExtractionFailedError(str(error)) from error
 
-        try:
-            extracted = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise ExtractionFailedError("Model returned output that is not valid JSON") from error
+        extracted = result["extracted"]
+        if result["self_checked_fields"]:
+            logger.info(
+                "Self-check ran for document %s on fields: %s",
+                document_id,
+                ", ".join(result["self_checked_fields"]),
+            )
 
         proposal = {
             **extracted,
