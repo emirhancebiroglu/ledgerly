@@ -6,3 +6,7 @@ ledgerly:
   document:
     # Small on purpose: the over-cap test builds a buffer of this size, and 10MB per run is waste.
     max-bytes: 65536
+  ai:
+    # Tests replace the ExtractionClient bean; nothing should reach this address.
+    base-url: http://localhost:59999
+    timeout-seconds: 2

@@ -182,9 +182,25 @@ places where a subtle bug is both most likely and most expensive.
 
 ## 9. Open questions
 
-| # | Question | Decide by |
-|---|---|---|
-| Q1 | LLM provider and model | M4 |
-| Q2 | Object storage — Render disk vs S3-compatible bucket | M2 |
-| Q3 | Async processing — Spring `@Async` vs a real queue | M4, based on observed latency |
-| Q4 | Multi-currency: convert at post time or store native and convert on read | M2 |
+| # | Question | Decide by | Status |
+|---|---|---|---|
+| Q1 | LLM provider and model | **M5** (moved from M4) | Open |
+| Q2 | Object storage — Render disk vs S3-compatible bucket | M4 | **Decided** |
+| Q3 | Async processing — Spring `@Async` vs a real queue | **M5**, from observed latency | Open |
+| Q4 | Multi-currency: convert at post time or store native and convert on read | M2 | **Decided** |
+
+**Q1 moved to M5.** The plan was to choose a provider at M4 by running candidates against ten real
+invoices. Measuring that needs the eval harness M5 builds; doing it at M4 would have meant
+hand-grading or guessing, and a guess is exactly what the "decide by measurement" plan was written
+to avoid. M4 ships the `LlmClient` port and a `FakeLlmClient` only — no real adapter is wired.
+
+**Q2 decided at M4: local disk behind a `StorageClient` port.** `LocalDiskStorage` writes under an
+opaque UUID key, outside any web-served directory. An S3 adapter is a new implementation of the
+same port if Render's disk proves insufficient (revisit at M10), with no caller changes. Adding
+MinIO and the AWS SDK to the milestone whose purpose was proving the `api` ↔ `ai` contract would
+have bought nothing that port does not already buy.
+
+**Q3 stays open; M4 processes synchronously.** The stub returns instantly, so there is no latency to
+design around yet, and the real number first exists at M5. The status lifecycle already models
+`PENDING → PROCESSING → …`, so going asynchronous later is a service-layer change, not a schema
+change.
