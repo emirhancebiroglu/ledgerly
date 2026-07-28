@@ -1,4 +1,4 @@
-import { getDashboardSummary } from "@/lib/dashboard";
+import { getDashboardSummary, resolveDisplayCurrency } from "@/lib/dashboard";
 import { listExpenses } from "@/lib/expenses";
 import { listCategories, categoryNameLookup } from "@/lib/categories";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -25,12 +25,8 @@ export default async function DashboardPage() {
   }
 
   const categoryName = categoryNameLookup(categories);
-  // categoryBreakdown/monthlySeries sum across currencies (api's own documented gap —
-  // DashboardSummaryResponse.java), unlike totalsThisMonth. The display currency for those two
-  // charts is the first currency present this month, which is correct for the overwhelmingly
-  // common single-currency org and a known, narrower guarantee for one that mixes currencies —
-  // same boundary the api already draws.
-  const displayCurrency = summary.totalsThisMonth[0]?.currency ?? "USD";
+  const displayCurrency = resolveDisplayCurrency(summary);
+  const hasSpendData = displayCurrency !== undefined;
 
   return (
     <div className="flex max-w-[1080px] flex-col gap-5 p-6 md:p-8">
@@ -47,8 +43,14 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 shell:grid-cols-2">
-        <CategoryBreakdown categories={summary.categoryBreakdown} currency={displayCurrency} />
-        <SpendOverTimeChart series={summary.monthlySeries} currency={displayCurrency} />
+        <CategoryBreakdown
+          categories={hasSpendData ? summary.categoryBreakdown : []}
+          currency={displayCurrency ?? ""}
+        />
+        <SpendOverTimeChart
+          series={hasSpendData ? summary.monthlySeries : []}
+          currency={displayCurrency ?? ""}
+        />
       </div>
 
       <RecentExpenses expenses={recentExpenses} categoryName={categoryName} />
