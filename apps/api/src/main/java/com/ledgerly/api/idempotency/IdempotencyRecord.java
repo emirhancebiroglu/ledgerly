@@ -39,7 +39,7 @@ public class IdempotencyRecord {
   private String response;
 
   @Column(name = "response_status")
-  private Integer responseStatus;
+  private Short responseStatus;
 
   @Column(name = "expires_at", nullable = false)
   private Instant expiresAt;
@@ -77,7 +77,7 @@ public class IdempotencyRecord {
   }
 
   public Integer getResponseStatus() {
-    return responseStatus;
+    return responseStatus == null ? null : responseStatus.intValue();
   }
 
   public Instant getExpiresAt() {
@@ -90,7 +90,7 @@ public class IdempotencyRecord {
 
   public void complete(int responseStatus, String response) {
     this.status = IdempotencyStatus.COMPLETED;
-    this.responseStatus = responseStatus;
+    this.responseStatus = (short) responseStatus;
     this.response = response;
   }
 }

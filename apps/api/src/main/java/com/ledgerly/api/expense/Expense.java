@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -52,11 +53,11 @@ public class Expense {
   @Column(name = "amount_minor", nullable = false, updatable = false)
   private long amountMinor;
 
-  @Column(nullable = false, updatable = false)
+  @Column(nullable = false, updatable = false, columnDefinition = "bpchar(3)")
   private String currency;
 
   @Column(name = "categorization_confidence", nullable = false, updatable = false)
-  private double categorizationConfidence;
+  private BigDecimal categorizationConfidence;
 
   @Column(updatable = false)
   private String citation;
@@ -88,7 +89,7 @@ public class Expense {
     this.ledgerTransactionId = ledgerTransactionId;
     this.amountMinor = amountMinor;
     this.currency = currency;
-    this.categorizationConfidence = categorizationConfidence;
+    this.categorizationConfidence = BigDecimal.valueOf(categorizationConfidence);
     this.citation = citation;
     this.status = status;
     this.createdAt = Instant.now();
@@ -174,7 +175,7 @@ public class Expense {
   }
 
   public double getCategorizationConfidence() {
-    return categorizationConfidence;
+    return categorizationConfidence.doubleValue();
   }
 
   public String getCitation() {

@@ -20,7 +20,7 @@ public class Organization {
   @Column(nullable = false)
   private String name;
 
-  @Column(name = "base_currency", nullable = false)
+  @Column(name = "base_currency", nullable = false, columnDefinition = "bpchar(3)")
   private String baseCurrency;
 
   @Column(name = "created_at", nullable = false)
