@@ -42,7 +42,7 @@ public class Alert {
   private String alertType;
 
   @Column(name = "threshold_percent", updatable = false)
-  private Integer thresholdPercent;
+  private Short thresholdPercent;
 
   @Column(name = "spent_minor", updatable = false)
   private Long spentMinor;
@@ -87,7 +87,7 @@ public class Alert {
     this.period = period;
     this.currency = currency;
     this.alertType = "BUDGET_THRESHOLD";
-    this.thresholdPercent = thresholdPercent;
+    this.thresholdPercent = (short) thresholdPercent;
     this.spentMinor = spentMinor;
     this.limitMinor = limitMinor;
     this.createdAt = Instant.now();
@@ -120,7 +120,9 @@ public class Alert {
   public String getPeriod() { return period; }
   public String getCurrency() { return currency; }
   public String getAlertType() { return alertType; }
-  public Integer getThresholdPercent() { return thresholdPercent; }
+  public Integer getThresholdPercent() {
+    return thresholdPercent == null ? null : thresholdPercent.intValue();
+  }
   public Long getSpentMinor() { return spentMinor; }
   public Long getLimitMinor() { return limitMinor; }
   public Integer getHistoryCount() { return historyCount; }

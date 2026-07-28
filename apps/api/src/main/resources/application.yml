@@ -78,9 +78,6 @@ logging:
   structured:
     format:
       console: logstash
-    json:
-      add:
-        service: api
 
 management:
   health:

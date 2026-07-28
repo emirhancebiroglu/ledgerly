@@ -7,6 +7,7 @@ set -euo pipefail
 
 API_URL="${API_URL:-http://localhost:8080}"
 COMPOSE_FILE="${COMPOSE_FILE:-infra/docker-compose.yml}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-.env}"
 PDF_PATH="${PDF_PATH:?Set PDF_PATH to a valid PDF fixture}"
 WAIT_SECONDS="${WAIT_SECONDS:-300}"
 # Defaults cover the 5s queue poll interval plus the first refused agent call. Raise this if the
@@ -18,27 +19,24 @@ command -v jq >/dev/null
 test -f "$PDF_PATH"
 
 compose() {
-  docker compose -f "$COMPOSE_FILE" "$@"
+  docker compose --env-file "$COMPOSE_ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
 
 status_of() {
   curl -fsS "$API_URL/api/v1/documents/$1" -H "Authorization: Bearer $TOKEN" | jq -er '.status'
 }
 
-wait_for_status() {
+assert_durable_non_terminal_status() {
   local document_id="$1"
-  local wanted="$2"
-  local deadline=$((SECONDS + WAIT_SECONDS))
   local current
-  while (( SECONDS < deadline )); do
-    current="$(status_of "$document_id")"
-    if [[ "$current" == "$wanted" ]]; then
-      return 0
-    fi
-    sleep 1
-  done
-  echo "Timed out waiting for document $document_id to become $wanted; last status: $current" >&2
-  return 1
+  current="$(status_of "$document_id")"
+  case "$current" in
+    PENDING|PROCESSING) ;;
+    *)
+      echo "Document was not durable work during ai outage; status: $current" >&2
+      return 1
+      ;;
+  esac
 }
 
 wait_for_terminal_outcome() {
@@ -84,7 +82,7 @@ register_response="$(
     -H 'Content-Type: application/json' \
     --data "{\"organizationName\":\"degradation-$suffix\",\"email\":\"degradation-$suffix@example.test\",\"password\":\"correct-horse-battery\"}"
 )"
-TOKEN="$(jq -er '.access_token' <<<"$register_response")"
+TOKEN="$(jq -er '.accessToken' <<<"$register_response")"
 
 upload_response="$(
   curl -fsS -X POST "$API_URL/api/v1/documents" \
@@ -94,12 +92,15 @@ upload_response="$(
 )"
 document_id="$(jq -er '.id' <<<"$upload_response")"
 initial_status="$(jq -er '.status' <<<"$upload_response")"
-[[ "$initial_status" == "PENDING" ]]
+# The poller can claim a newly committed row before this HTTP response is serialized. Both states
+# are durable, non-terminal work. The integration test proves the stricter failed-call transition
+# back to PENDING; this demo avoids waiting for a full HTTP client timeout before recovery.
+[[ "$initial_status" == "PENDING" || "$initial_status" == "PROCESSING" ]]
 
-# The response is necessarily PENDING before the first poll. Let a stopped-ai dispatch actually
-# happen, then verify the row is still durable instead of merely reading the initial response.
+# Let a stopped-ai dispatch actually happen, then verify the row is still durable instead of
+# merely trusting the upload response.
 sleep "$OUTAGE_SETTLE_SECONDS"
-wait_for_status "$document_id" PENDING
+assert_durable_non_terminal_status "$document_id"
 compose start ai >/dev/null
 AI_STARTED_FOR_RECOVERY=true
 wait_for_terminal_outcome "$document_id"
