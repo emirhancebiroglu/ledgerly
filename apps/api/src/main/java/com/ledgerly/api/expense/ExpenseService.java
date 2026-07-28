@@ -1,7 +1,12 @@
 package com.ledgerly.api.expense;
 
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
+import com.ledgerly.api.document.Document;
+import com.ledgerly.api.document.DocumentRepository;
+import com.ledgerly.api.document.DocumentResponse;
 import com.ledgerly.api.expense.ExpenseListQuery.ExpenseSortField;
+import com.ledgerly.api.ledger.LedgerEntryView;
+import com.ledgerly.api.ledger.LedgerTransactionRepository;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -18,9 +23,16 @@ public class ExpenseService {
   private static final int MAX_PAGE_SIZE = 100;
 
   private final ExpenseRepository expenseRepository;
+  private final DocumentRepository documentRepository;
+  private final LedgerTransactionRepository ledgerTransactionRepository;
 
-  public ExpenseService(ExpenseRepository expenseRepository) {
+  public ExpenseService(
+      ExpenseRepository expenseRepository,
+      DocumentRepository documentRepository,
+      LedgerTransactionRepository ledgerTransactionRepository) {
     this.expenseRepository = expenseRepository;
+    this.documentRepository = documentRepository;
+    this.ledgerTransactionRepository = ledgerTransactionRepository;
   }
 
   @Transactional(readOnly = true)
@@ -28,6 +40,29 @@ public class ExpenseService {
     return expenseRepository
         .findByIdAndOrganizationId(id, principal.organizationId())
         .orElseThrow(() -> new NoSuchElementException("Expense not found: " + id));
+  }
+
+  /**
+   * {@code get} plus its ledger entries and document metadata. A {@code NEEDS_REVIEW} expense has
+   * no {@code ledgerTransactionId} yet, so its entry list is empty rather than a lookup that would
+   * otherwise NPE on a null id.
+   */
+  @Transactional(readOnly = true)
+  public ExpenseDetailResponse getDetail(UUID id, AuthenticatedPrincipal principal) {
+    Expense expense = get(id, principal);
+
+    List<LedgerEntryView> ledgerEntries =
+        expense.getLedgerTransactionId() == null
+            ? List.of()
+            : ledgerTransactionRepository.findEntriesByTransactionId(expense.getLedgerTransactionId());
+
+    Document document =
+        documentRepository
+            .findByIdAndOrganizationId(expense.getDocumentId(), principal.organizationId())
+            .orElseThrow(
+                () -> new NoSuchElementException("Document not found: " + expense.getDocumentId()));
+
+    return ExpenseDetailResponse.from(expense, ledgerEntries, DocumentResponse.from(document));
   }
 
   @Transactional(readOnly = true)

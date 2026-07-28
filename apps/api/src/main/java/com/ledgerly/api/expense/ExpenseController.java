@@ -45,6 +45,13 @@ public class ExpenseController {
     return ExpenseResponse.from(expenseService.get(id, principal));
   }
 
+  /** {@link #get} plus ledger entries and document metadata, for the expense-detail screen. */
+  @GetMapping("/api/v1/expenses/{id}/detail")
+  public ExpenseDetailResponse getDetail(
+      @PathVariable UUID id, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
+    return expenseService.getDetail(id, principal);
+  }
+
   /**
    * Filter/sort/search over the caller's org. {@code sort} is {@code (date|amount),(asc|desc)},
    * e.g. {@code amount,desc}; defaults to {@code date,desc}. An unrecognized {@code status} or

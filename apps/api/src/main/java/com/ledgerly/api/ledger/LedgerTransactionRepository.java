@@ -2,6 +2,7 @@ package com.ledgerly.api.ledger;
 
 import java.sql.PreparedStatement;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -49,5 +50,29 @@ public class LedgerTransactionRepository {
           ps.setString(8, entry.baseAmount().currency());
           ps.setBigDecimal(9, entry.fxRate());
         });
+  }
+
+  /**
+   * The entries of one transaction, native amount alongside the account they posted to, for the
+   * expense-detail screen — display order (DEBIT before CREDIT, matching how every transaction in
+   * this codebase is built) rather than insertion order, since {@code save}'s batch insert does
+   * not guarantee row order survives a read back.
+   */
+  public List<LedgerEntryView> findEntriesByTransactionId(UUID transactionId) {
+    return jdbcTemplate.query(
+        "SELECT le.account_id, a.name AS account_name, le.direction, "
+            + "le.native_amount_minor, le.native_currency "
+            + "FROM ledger_entry le "
+            + "JOIN account a ON a.id = le.account_id "
+            + "WHERE le.transaction_id = ? "
+            + "ORDER BY le.direction DESC",
+        (rs, rowNum) ->
+            new LedgerEntryView(
+                (UUID) rs.getObject("account_id"),
+                rs.getString("account_name"),
+                rs.getString("direction"),
+                rs.getLong("native_amount_minor"),
+                rs.getString("native_currency")),
+        transactionId);
   }
 }
