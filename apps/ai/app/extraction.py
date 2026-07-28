@@ -97,10 +97,7 @@ class ExtractionService:
         errors = sorted(self._validator.iter_errors(proposal), key=lambda e: e.path)
         if errors:
             # The proposal itself is not logged — a document's contents are the customer's.
-            logger.warning(
-                "Extraction produced a schema-invalid proposal: %s",
-                "; ".join(error.message for error in errors[:5]),
-            )
+            logger.warning("Extraction produced a schema-invalid proposal")
             raise ExtractionFailedError("Extraction did not satisfy the proposal schema")
 
         return proposal

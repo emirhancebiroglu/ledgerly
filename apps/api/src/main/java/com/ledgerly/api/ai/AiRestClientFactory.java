@@ -1,5 +1,6 @@
 package com.ledgerly.api.ai;
 
+import com.ledgerly.api.correlation.CorrelationIdHolder;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -31,6 +32,14 @@ public class AiRestClientFactory {
         .baseUrl(baseUrl)
         .requestFactory(requestFactory)
         .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + serviceToken)
+        .requestInterceptor(
+            (request, body, execution) -> {
+              String correlationId = CorrelationIdHolder.current();
+              if (correlationId != null) {
+                request.getHeaders().set("X-Correlation-Id", correlationId);
+              }
+              return execution.execute(request, body);
+            })
         .build();
   }
 }

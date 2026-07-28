@@ -16,10 +16,12 @@ from app.extraction import ExtractionFailedError, ExtractionService
 from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
 from app.llm.client import LlmClient
 from app.policy.chunking import EmptyDocumentError
+from app.observability import configure_logging, reset_correlation_id, set_correlation_id
 from app.policy.embedding import PolicyEmbeddingFailedError, PolicyEmbeddingService
 from app.rate_limit import AiRateLimiter, RateLimitExceeded, RateLimitUnavailable
 from app.service_auth import is_cost_bearing_agent_request, require_service_auth
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -41,6 +43,20 @@ app.state.rate_limiter = AiRateLimiter(
     settings.rate_limit_max_requests,
     settings.rate_limit_window_seconds,
 )
+
+
+@app.middleware("http")
+async def request_logging(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-Id")
+    if correlation_id is not None:
+        correlation_id = correlation_id.replace("\r", "").replace("\n", "")[:128]
+    token = set_correlation_id(correlation_id)
+    try:
+        response = await call_next(request)
+        logger.info("HTTP request completed method=%s path=%s status=%s", request.method, request.url.path, response.status_code)
+        return response
+    finally:
+        reset_correlation_id(token)
 
 
 @app.middleware("http")
@@ -242,7 +258,7 @@ async def extract(
     except ExtractionFailedError as error:
         # A document this service cannot read is a bad request, not a server fault: returning 500
         # would tell `api` to retry something that will fail identically every time.
-        logger.info("Extraction failed for document %s: %s", document_id, error)
+        logger.info("Extraction failed documentId=%s exceptionType=%s", document_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -272,7 +288,7 @@ async def embed_policy(
     try:
         return service.embed_policy(policy_document_id, content)
     except (PolicyEmbeddingFailedError, EmptyDocumentError) as error:
-        logger.info("Policy embedding failed for document %s: %s", policy_document_id, error)
+        logger.info("Policy embedding failed documentId=%s exceptionType=%s", policy_document_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -318,7 +334,7 @@ async def categorize(
             policy_chunks=[chunk.chunk_text for chunk in body.policy_chunks],
         )
     except CategorizationFailedError as error:
-        logger.info("Categorization failed for document %s: %s", body.document_id, error)
+        logger.info("Categorization failed documentId=%s exceptionType=%s", body.document_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -338,7 +354,7 @@ async def anomaly(
             budget=body.budget.model_dump(mode="json") if body.budget is not None else None,
         )
     except AnomalyFailedError as error:
-        logger.info("Anomaly assessment failed for expense %s: %s", body.expense_id, error)
+        logger.info("Anomaly assessment failed expenseId=%s exceptionType=%s", body.expense_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -349,4 +365,5 @@ async def not_found_handler(request: Request, exc: Exception) -> JSONResponse:
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled exception type=%s status=500", type(exc).__name__)
     return JSONResponse(status_code=500, content={"detail": "Unexpected error"})

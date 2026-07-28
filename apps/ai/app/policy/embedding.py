@@ -51,10 +51,7 @@ class PolicyEmbeddingService:
 
         errors = sorted(self._validator.iter_errors(response), key=lambda e: e.path)
         if errors:
-            logger.warning(
-                "Policy embedding produced a schema-invalid response: %s",
-                "; ".join(error.message for error in errors[:5]),
-            )
+            logger.warning("Policy embedding produced a schema-invalid response")
             raise PolicyEmbeddingFailedError("Embedding response did not satisfy the schema")
 
         return response

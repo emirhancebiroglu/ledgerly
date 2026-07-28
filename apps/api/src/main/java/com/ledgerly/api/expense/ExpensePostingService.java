@@ -138,7 +138,8 @@ public class ExpensePostingService {
       // Retrieval is best-effort context, not a required step: categorization still runs with an
       // empty chunk list rather than failing the whole expense over a retrieval hiccup.
       log.warn(
-          "Policy chunk retrieval failed, categorizing without policy context: {}", e.toString());
+          "Policy chunk retrieval failed, categorizing without policy context exceptionType={}",
+          e.getClass().getSimpleName());
       return List.of();
     }
 

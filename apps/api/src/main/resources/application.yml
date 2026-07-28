@@ -75,8 +75,12 @@ ledgerly:
     # the database predicate still restricts every sample to the preceding 90 days.
     history-limit: ${ANOMALY_HISTORY_LIMIT:1000}
 logging:
-  pattern:
-    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{correlationId}] [%thread] %logger{36} - %msg%n"
+  structured:
+    format:
+      console: logstash
+    json:
+      add:
+        service: api
 
 management:
   health:

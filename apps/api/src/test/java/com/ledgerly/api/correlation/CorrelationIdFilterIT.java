@@ -53,8 +53,8 @@ class CorrelationIdFilterIT extends AbstractPostgresIT {
   }
 
   @Test
-  void clientSuppliedCorrelationIdIsPropagatedRatherThanOverwritten() throws Exception {
-    String clientSuppliedId = "client-chosen-id-12345";
+  void clientSuppliedUuidCorrelationIdIsPropagatedRatherThanOverwritten() throws Exception {
+    String clientSuppliedId = "3d3811bc-6353-4d0b-864a-7ed86ae97ece";
 
     MvcResult result =
         mockMvc
@@ -63,6 +63,20 @@ class CorrelationIdFilterIT extends AbstractPostgresIT {
             .andReturn();
 
     assertThat(result.getResponse().getHeader(CorrelationIdFilter.HEADER)).isEqualTo(clientSuppliedId);
+  }
+
+  @Test
+  void unsafeClientSuppliedCorrelationIdIsReplacedBeforeLogging() throws Exception {
+    MvcResult result =
+        mockMvc
+            .perform(
+                get("/actuator/health")
+                    .header(CorrelationIdFilter.HEADER, "Bearer service-token-123"))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    assertThat(result.getResponse().getHeader(CorrelationIdFilter.HEADER))
+        .isNotEqualTo("Bearer service-token-123");
   }
 
   @Test

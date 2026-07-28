@@ -146,7 +146,7 @@ public class ApiExceptionHandler {
   public ProblemDetail handleUnexpected(Exception exception) {
     // Logged, never returned: the client gets a correlation id to quote, and the detail stays
     // server-side where it cannot leak internals.
-    log.error("Unhandled exception for correlation id {}", CorrelationIdHolder.current(), exception);
+    log.error("Unhandled exception type={} status=500", exception.getClass().getSimpleName());
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"));
   }

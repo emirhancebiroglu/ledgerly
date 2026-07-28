@@ -110,7 +110,10 @@ def build_extraction_graph(llm_client: LlmClient):
         except LlmError as error:
             # The self-check is a best-effort improvement, not a required step: if it fails, the
             # original (already schema-checkable) extraction still stands.
-            logger.info("Self-check call failed, keeping the original extraction: %s", error)
+            logger.info(
+                "Self-check call failed, keeping the original extraction exceptionType=%s",
+                type(error).__name__,
+            )
             return {**state, "self_check_ran": True, "self_checked_fields": low_confidence}
 
         try:
