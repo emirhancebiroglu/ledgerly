@@ -12,8 +12,9 @@ export interface CategoryBreakdownEntry {
 }
 
 export interface MonthlySpend {
-  year: number;
-  month: number;
+  /** ISO `YearMonth` string, e.g. `"2026-07"` — Spring's default Jackson JSR-310
+   * serialization of `java.time.YearMonth` (`MonthlySpend.java` on the api side). */
+  month: string;
   amountMinor: number;
 }
 
