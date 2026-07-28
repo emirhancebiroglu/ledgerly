@@ -3,14 +3,16 @@ package com.ledgerly.api.budget;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 public record BudgetResponse(
     UUID id,
     UUID categoryId,
     String period,
-    long limitMinor,
+    @JsonSerialize(using = ToStringSerializer.class) long limitMinor,
     String currency,
-    long spentMinor,
+    @JsonSerialize(using = ToStringSerializer.class) long spentMinor,
     BigDecimal burnRate,
     BudgetStatus status,
     Instant createdAt,

@@ -13,9 +13,11 @@ public record BudgetUsage(long spentMinor, BigDecimal burnRate, BudgetStatus sta
         BigDecimal.valueOf(spentMinor)
             .divide(BigDecimal.valueOf(limitMinor), 4, RoundingMode.HALF_UP);
     BudgetStatus status =
-        burnRate.compareTo(BigDecimal.ONE) >= 0
+        BigDecimal.valueOf(spentMinor).compareTo(BigDecimal.valueOf(limitMinor)) >= 0
             ? BudgetStatus.OVER_BUDGET
-            : burnRate.compareTo(NEAR_THRESHOLD) >= 0
+            : BigDecimal.valueOf(spentMinor)
+                        .compareTo(BigDecimal.valueOf(limitMinor).multiply(NEAR_THRESHOLD))
+                    >= 0
                 ? BudgetStatus.NEAR_THRESHOLD
                 : BudgetStatus.ON_TRACK;
     return new BudgetUsage(spentMinor, burnRate, status);

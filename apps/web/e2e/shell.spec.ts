@@ -80,6 +80,7 @@ test.describe("app shell", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
+    await page.getByRole("button", { name: "Search or jump to..." }).focus();
     await page.keyboard.press("Meta+k");
     await expect(page.getByRole("dialog")).toBeVisible();
   });
@@ -114,13 +115,15 @@ test.describe("app shell", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  test("disabled nav items (Budgets, Alerts, Policies) are aria-disabled and not focusable links", async ({
+  test("Budgets is a live nav item while Alerts and Policies remain disabled", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
-    for (const label of ["Budgets", "Alerts", "Policies"]) {
+    await expect(page.getByRole("link", { name: "Budgets" })).toBeVisible();
+
+    for (const label of ["Alerts", "Policies"]) {
       const item = page.getByText(label, { exact: true });
       await expect(item).toBeVisible();
       const isInsideAnchor = await item.evaluate((el) => el.closest("a") !== null);

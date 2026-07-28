@@ -15,7 +15,8 @@ async function resetExpense(page: Page, id: string): Promise<void> {
   // resolves the fixture and the second project's identical test finds it already gone. Called
   // directly against the mock server's port rather than through the BFF proxy: this is
   // test-only wiring, not part of the app's real request path.
-  const response = await page.request.post(`http://localhost:8080/api/v1/test/reset-expense/${id}`);
+  const apiPort = process.env.E2E_API_PORT ?? "8081";
+  const response = await page.request.post(`http://localhost:${apiPort}/api/v1/test/reset-expense/${id}`);
   if (!response.ok()) {
     throw new Error(`Failed to reset fixture ${id}: ${response.status()}`);
   }

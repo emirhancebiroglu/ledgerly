@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** Bounded, tenant-scoped source of truth for the anomaly service's historical input. */
+/** Bounded, tenant-scoped source of truth for comparable postings in the prior 90-day window. */
 @Repository
 public class AnomalyHistoryRepository {
 

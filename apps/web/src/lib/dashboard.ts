@@ -18,6 +18,23 @@ export interface MonthlySpend {
   amountMinor: number;
 }
 
+export interface AlertSummary {
+  id: string;
+  expenseId: string;
+  categoryId: string;
+  period: string;
+  currency: string;
+  alertType: "BUDGET_THRESHOLD" | "ANOMALY_HIGH";
+  thresholdPercent: number | null;
+  spentMinor: bigint | null;
+  limitMinor: bigint | null;
+  historyCount: number | null;
+  zScore: number | null;
+  budgetBurnRate: number | null;
+  explanation: string | null;
+  createdAt: string;
+}
+
 export interface DashboardSummary {
   totalsThisMonth: CurrencyTotal[];
   totalsLastMonth: CurrencyTotal[];
@@ -25,6 +42,8 @@ export interface DashboardSummary {
   monthlySeries: MonthlySpend[];
   reviewQueueCount: number;
   documentsProcessedToday: number;
+  alertCount: number;
+  recentAlerts: AlertSummary[];
 }
 
 export async function getDashboardSummary(): Promise<DashboardSummary | null> {
@@ -32,7 +51,30 @@ export async function getDashboardSummary(): Promise<DashboardSummary | null> {
   if (!response.ok) {
     return null;
   }
-  return (await response.json()) as DashboardSummary;
+  const summary = (await response.json()) as Omit<DashboardSummary, "recentAlerts"> & {
+    recentAlerts: Array<Omit<AlertSummary, "spentMinor" | "limitMinor"> & {
+      spentMinor: string | number | null;
+      limitMinor: string | number | null;
+    }>;
+  };
+  return {
+    ...summary,
+    recentAlerts: summary.recentAlerts.map((alert) => ({
+      ...alert,
+      spentMinor: parseOptionalMinor(alert.spentMinor),
+      limitMinor: parseOptionalMinor(alert.limitMinor),
+    })),
+  };
+}
+
+function parseOptionalMinor(value: string | number | null): bigint | null {
+  if (value === null) return null;
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("Unsafe minor-unit value from API");
+    return BigInt(value);
+  }
+  if (!/^-?\d+$/.test(value)) throw new Error("Invalid minor-unit value from API");
+  return BigInt(value);
 }
 
 /**

@@ -5,7 +5,10 @@ import {
   setSessionCookies,
 } from "@/lib/session";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+// `API_URL` is server-only so a standalone deployment/test harness can target its upstream at
+// runtime. Keep the public variable as the existing deployment fallback; nothing in this module
+// is safe to import from a client component.
+const API_BASE_URL = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 export interface AuthTokens {
   accessToken: string;
