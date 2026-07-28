@@ -12,14 +12,20 @@ import com.ledgerly.api.auth.AuthResponse;
 import com.ledgerly.api.auth.RegisterRequest;
 import com.ledgerly.api.category.CategoryRequest;
 import com.ledgerly.api.document.DocumentQueuePoller;
+import com.ledgerly.api.document.DocumentExtractionWorker;
+import com.ledgerly.api.document.DocumentStatus;
+import com.ledgerly.api.document.DocumentStatusTransitions;
 import com.ledgerly.api.document.ExtractionClient;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
+import com.ledgerly.api.support.SqlStatementCounter;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -31,6 +37,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -53,7 +60,8 @@ import org.springframework.test.web.servlet.ResultActions;
 @Import({
   ExpensePostingPipelineIT.StubExtractionConfig.class,
   ExpensePostingPipelineIT.StubCategorizationConfig.class,
-  ExpensePostingPipelineIT.SynchronousAsyncConfig.class
+  ExpensePostingPipelineIT.SynchronousAsyncConfig.class,
+  ExpensePostingPipelineIT.SqlCounterConfig.class
 })
 @org.springframework.test.context.TestPropertySource(
     properties = {
@@ -72,6 +80,8 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
   @Autowired private StubExtractionClient stubExtractionClient;
   @Autowired private StubCategorizationClient stubCategorizationClient;
   @Autowired private DocumentQueuePoller queuePoller;
+  @Autowired private DocumentExtractionWorker documentExtractionWorker;
+  @Autowired private DocumentStatusTransitions documentStatusTransitions;
   @Autowired private DataSource dataSource;
 
   @BeforeEach
@@ -216,6 +226,23 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
     assertThat(expenseCountForDocument(documentIdOf(uploaded))).isZero();
   }
 
+  @Test
+  void completedDocumentStatementCountIsBoundedAsCategoryAndHistoryFixturesGrow() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    insertClassificationFixture(organizationId, 10, 10);
+    stubCategorizationClient.respondWith(
+        documentId -> categorizeResponse(documentId, "Category-001", 0.92, null));
+
+    long statementsWithTenRows = statementsForCompletedDocument(token);
+
+    insertClassificationFixture(organizationId, 100, 100);
+    long statementsWithOneHundredRows = statementsForCompletedDocument(token);
+
+    assertThat(statementsWithTenRows).isPositive();
+    assertThat(statementsWithOneHundredRows).isLessThanOrEqualTo(statementsWithTenRows + 2);
+  }
+
   private void createCategory(String token, String name) throws Exception {
     mockMvc
         .perform(
@@ -225,6 +252,139 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new CategoryRequest(name))))
         .andExpect(status().isCreated());
+  }
+
+  /** Creates direct fixtures outside the counted path: one transaction backs all history rows. */
+  private void insertClassificationFixture(UUID organizationId, int categoryTarget, int historyTarget)
+      throws Exception {
+    try (Connection connection = dataSource.getConnection()) {
+      connection.setAutoCommit(false);
+      try {
+        UUID userId = userIdFor(connection, organizationId);
+        int categoryStart = (categoryTarget == 10) ? 1 : 11;
+        try (PreparedStatement category =
+            connection.prepareStatement(
+                "INSERT INTO category (id, organization_id, name) VALUES (?, ?, ?)")) {
+          for (int number = categoryStart; number <= categoryTarget; number++) {
+            category.setObject(1, UUID.randomUUID());
+            category.setObject(2, organizationId);
+            category.setString(3, "Category-%03d".formatted(number));
+            category.addBatch();
+          }
+          category.executeBatch();
+        }
+
+        UUID categoryId = categoryIdFor(connection, organizationId, "Category-001");
+        UUID accountId = UUID.randomUUID();
+        UUID transactionId = UUID.randomUUID();
+        try (PreparedStatement account =
+                connection.prepareStatement(
+                    "INSERT INTO account (id, organization_id, name, account_type, currency) "
+                        + "VALUES (?, ?, ?, 'EXPENSE', 'EUR')");
+            PreparedStatement transaction =
+                connection.prepareStatement(
+                    "INSERT INTO ledger_transaction (id, organization_id, base_currency, posted_at) "
+                        + "VALUES (?, ?, 'EUR', now() - INTERVAL '1 day')");
+            PreparedStatement entry =
+                connection.prepareStatement(
+                    "INSERT INTO ledger_entry (id, transaction_id, account_id, direction, "
+                        + "native_amount_minor, native_currency, base_amount_minor, base_currency, fx_rate) "
+                        + "VALUES (?, ?, ?, ?, 100, 'EUR', 100, 'EUR', 1)")) {
+          account.setObject(1, accountId);
+          account.setObject(2, organizationId);
+          account.setString(3, "History fixture account " + UUID.randomUUID());
+          account.executeUpdate();
+          transaction.setObject(1, transactionId);
+          transaction.setObject(2, organizationId);
+          transaction.executeUpdate();
+          for (String direction : List.of("DEBIT", "CREDIT")) {
+            entry.setObject(1, UUID.randomUUID());
+            entry.setObject(2, transactionId);
+            entry.setObject(3, accountId);
+            entry.setString(4, direction);
+            entry.addBatch();
+          }
+          entry.executeBatch();
+        }
+
+        int historyStart = (historyTarget == 10) ? 1 : 11;
+        try (PreparedStatement document =
+                connection.prepareStatement(
+                    "INSERT INTO document (id, organization_id, uploaded_by, filename, content_type, "
+                        + "size_bytes, storage_key, content_hash, status) "
+                        + "VALUES (?, ?, ?, 'history.pdf', 'application/pdf', 1, ?, ?, 'EXTRACTED')");
+            PreparedStatement expense =
+                connection.prepareStatement(
+                    "INSERT INTO expense (id, organization_id, document_id, category_id, "
+                        + "ledger_transaction_id, amount_minor, currency, categorization_confidence, status) "
+                        + "VALUES (?, ?, ?, ?, ?, 100, 'EUR', 0.9, 'POSTED')")) {
+          for (int number = historyStart; number <= historyTarget; number++) {
+            UUID documentId = UUID.randomUUID();
+            document.setObject(1, documentId);
+            document.setObject(2, organizationId);
+            document.setObject(3, userId);
+            document.setString(4, "history-storage-" + UUID.randomUUID());
+            document.setString(5, "history-hash-" + number + "-" + UUID.randomUUID());
+            document.addBatch();
+
+            expense.setObject(1, UUID.randomUUID());
+            expense.setObject(2, organizationId);
+            expense.setObject(3, documentId);
+            expense.setObject(4, categoryId);
+            expense.setObject(5, transactionId);
+            expense.addBatch();
+          }
+          document.executeBatch();
+          expense.executeBatch();
+        }
+        connection.commit();
+      } catch (Exception exception) {
+        connection.rollback();
+        throw exception;
+      }
+    }
+  }
+
+  private long statementsForCompletedDocument(String token) throws Exception {
+    SqlStatementCounter.reset();
+    MvcResult uploaded =
+        upload(token)
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andReturn();
+    UUID documentId = documentIdOf(uploaded);
+    UUID organizationId = organizationIdOf(token);
+    assertThat(documentStatusTransitions.claimDueDocument(documentId, organizationId, Instant.now()))
+        .isTrue();
+    documentExtractionWorker.extractAsync(documentId, organizationId, null);
+    assertThat(documentStatusTransitions.load(documentId, organizationId).getStatus())
+        .isEqualTo(DocumentStatus.EXTRACTED);
+    assertThat(expenseCountForDocument(documentId)).isEqualTo(1);
+    return SqlStatementCounter.executed();
+  }
+
+  private UUID userIdFor(Connection connection, UUID organizationId) throws Exception {
+    try (PreparedStatement statement =
+        connection.prepareStatement("SELECT id FROM app_user WHERE organization_id = ? LIMIT 1")) {
+      statement.setObject(1, organizationId);
+      try (ResultSet rows = statement.executeQuery()) {
+        rows.next();
+        return (UUID) rows.getObject("id");
+      }
+    }
+  }
+
+  private UUID categoryIdFor(Connection connection, UUID organizationId, String name) throws Exception {
+    try (PreparedStatement statement =
+        connection.prepareStatement(
+            "SELECT id FROM category WHERE organization_id = ? AND name = ?")) {
+      statement.setObject(1, organizationId);
+      statement.setString(2, name);
+      try (ResultSet rows = statement.executeQuery()) {
+        rows.next();
+        return (UUID) rows.getObject("id");
+      }
+    }
   }
 
   private UUID organizationIdOf(String accessToken) {
@@ -531,6 +691,22 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
     @Override
     public java.util.concurrent.Executor getAsyncExecutor() {
       return documentProcessingExecutor();
+    }
+  }
+
+  @TestConfiguration
+  static class SqlCounterConfig {
+    @Bean
+    static BeanPostProcessor countingDataSourceWrapper() {
+      return new BeanPostProcessor() {
+        @Override
+        public Object postProcessAfterInitialization(Object bean, String beanName) {
+          if (beanName.equals("dataSource") && bean instanceof javax.sql.DataSource dataSource) {
+            return SqlStatementCounter.wrap(dataSource);
+          }
+          return bean;
+        }
+      };
     }
   }
 }
