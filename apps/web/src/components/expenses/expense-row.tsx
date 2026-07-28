@@ -1,17 +1,8 @@
 import Link from "next/link";
 import { StatusChip } from "@/components/status-chip";
 import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/date";
 import type { Expense } from "@/lib/expenses";
-
-const DATE_LOCALE = "en-US";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(DATE_LOCALE, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-}
 
 interface ExpenseRowProps {
   expense: Expense;

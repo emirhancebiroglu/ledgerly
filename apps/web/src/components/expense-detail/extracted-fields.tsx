@@ -1,17 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { StatusChip } from "@/components/status-chip";
 import { formatMoney } from "@/lib/money";
+import { formatDate } from "@/lib/date";
 import type { ExpenseDetail } from "@/lib/expense-detail";
-
-const DATE_LOCALE = "en-US";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(DATE_LOCALE, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  });
-}
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (

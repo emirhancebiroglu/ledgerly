@@ -12,8 +12,8 @@ const baseDocument = {
 };
 
 describe("AgentTimeline", () => {
-  it("marks a flagged step distinctly (both text and a different dot color from normal steps)", () => {
-    render(
+  it("marks a flagged step distinctly by icon and text, not color alone", () => {
+    const { container } = render(
       <AgentTimeline
         document={{ ...baseDocument, status: "NEEDS_REVIEW", failureReason: null }}
         expenseStatus="NEEDS_REVIEW"
@@ -21,8 +21,9 @@ describe("AgentTimeline", () => {
     );
 
     expect(screen.getByText("Flagged for review")).toBeInTheDocument();
-    // "Flagged" text label — never color alone.
+    // "Flagged" text label plus a distinct icon (lucide TriangleAlert) — never color alone.
     expect(screen.getAllByText("Flagged").length).toBeGreaterThan(0);
+    expect(container.querySelector("svg.lucide-triangle-alert")).toBeInTheDocument();
   });
 
   it("renders only the known steps for a posted expense, no flagged marker", () => {

@@ -24,7 +24,19 @@ export function LedgerEntries({ entries }: LedgerEntriesProps) {
     );
   }
 
-  const balance = entries.reduce((sum, entry) => sum + signedAmount(entry), 0);
+  // LedgerEntryView projects the native amount/currency each entry actually posted in — the
+  // zero-sum invariant a transaction guarantees is over the *base*-currency amount, a different
+  // column this view doesn't carry. Today every entry's native currency always equals its base
+  // currency (ExpensePostingTransactions posts with fxRate = 1), so summing native units is
+  // equivalent — but FX support already exists as an API shape (fxRate, CurrencyMismatchException)
+  // for exactly the case where that stops being true. Detecting a currency mismatch here and
+  // refusing to compute a single balance is safer than silently adding incommensurable units and
+  // labeling the result with whichever currency happened to come first.
+  const currencies = new Set(entries.map((entry) => entry.currency));
+  const isSingleCurrency = currencies.size === 1;
+  const balance = isSingleCurrency
+    ? entries.reduce((sum, entry) => sum + signedAmount(entry), 0)
+    : null;
   const currency = entries[0].currency;
 
   return (
@@ -55,13 +67,23 @@ export function LedgerEntries({ entries }: LedgerEntriesProps) {
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-[12.5px]">
         <span className="text-muted-foreground">Balance</span>
-        <span
-          className="font-mono tabular-nums"
-          data-testid="ledger-balance"
-          aria-label={`Ledger balance: ${formatMoney(balance, currency)}`}
-        >
-          {formatMoney(balance, currency)}
-        </span>
+        {isSingleCurrency ? (
+          <span
+            className="font-mono tabular-nums"
+            data-testid="ledger-balance"
+            aria-label={`Ledger balance: ${formatMoney(balance!, currency)}`}
+          >
+            {formatMoney(balance!, currency)}
+          </span>
+        ) : (
+          <span
+            className="text-muted-foreground"
+            data-testid="ledger-balance"
+            title="Entries post in more than one currency — no single balance to show."
+          >
+            Mixed currencies
+          </span>
+        )}
       </div>
     </Card>
   );

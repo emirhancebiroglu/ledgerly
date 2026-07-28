@@ -1,18 +1,8 @@
+import { TriangleAlert } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { formatDateTime } from "@/lib/date";
 import type { DocumentMeta } from "@/lib/expense-detail";
 import type { ExpenseStatus } from "@/components/status-chip";
-
-const DATETIME_LOCALE = "en-US";
-
-function formatTimestamp(iso: string): string {
-  return new Date(iso).toLocaleString(DATETIME_LOCALE, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 interface TimelineStep {
   label: string;
@@ -84,12 +74,17 @@ export function AgentTimeline({ document, expenseStatus }: AgentTimelineProps) {
         {steps.map((step, index) => (
           <li key={index} className="flex gap-3">
             <div className="flex flex-col items-center">
-              <span
-                className={`mt-1 size-2.5 shrink-0 rounded-full ${
-                  step.flagged ? "bg-warning" : "bg-muted-foreground/40"
-                }`}
-                aria-hidden
-              />
+              {step.flagged ? (
+                <TriangleAlert
+                  className="mt-0.5 size-3 shrink-0 text-warning"
+                  aria-hidden
+                />
+              ) : (
+                <span
+                  className="mt-1.5 size-2.5 shrink-0 rounded-full bg-muted-foreground/40"
+                  aria-hidden
+                />
+              )}
               {index < steps.length - 1 && (
                 <span className="w-px flex-1 bg-border" aria-hidden />
               )}
@@ -104,7 +99,7 @@ export function AgentTimeline({ document, expenseStatus }: AgentTimelineProps) {
                 )}
               </div>
               <div className="font-mono text-[11px] text-muted-foreground">
-                {formatTimestamp(step.timestamp)}
+                {formatDateTime(step.timestamp)}
               </div>
               <div className="mt-0.5 text-[12.5px] text-muted-foreground">{step.detail}</div>
             </div>
