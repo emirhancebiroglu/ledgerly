@@ -4,6 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import java.io.IOException;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.connection.Message;
@@ -30,13 +33,32 @@ public class DocumentEventController {
 
   private static final Logger log = LoggerFactory.getLogger(DocumentEventController.class);
 
+  private static final String EVENT_NAME = "status";
+
   /** No event is expected to sit unconsumed for longer than this; a stalled client's connection
    * closes rather than holding server resources forever. */
   private static final long EMITTER_TIMEOUT_MILLIS = 15 * 60 * 1000L;
 
+  /**
+   * Registering the three {@code SseEmitter} callbacks only detects a dropped client the next
+   * time something is written to it — with no traffic, a half-open connection (client killed,
+   * laptop closed, an idle-timing-out proxy) goes unnoticed until {@link #EMITTER_TIMEOUT_MILLIS}.
+   * A periodic comment-line ping forces that write, so a dead peer is detected promptly instead of
+   * silently holding a listener for up to 15 minutes, and keeps proxies that kill idle connections
+   * from severing a still-live stream during a slow extraction.
+   */
+  private static final long HEARTBEAT_SECONDS = 20L;
+
   private final DocumentUploadService documentUploadService;
   private final RedisMessageListenerContainer listenerContainer;
   private final ObjectMapper objectMapper;
+  private final ScheduledExecutorService heartbeatScheduler =
+      Executors.newSingleThreadScheduledExecutor(
+          runnable -> {
+            Thread thread = new Thread(runnable, "sse-heartbeat");
+            thread.setDaemon(true);
+            return thread;
+          });
 
   public DocumentEventController(
       DocumentUploadService documentUploadService,
@@ -56,9 +78,17 @@ public class DocumentEventController {
 
     SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MILLIS);
     ChannelTopic topic = new ChannelTopic(DocumentEventChannels.channelFor(id));
-    MessageListener listener = (message, pattern) -> onMessage(emitter, listenerContainer, topic, message);
+    MessageListener listener = (message, pattern) -> onMessage(emitter, message);
 
-    Runnable unsubscribe = () -> listenerContainer.removeMessageListener(listener, topic);
+    var heartbeat =
+        heartbeatScheduler.scheduleAtFixedRate(
+            () -> sendHeartbeat(emitter), HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
+
+    Runnable unsubscribe =
+        () -> {
+          listenerContainer.removeMessageListener(listener, topic);
+          heartbeat.cancel(false);
+        };
     emitter.onCompletion(unsubscribe);
     emitter.onTimeout(unsubscribe);
     emitter.onError(throwable -> unsubscribe.run());
@@ -69,46 +99,43 @@ public class DocumentEventController {
       // The transition to a terminal status may have already happened and published before this
       // subscription existed -- emit the current state immediately rather than leaving a client
       // waiting forever for an event that already fired.
-      emitCurrentStatus(emitter, document);
+      send(
+          emitter,
+          new DocumentStatusChangedEvent(
+              document.getId(), document.getOrganizationId(), document.getStatus(), document.getFailureReason()),
+          true);
     }
 
     return emitter;
   }
 
-  private void onMessage(
-      SseEmitter emitter,
-      RedisMessageListenerContainer listenerContainer,
-      ChannelTopic topic,
-      Message message) {
+  private void onMessage(SseEmitter emitter, Message message) {
     try {
       DocumentStatusChangedEvent event =
           objectMapper.readValue(message.getBody(), DocumentStatusChangedEvent.class);
-      emitter.send(SseEmitter.event().name("status").data(event));
-      if (event.status().isTerminal()) {
-        emitter.complete();
-      }
-    } catch (IOException e) {
-      // The client is gone (broken pipe, navigated away) -- complete rather than leaving a
-      // listener registered against a connection nothing will ever read from again.
-      emitter.completeWithError(e);
+      send(emitter, event, event.status().isTerminal());
     } catch (Exception e) {
       log.warn("Failed to relay document status event to SSE client: {}", e.toString());
       emitter.completeWithError(e);
     }
   }
 
-  private void emitCurrentStatus(SseEmitter emitter, Document document) {
+  private void send(SseEmitter emitter, DocumentStatusChangedEvent event, boolean thenComplete) {
     try {
-      emitter.send(
-          SseEmitter.event()
-              .name("status")
-              .data(
-                  new DocumentStatusChangedEvent(
-                      document.getId(),
-                      document.getOrganizationId(),
-                      document.getStatus(),
-                      document.getFailureReason())));
-      emitter.complete();
+      emitter.send(SseEmitter.event().name(EVENT_NAME).data(event));
+      if (thenComplete) {
+        emitter.complete();
+      }
+    } catch (IOException e) {
+      // The client is gone (broken pipe, navigated away) -- complete rather than leaving a
+      // listener registered against a connection nothing will ever read from again.
+      emitter.completeWithError(e);
+    }
+  }
+
+  private void sendHeartbeat(SseEmitter emitter) {
+    try {
+      emitter.send(SseEmitter.event().comment("keepalive"));
     } catch (IOException e) {
       emitter.completeWithError(e);
     }

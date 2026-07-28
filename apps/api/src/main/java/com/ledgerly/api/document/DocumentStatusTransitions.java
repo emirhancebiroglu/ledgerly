@@ -81,19 +81,30 @@ public class DocumentStatusTransitions {
    * One document, one transaction — used by {@link DocumentReaper} so a crash partway through a
    * sweep leaves every already-reclaimed document reclaimed, not rolled back as a batch.
    *
-   * <p>Does not publish a {@link DocumentStatusChangedEvent}: the bulk {@code @Modifying} query
-   * this calls returns only an affected-row count, not the row or its {@code organizationId}, and
-   * a reaper sweep firing minutes after a crash has no realistic open SSE stream to notify anyway.
-   * A client polling {@code GET /documents/{id}} still sees the terminal status once written.
+   * <p>Publishes a {@link DocumentStatusChangedEvent} when this call actually wins the race: the
+   * reaper's {@code stuck-after-seconds} default (5 min) is well inside the SSE emitter's timeout
+   * (15 min), so a client's stream is very likely still open when a reap happens — the crash case
+   * the reaper exists for is exactly when a user is most likely still watching the panel wondering
+   * why the document never resolved.
    *
+   * @param organizationId the caller ({@link DocumentReaper}) already has this from the candidate
+   *     row it loaded to find this document; the bulk {@code @Modifying} query below only returns
+   *     an affected-row count, not enough on its own to build the event.
    * @return true if this call actually reclaimed the row (see {@link
    *     DocumentRepository#reclaimStuckDocument} for why a race can legitimately return false)
    */
   @Transactional
-  public boolean reclaimStuckDocument(UUID documentId, Instant cutoff, Instant now, String reason) {
-    return documentRepository.reclaimStuckDocument(
-            documentId, DocumentStatus.PROCESSING, cutoff, now, reason)
-        > 0;
+  public boolean reclaimStuckDocument(
+      UUID documentId, UUID organizationId, Instant cutoff, Instant now, String reason) {
+    boolean reclaimed =
+        documentRepository.reclaimStuckDocument(
+                documentId, DocumentStatus.PROCESSING, cutoff, now, reason)
+            > 0;
+    if (reclaimed) {
+      eventPublisher.publishEvent(
+          new DocumentStatusChangedEvent(documentId, organizationId, DocumentStatus.FAILED, reason));
+    }
+    return reclaimed;
   }
 
   private void publish(Document document, String detail) {
