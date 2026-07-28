@@ -9,6 +9,7 @@ import com.ledgerly.api.document.ContentHasher;
 import com.ledgerly.api.document.DocumentTooLargeException;
 import com.ledgerly.api.document.FilenameSanitizer;
 import com.ledgerly.api.document.UnsupportedDocumentTypeException;
+import com.ledgerly.api.ratelimit.UploadRateLimiter;
 import com.ledgerly.api.storage.BlobRollbackCleanup;
 import com.ledgerly.api.storage.StorageClient;
 import java.util.List;
@@ -41,6 +42,7 @@ public class PolicyUploadTransactions {
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
   private final long maxBytes;
+  private final UploadRateLimiter uploadRateLimiter;
 
   public PolicyUploadTransactions(
       PolicyDocumentRepository policyDocumentRepository,
@@ -49,6 +51,7 @@ public class PolicyUploadTransactions {
       BlobRollbackCleanup blobRollbackCleanup,
       AuditService auditService,
       ObjectMapper objectMapper,
+      UploadRateLimiter uploadRateLimiter,
       @Value("${ledgerly.document.max-bytes:10485760}") long maxBytes) {
     this.policyDocumentRepository = policyDocumentRepository;
     this.policyChunkRepository = policyChunkRepository;
@@ -56,6 +59,7 @@ public class PolicyUploadTransactions {
     this.blobRollbackCleanup = blobRollbackCleanup;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
+    this.uploadRateLimiter = uploadRateLimiter;
     this.maxBytes = maxBytes;
   }
 
@@ -72,6 +76,9 @@ public class PolicyUploadTransactions {
     if (!isPdf) {
       throw new UnsupportedDocumentTypeException("Policy documents must be PDF");
     }
+
+    // Invalid uploads do not consume AI capacity; a valid one is charged before any blob write.
+    uploadRateLimiter.checkPolicyUpload(principal.organizationId());
 
     String storageKey = storageClient.store(content);
     blobRollbackCleanup.registerOnRollback(storageKey);

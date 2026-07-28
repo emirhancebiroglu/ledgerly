@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     enable_docs: bool = False
     cors_origins: list[str] = ["http://localhost:3000"]
     service_token: SecretStr
+    rate_limit_enabled: bool = True
+    rate_limit_redis_url: str = "redis://localhost:6379/0"
+    rate_limit_max_requests: int = Field(default=30, gt=0)
+    rate_limit_window_seconds: int = Field(default=60, gt=0)
 
     @field_validator("service_token")
     @classmethod

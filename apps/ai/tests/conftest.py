@@ -7,6 +7,7 @@ import os
 os.environ.setdefault("AI_LLM_PROVIDER", "fake")
 os.environ.setdefault("AI_EMBEDDING_PROVIDER", "fake")
 os.environ.setdefault("AI_SERVICE_TOKEN", "test-service-token")
+os.environ.setdefault("AI_RATE_LIMIT_ENABLED", "false")
 
 
 import pytest

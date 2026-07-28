@@ -59,6 +59,7 @@ services:
       - ../docs/contracts:/docs/contracts:ro
     environment:
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN must be set}
+      AI_RATE_LIMIT_REDIS_URL: redis://redis:6379/0
       AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-litellm}
       AI_LLM_API_KEY: ${AI_LLM_API_KEY:?AI_LLM_API_KEY must be set}
       AI_EMBEDDING_PROVIDER: ${AI_EMBEDDING_PROVIDER:-litellm}

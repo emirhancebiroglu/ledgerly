@@ -15,12 +15,15 @@ import com.ledgerly.api.expense.ExpenseAlreadyResolvedException;
 import com.ledgerly.api.expense.InvalidExpenseListQueryException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import com.ledgerly.api.policy.IllegalPolicyDocumentTransitionException;
+import com.ledgerly.api.ratelimit.RateLimitExceededException;
+import com.ledgerly.api.ratelimit.RateLimitUnavailableException;
 import com.ledgerly.api.storage.StorageKeyNotFoundException;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -124,6 +127,19 @@ public class ApiExceptionHandler {
       IllegalPolicyDocumentTransitionException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
+  }
+
+  @ExceptionHandler(RateLimitExceededException.class)
+  public ResponseEntity<ProblemDetail> handleRateLimitExceeded(RateLimitExceededException exception) {
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header("Retry-After", Long.toString(exception.getRetryAfterSeconds()))
+        .body(withCorrelationId(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded")));
+  }
+
+  @ExceptionHandler(RateLimitUnavailableException.class)
+  public ProblemDetail handleRateLimitUnavailable() {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Rate limiting is temporarily unavailable"));
   }
 
   @ExceptionHandler(Exception.class)

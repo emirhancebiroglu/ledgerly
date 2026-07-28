@@ -2,6 +2,7 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.1
+redis==5.2.1
 python-multipart==0.0.20
 jsonschema==4.23.0
 litellm==1.81.10

@@ -16,9 +16,13 @@ _UNAUTHORIZED = JSONResponse(
 )
 
 
+def is_cost_bearing_agent_request(request: Request) -> bool:
+    return request.method == "POST" and request.url.path in _PROTECTED_PATHS
+
+
 async def require_service_auth(request: Request, service_token: SecretStr) -> JSONResponse | None:
     """Reject unauthenticated agent calls before FastAPI reads a request body."""
-    if request.method != "POST" or request.url.path not in _PROTECTED_PATHS:
+    if not is_cost_bearing_agent_request(request):
         return None
 
     authorization = request.headers.get("Authorization", "")
