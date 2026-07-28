@@ -1,10 +1,13 @@
 import logging
+from datetime import datetime
+from uuid import UUID
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 
+from app.anomaly.anomaly import AnomalyFailedError, AnomalyService
 from app.categorization.categorization import CategorizationFailedError, CategorizationService
 from app.config import settings
 from app.contracts import EMBED_POLICY_REQUEST_SCHEMA, EXTRACT_REQUEST_SCHEMA, load_schema
@@ -107,6 +110,10 @@ def get_categorization_service() -> CategorizationService:
     return CategorizationService(get_llm_client())
 
 
+def get_anomaly_service() -> AnomalyService:
+    return AnomalyService(get_llm_client())
+
+
 class EmbedQueryRequest(BaseModel):
     text: str = Field(min_length=1)
     correlation_id: str | None = None
@@ -125,6 +132,47 @@ class CategorizeRequestBody(BaseModel):
     categories: list[str] = Field(min_length=1)
     policy_chunks: list[CategorizeChunk] = Field(default_factory=list)
     correlation_id: str | None = None
+
+
+class AnomalyHistoryItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    amount_minor: StrictInt = Field(gt=0)
+    posted_at: datetime
+
+    @field_validator("posted_at", mode="before")
+    @classmethod
+    def posted_at_must_be_a_datetime_string(cls, value: object) -> object:
+        if not isinstance(value, str):
+            raise ValueError("posted_at must be a date-time string")
+        return value
+
+    @field_validator("posted_at")
+    @classmethod
+    def posted_at_must_include_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("posted_at must include an offset")
+        return value
+
+
+class AnomalyBudget(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    period: str = Field(pattern=r"^[0-9]{4}-(0[1-9]|1[0-2])$")
+    limit_minor: StrictInt = Field(gt=0)
+    spent_minor: StrictInt = Field(ge=0)
+
+
+class AnomalyRequestBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    expense_id: UUID
+    category_id: UUID
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    amount_minor: StrictInt = Field(gt=0)
+    history: list[AnomalyHistoryItem] = Field(max_length=1000)
+    budget: AnomalyBudget | None
+    correlation_id: str | None = Field(default=None, max_length=128)
 
 
 @app.get("/health")
@@ -227,6 +275,24 @@ async def categorize(
         )
     except CategorizationFailedError as error:
         logger.info("Categorization failed for document %s: %s", body.document_id, error)
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@app.post("/anomaly")
+async def anomaly(
+    body: AnomalyRequestBody,
+    service: AnomalyService = Depends(get_anomaly_service),
+) -> dict:
+    """Return deterministic anomaly facts and an advisory qualitative explanation."""
+    try:
+        return service.analyze(
+            expense_id=str(body.expense_id),
+            amount_minor=body.amount_minor,
+            history=[item.model_dump(mode="json") for item in body.history],
+            budget=body.budget.model_dump(mode="json") if body.budget is not None else None,
+        )
+    except AnomalyFailedError as error:
+        logger.info("Anomaly assessment failed for expense %s: %s", body.expense_id, error)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgerly.dev/contracts/anomaly-response.schema.json",
+  "title": "AnomalyResponse",
+  "description": "What `ai` returns from `POST /anomaly`. Risk and every numeric fact are deterministic Python output; the LLM contributes qualitative explanation only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expense_id", "risk", "history_count", "z_score", "budget_burn_rate", "explanation", "model"],
+  "properties": {
+    "expense_id": {"type": "string", "format": "uuid"},
+    "risk": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH"]},
+    "history_count": {"type": "integer", "minimum": 0},
+    "z_score": {"type": "number"},
+    "budget_burn_rate": {"type": ["number", "null"], "minimum": 0},
+    "explanation": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "model": {"type": "string", "minLength": 1}
+  }
+}
