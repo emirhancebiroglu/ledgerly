@@ -23,7 +23,17 @@ export interface ListExpensesParams {
   size?: number;
 }
 
-export async function listExpenses(params: ListExpensesParams = {}): Promise<Expense[]> {
+export type ListExpensesResult =
+  | { ok: true; expenses: Expense[] }
+  | { ok: false; status: number; message: string };
+
+/**
+ * `ExpenseController.list` 400s on an unrecognized `status`/`sort` (`ExpenseListQuery.parse`) —
+ * distinct from a query that's valid but matches nothing, which is a normal 200 with an empty
+ * array. Callers need to tell those apart: an empty array renders an empty state, a 400 renders
+ * an error state with the server's own message.
+ */
+export async function listExpenses(params: ListExpensesParams = {}): Promise<ListExpensesResult> {
   const query = new URLSearchParams();
   if (params.status) query.set("status", params.status);
   if (params.search) query.set("search", params.search);
@@ -35,8 +45,17 @@ export async function listExpenses(params: ListExpensesParams = {}): Promise<Exp
   const response = await apiFetchAuthenticated(
     `/api/v1/expenses${queryString ? `?${queryString}` : ""}`,
   );
+
   if (!response.ok) {
-    return [];
+    let message = "Something went wrong loading expenses.";
+    try {
+      const problem = (await response.json()) as { detail?: string };
+      message = problem.detail ?? message;
+    } catch {
+      // Non-JSON error body — keep the generic message.
+    }
+    return { ok: false, status: response.status, message };
   }
-  return (await response.json()) as Expense[];
+
+  return { ok: true, expenses: (await response.json()) as Expense[] };
 }

@@ -128,8 +128,35 @@ const server = createServer((req, res) => {
   }
   if (url.pathname === "/api/v1/expenses") {
     if (!isAuthed) return send(res, 401, {});
-    const size = Number(url.searchParams.get("size") ?? EXPENSES.length);
-    return send(res, 200, EXPENSES.slice(0, size));
+
+    const status = url.searchParams.get("status");
+    if (status && !["POSTED", "NEEDS_REVIEW"].includes(status)) {
+      return send(res, 400, { detail: `Unknown status: ${status}` });
+    }
+    const sort = url.searchParams.get("sort");
+    const [sortField, sortDir] = sort ? sort.split(",") : ["date", "desc"];
+    if (!["date", "amount"].includes(sortField)) {
+      return send(res, 400, { detail: `Unknown sort field: ${sortField}` });
+    }
+    if (sortDir && !["asc", "desc"].includes(sortDir)) {
+      return send(res, 400, { detail: `Unknown sort direction: ${sortDir}` });
+    }
+
+    const search = url.searchParams.get("search")?.toLowerCase();
+    let results = EXPENSES.filter((e) => {
+      if (status && e.status !== status) return false;
+      if (search && !e.vendor.toLowerCase().includes(search)) return false;
+      return true;
+    });
+
+    results = [...results].sort((a, b) => {
+      const key = sortField === "amount" ? "amountMinor" : "createdAt";
+      const cmp = a[key] < b[key] ? -1 : a[key] > b[key] ? 1 : 0;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+
+    const size = Number(url.searchParams.get("size") ?? results.length);
+    return send(res, 200, results.slice(0, size));
   }
   if (url.pathname === "/api/v1/categories") {
     if (!isAuthed) return send(res, 401, {});

@@ -8,11 +8,12 @@ import { SpendOverTimeChart } from "@/components/dashboard/spend-over-time-chart
 import { RecentExpenses } from "@/components/dashboard/recent-expenses";
 
 export default async function DashboardPage() {
-  const [summary, recentExpenses, categories] = await Promise.all([
+  const [summary, recentExpensesResult, categories] = await Promise.all([
     getDashboardSummary(),
     listExpenses({ sort: "date,desc", size: 5 }),
     listCategories(),
   ]);
+  const recentExpenses = recentExpensesResult.ok ? recentExpensesResult.expenses : [];
 
   if (!summary) {
     return (
