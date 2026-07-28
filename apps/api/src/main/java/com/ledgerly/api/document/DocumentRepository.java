@@ -35,6 +35,39 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
   List<Document> findByStatusAndUpdatedAtBefore(
       DocumentStatus status, Instant cutoff, Pageable pageable);
 
+  /** Bounded candidate scan for the durable extraction queue; the following claim is atomic. */
+  List<Document> findByStatusAndNextAttemptAtLessThanEqual(
+      DocumentStatus status, Instant now, Pageable pageable);
+
+  /**
+   * Atomically claims a due queue row. Candidate selection is deliberately separate from this
+   * write: two instances can select the same id, but only one can change its current PENDING row
+   * to PROCESSING and increment its attempt count.
+   */
+  @Modifying
+  @Query(
+      "UPDATE Document d SET d.status = com.ledgerly.api.document.DocumentStatus.PROCESSING, "
+          + "d.extractionAttempts = d.extractionAttempts + 1, d.failureReason = null, "
+          + "d.updatedAt = :now WHERE d.id = :id "
+          + "AND d.status = com.ledgerly.api.document.DocumentStatus.PENDING "
+          + "AND d.nextAttemptAt <= :now AND d.extractionAttempts < :maxAttempts")
+  int claimDueDocument(
+      @Param("id") UUID id, @Param("now") Instant now, @Param("maxAttempts") int maxAttempts);
+
+  /** Releases a claim that could not enter the worker executor without spending a retry attempt. */
+  @Modifying
+  @Query(
+      "UPDATE Document d SET d.status = com.ledgerly.api.document.DocumentStatus.PENDING, "
+          + "d.extractionAttempts = d.extractionAttempts - 1, d.nextAttemptAt = :retryAt, "
+          + "d.failureReason = :reason, d.updatedAt = :now WHERE d.id = :id "
+          + "AND d.status = com.ledgerly.api.document.DocumentStatus.PROCESSING "
+          + "AND d.extractionAttempts > 0")
+  int releaseClaimAfterDispatchRejection(
+      @Param("id") UUID id,
+      @Param("now") Instant now,
+      @Param("retryAt") Instant retryAt,
+      @Param("reason") String reason);
+
   /**
    * Atomically reclaims one stuck document: the {@code WHERE status = :expectedStatus} makes this
    * safe with two reaper instances racing the same row — whichever one's UPDATE runs first flips

@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.auth.AuthResponse;
 import com.ledgerly.api.auth.RegisterRequest;
 import com.ledgerly.api.category.CategoryRequest;
+import com.ledgerly.api.document.DocumentQueuePoller;
 import com.ledgerly.api.document.ExtractionClient;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
 import io.jsonwebtoken.Jwts;
@@ -55,7 +56,10 @@ import org.springframework.test.web.servlet.ResultActions;
   ExpensePostingPipelineIT.SynchronousAsyncConfig.class
 })
 @org.springframework.test.context.TestPropertySource(
-    properties = "spring.main.allow-bean-definition-overriding=true")
+    properties = {
+      "spring.main.allow-bean-definition-overriding=true",
+      "ledgerly.document.queue.interval-seconds=3600"
+    })
 class ExpensePostingPipelineIT extends AbstractPostgresIT {
 
   private static final byte[] REAL_PDF =
@@ -67,6 +71,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
   @Autowired private ObjectMapper objectMapper;
   @Autowired private StubExtractionClient stubExtractionClient;
   @Autowired private StubCategorizationClient stubCategorizationClient;
+  @Autowired private DocumentQueuePoller queuePoller;
   @Autowired private DataSource dataSource;
 
   @BeforeEach
@@ -85,7 +90,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
     stubCategorizationClient.respondWith(
         documentId -> categorizeResponse(documentId, "Travel", 0.92, "policy excerpt"));
 
-    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult uploaded = uploadAndProcess(token);
     UUID documentId = documentIdOf(uploaded);
 
     UUID expenseId = expenseIdForDocument(documentId);
@@ -110,7 +115,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
     stubCategorizationClient.respondWith(
         documentId -> categorizeResponse(documentId, "Travel", 0.92, null));
 
-    upload(token).andExpect(jsonPath("$.status").value("EXTRACTED"));
+    uploadAndProcess(token);
 
     Long alertCount =
         queryLong(
@@ -132,7 +137,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
                 0.92,
                 "Travel expenses over 500 EUR require manager approval."));
 
-    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult uploaded = uploadAndProcess(token);
     UUID expenseId = expenseIdForDocument(documentIdOf(uploaded));
 
     mockMvc
@@ -154,7 +159,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
         documentId ->
             categorizeResponse(documentId, "Travel", 0.92, "a policy that does not exist"));
 
-    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult uploaded = uploadAndProcess(token);
     UUID expenseId = expenseIdForDocument(documentIdOf(uploaded));
 
     mockMvc
@@ -171,7 +176,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
         documentId -> categorizeResponse(documentId, "Travel", 0.4, null));
     long ledgerEntriesBefore = countRows("ledger_entry");
 
-    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult uploaded = uploadAndProcess(token);
     UUID documentId = documentIdOf(uploaded);
     UUID expenseId = expenseIdForDocument(documentId);
 
@@ -192,7 +197,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
     stubCategorizationClient.respondWith(
         documentId -> categorizeResponse(documentId, "Travel", 0.7, null));
 
-    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult uploaded = uploadAndProcess(token);
     UUID expenseId = expenseIdForDocument(documentIdOf(uploaded));
 
     mockMvc
@@ -206,7 +211,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
     createCategory(token, "Travel");
     stubCategorizationClient.failWith(() -> new RuntimeException("ai unavailable"));
 
-    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult uploaded = uploadAndProcess(token);
 
     assertThat(expenseCountForDocument(documentIdOf(uploaded))).isZero();
   }
@@ -383,6 +388,16 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
             .file(new MockMultipartFile("file", "invoice.pdf", null, REAL_PDF))
             .header("Authorization", "Bearer " + token)
             .header("Idempotency-Key", "key-" + System.nanoTime()));
+  }
+
+  private MvcResult uploadAndProcess(String token) throws Exception {
+    MvcResult uploaded =
+        upload(token)
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andReturn();
+    queuePoller.processDueDocuments();
+    return uploaded;
   }
 
   private String registerAndGetAccessToken() throws Exception {

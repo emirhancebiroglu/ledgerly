@@ -76,11 +76,13 @@ public class DocumentExtractionWorker {
       rawProposal =
           extractionClient.extract(
               document.getId(), content, document.getContentType(), document.getFilename());
-    } catch (RuntimeException e) {
-      // A timeout, a refused connection and a 5xx are the same event from here: no usable answer.
+    } catch (ExtractionUnavailableException e) {
+      // A timeout, a refused connection and a 5xx leave the durable work item PENDING for retry.
       log.warn("Extraction call failed for document {}: {}", documentId, e.toString());
-      return transitions.recordFailure(
-          documentId, organizationId, "Extraction service unavailable");
+      return transitions.retryAfterTransientFailure(documentId, organizationId);
+    } catch (ExtractionRequestRejectedException e) {
+      log.warn("Extraction request rejected for document {}: {}", documentId, e.toString());
+      return transitions.recordFailure(documentId, organizationId, "Extraction service rejected the request");
     }
 
     ExtractionProposal proposal;

@@ -1,5 +1,7 @@
 package com.ledgerly.api.document;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -8,7 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The transactional status writes for {@link DocumentProcessingService}.
+ * The transactional status writes for the extraction queue and worker.
  *
  * <p>These live in their own bean deliberately. A {@code @Transactional} method invoked via {@code
  * this} from inside the same bean bypasses the Spring proxy entirely and silently runs with no
@@ -25,11 +27,30 @@ public class DocumentStatusTransitions {
 
   private final DocumentRepository documentRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final Clock clock;
+  private final int maxAttempts;
+  private final Duration retryInitialDelay;
+  private final Duration retryMaxDelay;
 
   public DocumentStatusTransitions(
-      DocumentRepository documentRepository, ApplicationEventPublisher eventPublisher) {
+      DocumentRepository documentRepository,
+      ApplicationEventPublisher eventPublisher,
+      Clock clock,
+      @org.springframework.beans.factory.annotation.Value("${ledgerly.document.queue.max-attempts:5}")
+          int maxAttempts,
+      @org.springframework.beans.factory.annotation.Value("${ledgerly.document.queue.retry-initial-seconds:5}")
+          long retryInitialSeconds,
+      @org.springframework.beans.factory.annotation.Value("${ledgerly.document.queue.retry-max-seconds:300}")
+          long retryMaxSeconds) {
     this.documentRepository = documentRepository;
     this.eventPublisher = eventPublisher;
+    this.clock = clock;
+    if (maxAttempts < 1 || retryInitialSeconds < 1 || retryMaxSeconds < retryInitialSeconds) {
+      throw new IllegalArgumentException("Document queue retry configuration is invalid");
+    }
+    this.maxAttempts = maxAttempts;
+    this.retryInitialDelay = Duration.ofSeconds(retryInitialSeconds);
+    this.retryMaxDelay = Duration.ofSeconds(retryMaxSeconds);
   }
 
   @Transactional
@@ -68,6 +89,57 @@ public class DocumentStatusTransitions {
     document.markFailed(reason);
     publish(document, reason);
     return document;
+  }
+
+  /**
+   * Records a transient dependency failure without losing the work item. The attempt count was
+   * incremented by the atomic queue claim, so the final allowed failed call is terminal and every
+   * earlier call is made due again only after bounded exponential backoff.
+   */
+  @Transactional
+  public Document retryAfterTransientFailure(UUID documentId, UUID organizationId) {
+    Document document = load(documentId, organizationId);
+    if (document.getExtractionAttempts() >= maxAttempts) {
+      document.markFailed("Extraction service unavailable after " + maxAttempts + " attempts");
+      publish(document, document.getFailureReason());
+      return document;
+    }
+
+    Instant now = Instant.now(clock);
+    Instant retryAt = now.plus(backoffForAttempt(document.getExtractionAttempts()));
+    document.markPendingForRetry(retryAt, "Extraction service unavailable; retry scheduled", now);
+    publish(document, document.getFailureReason());
+    return document;
+  }
+
+  /** Returns true only for the one queue worker that won the conditional update. */
+  @Transactional
+  public boolean claimDueDocument(UUID documentId, UUID organizationId, Instant now) {
+    boolean claimed = documentRepository.claimDueDocument(documentId, now, maxAttempts) > 0;
+    if (claimed) {
+      eventPublisher.publishEvent(
+          new DocumentStatusChangedEvent(
+              documentId, organizationId, DocumentStatus.PROCESSING, null));
+    }
+    return claimed;
+  }
+
+  /**
+   * Gives a claimed row back to PostgreSQL when the bounded worker executor is full. This is not
+   * an extraction attempt: decrementing the claim increment means load shedding cannot exhaust a
+   * document's agent retry budget before a worker ever sees it.
+   */
+  @Transactional
+  public boolean releaseClaimAfterDispatchRejection(
+      UUID documentId, UUID organizationId, Instant now, Instant retryAt) {
+    String reason = "Extraction queue is busy; dispatch retry scheduled";
+    boolean released =
+        documentRepository.releaseClaimAfterDispatchRejection(documentId, now, retryAt, reason) > 0;
+    if (released) {
+      eventPublisher.publishEvent(
+          new DocumentStatusChangedEvent(documentId, organizationId, DocumentStatus.PENDING, reason));
+    }
+    return released;
   }
 
   @Transactional(readOnly = true)
@@ -111,5 +183,15 @@ public class DocumentStatusTransitions {
     eventPublisher.publishEvent(
         new DocumentStatusChangedEvent(
             document.getId(), document.getOrganizationId(), document.getStatus(), detail));
+  }
+
+  private Duration backoffForAttempt(int attempt) {
+    long multiplier = 1L << Math.min(Math.max(attempt - 1, 0), 30);
+    try {
+      Duration backoff = retryInitialDelay.multipliedBy(multiplier);
+      return backoff.compareTo(retryMaxDelay) > 0 ? retryMaxDelay : backoff;
+    } catch (ArithmeticException ignored) {
+      return retryMaxDelay;
+    }
   }
 }
