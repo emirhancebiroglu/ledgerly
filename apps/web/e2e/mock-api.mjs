@@ -133,13 +133,24 @@ const server = createServer((req, res) => {
     if (status && !["POSTED", "NEEDS_REVIEW"].includes(status)) {
       return send(res, 400, { detail: `Unknown status: ${status}` });
     }
+    // Mirrors ExpenseListQuery.parse's split(",", 2) exactly: "date," has a present-but-empty
+    // second part (parts.length === 2), which the real API 400s on just like "date,bogus" —
+    // only a genuinely absent sort param (parts.length === 1) defaults the direction to desc.
     const sort = url.searchParams.get("sort");
-    const [sortField, sortDir] = sort ? sort.split(",") : ["date", "desc"];
-    if (!["date", "amount"].includes(sortField)) {
-      return send(res, 400, { detail: `Unknown sort field: ${sortField}` });
-    }
-    if (sortDir && !["asc", "desc"].includes(sortDir)) {
-      return send(res, 400, { detail: `Unknown sort direction: ${sortDir}` });
+    let sortField = "date";
+    let sortDir = "desc";
+    if (sort) {
+      const parts = sort.split(",");
+      sortField = parts[0];
+      if (!["date", "amount"].includes(sortField)) {
+        return send(res, 400, { detail: `Unknown sort field: ${sortField}` });
+      }
+      if (parts.length >= 2) {
+        sortDir = parts[1];
+        if (!["asc", "desc"].includes(sortDir)) {
+          return send(res, 400, { detail: `Unknown sort direction: ${sortDir}` });
+        }
+      }
     }
 
     const search = url.searchParams.get("search")?.toLowerCase();
@@ -155,7 +166,10 @@ const server = createServer((req, res) => {
       return sortDir === "asc" ? cmp : -cmp;
     });
 
-    const size = Number(url.searchParams.get("size") ?? results.length);
+    // Matches ExpenseController's @RequestParam(defaultValue = "20") — a caller that omits
+    // `size` should see the real API's actual default, not "everything," or an e2e test could
+    // pass here while silently relying on a page size the real api would never give it.
+    const size = Number(url.searchParams.get("size") ?? 20);
     return send(res, 200, results.slice(0, size));
   }
   if (url.pathname === "/api/v1/categories") {

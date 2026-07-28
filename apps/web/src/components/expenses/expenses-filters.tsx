@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Search } from "lucide-react";
 
@@ -35,6 +35,18 @@ interface SearchInputProps {
 function SearchInput({ initialValue, onDebouncedChange }: SearchInputProps) {
   const [value, setValue] = useState(initialValue);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Cleanup only — sets no state, so this doesn't trip react-hooks/set-state-in-effect. Without
+  // it, a pending debounce outlives a fast navigation away from this input (a sidebar click, the
+  // back button, or the key={currentSearch} remount below) and fires router.push afterward,
+  // yanking the user back to /expenses with a stale search term.
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
 
   function onChange(next: string) {
     setValue(next);
