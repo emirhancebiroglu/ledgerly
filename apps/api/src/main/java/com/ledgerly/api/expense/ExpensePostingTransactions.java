@@ -3,6 +3,7 @@ package com.ledgerly.api.expense;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.audit.AuditService;
+import com.ledgerly.api.budget.BudgetThresholdEvaluator;
 import com.ledgerly.api.category.Category;
 import com.ledgerly.api.correlation.CorrelationIds;
 import com.ledgerly.api.document.ExtractionProposal;
@@ -39,6 +40,7 @@ public class ExpensePostingTransactions {
   private final LedgerAccountRepository ledgerAccountRepository;
   private final LedgerTransactionRepository ledgerTransactionRepository;
   private final ExpenseRepository expenseRepository;
+  private final BudgetThresholdEvaluator budgetThresholdEvaluator;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
 
@@ -46,11 +48,13 @@ public class ExpensePostingTransactions {
       LedgerAccountRepository ledgerAccountRepository,
       LedgerTransactionRepository ledgerTransactionRepository,
       ExpenseRepository expenseRepository,
+      BudgetThresholdEvaluator budgetThresholdEvaluator,
       AuditService auditService,
       ObjectMapper objectMapper) {
     this.ledgerAccountRepository = ledgerAccountRepository;
     this.ledgerTransactionRepository = ledgerTransactionRepository;
     this.expenseRepository = expenseRepository;
+    this.budgetThresholdEvaluator = budgetThresholdEvaluator;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
   }
@@ -71,11 +75,12 @@ public class ExpensePostingTransactions {
             organizationId, LIABILITY_ACCOUNT_NAME, "LIABILITY", proposal.currency());
 
     Money amount = Money.of(proposal.totalMinor(), proposal.currency());
+    Instant postedAt = Instant.now();
     LedgerTransaction transaction =
         LedgerTransaction.post(
             organizationId,
             proposal.currency(),
-            Instant.now(),
+            postedAt,
             List.of(
                 LedgerEntry.of(expenseAccountId, EntryDirection.DEBIT, amount, amount, BigDecimal.ONE),
                 LedgerEntry.of(
@@ -95,6 +100,8 @@ public class ExpensePostingTransactions {
                 response.confidence(),
                 response.citation()));
     expenseRepository.flush();
+
+    budgetThresholdEvaluator.evaluate(expense, postedAt, actor);
 
     auditService.record(
         organizationId,

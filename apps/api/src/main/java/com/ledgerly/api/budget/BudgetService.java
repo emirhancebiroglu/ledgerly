@@ -8,6 +8,7 @@ import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.correlation.CorrelationIds;
 import java.util.Currency;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -26,16 +27,19 @@ public class BudgetService {
   private static final String UNIQUE_CONSTRAINT = "uq_budget_organization_category_period_currency";
 
   private final BudgetRepository budgetRepository;
+  private final BudgetSpendRepository budgetSpendRepository;
   private final CategoryRepository categoryRepository;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
 
   public BudgetService(
       BudgetRepository budgetRepository,
+      BudgetSpendRepository budgetSpendRepository,
       CategoryRepository categoryRepository,
       AuditService auditService,
       ObjectMapper objectMapper) {
     this.budgetRepository = budgetRepository;
+    this.budgetSpendRepository = budgetSpendRepository;
     this.categoryRepository = categoryRepository;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
@@ -84,6 +88,22 @@ public class BudgetService {
   @Transactional(readOnly = true)
   public Budget get(UUID id, AuthenticatedPrincipal principal) {
     return findForOrganization(id, principal);
+  }
+
+  /** One batch aggregate query supplies usage for a whole bounded budget page. */
+  @Transactional(readOnly = true)
+  public Map<UUID, BudgetUsage> usageByBudget(List<Budget> budgets) {
+    Map<UUID, Long> spentMinorByBudget = new HashMap<>();
+    budgets.forEach(budget -> spentMinorByBudget.put(budget.getId(), 0L));
+    spentMinorByBudget.putAll(budgetSpendRepository.spentMinorByBudget(budgets));
+    return budgets.stream()
+        .collect(
+            java.util.stream.Collectors.toMap(
+                Budget::getId,
+                budget ->
+                    BudgetUsage.of(
+                        spentMinorByBudget.getOrDefault(budget.getId(), 0L),
+                        budget.getLimitMinor())));
   }
 
   @Transactional

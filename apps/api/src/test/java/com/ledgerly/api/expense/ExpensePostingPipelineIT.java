@@ -20,6 +20,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
@@ -96,6 +98,24 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
 
     assertThat(ledgerEntryCountForExpense(expenseId)).isEqualTo(2);
     assertThat(netBalanceForExpense(expenseId)).isZero();
+  }
+
+  @Test
+  void automaticPostingEvaluatesTheMatchingBudgetAndCreatesAn80PercentAlert() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    createCategory(token, "Travel");
+    UUID categoryId = categoryIdFor(organizationId, "Travel");
+    UUID budgetId = insertBudget(organizationId, categoryId, 15_125);
+    stubCategorizationClient.respondWith(
+        documentId -> categorizeResponse(documentId, "Travel", 0.92, null));
+
+    upload(token).andExpect(jsonPath("$.status").value("EXTRACTED"));
+
+    Long alertCount =
+        queryLong(
+            "SELECT COUNT(*) FROM alert WHERE budget_id = ? AND threshold_percent = 80", budgetId);
+    assertThat(alertCount).isEqualTo(1);
   }
 
   @Test
@@ -252,6 +272,48 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
         ResultSet rs = statement.executeQuery("SELECT count(*) FROM " + table)) {
       rs.next();
       return rs.getLong(1);
+    }
+  }
+
+  private UUID insertBudget(UUID organizationId, UUID categoryId, long limitMinor) throws Exception {
+    UUID budgetId = UUID.randomUUID();
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement ps =
+            connection.prepareStatement(
+                "INSERT INTO budget (id, organization_id, category_id, period, limit_minor, currency) "
+                    + "VALUES (?, ?, ?, ?, ?, 'EUR')")) {
+      ps.setObject(1, budgetId);
+      ps.setObject(2, organizationId);
+      ps.setObject(3, categoryId);
+      ps.setString(4, YearMonth.now(ZoneOffset.UTC).toString());
+      ps.setLong(5, limitMinor);
+      ps.executeUpdate();
+    }
+    return budgetId;
+  }
+
+  private UUID categoryIdFor(UUID organizationId, String name) throws Exception {
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement ps =
+            connection.prepareStatement(
+                "SELECT id FROM category WHERE organization_id = ? AND name = ?")) {
+      ps.setObject(1, organizationId);
+      ps.setString(2, name);
+      try (ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        return (UUID) rs.getObject("id");
+      }
+    }
+  }
+
+  private Long queryLong(String sql, UUID value) throws Exception {
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement ps = connection.prepareStatement(sql)) {
+      ps.setObject(1, value);
+      try (ResultSet rs = ps.executeQuery()) {
+        rs.next();
+        return rs.getLong(1);
+      }
     }
   }
 

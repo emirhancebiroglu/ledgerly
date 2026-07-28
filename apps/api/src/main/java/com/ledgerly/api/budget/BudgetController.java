@@ -30,7 +30,8 @@ public class BudgetController {
   public BudgetResponse create(
       @Valid @RequestBody BudgetRequest request,
       @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-    return BudgetResponse.from(budgetService.create(request, principal));
+    Budget budget = budgetService.create(request, principal);
+    return responseFor(budget);
   }
 
   @GetMapping("/api/v1/budgets")
@@ -38,13 +39,18 @@ public class BudgetController {
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size,
       @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-    return budgetService.list(page, size, principal).stream().map(BudgetResponse::from).toList();
+    List<Budget> budgets = budgetService.list(page, size, principal);
+    var usageByBudget = budgetService.usageByBudget(budgets);
+    return budgets.stream()
+        .map(budget -> BudgetResponse.from(budget, usageByBudget.get(budget.getId())))
+        .toList();
   }
 
   @GetMapping("/api/v1/budgets/{id}")
   public BudgetResponse get(
       @PathVariable UUID id, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-    return BudgetResponse.from(budgetService.get(id, principal));
+    Budget budget = budgetService.get(id, principal);
+    return responseFor(budget);
   }
 
   @PutMapping("/api/v1/budgets/{id}")
@@ -52,7 +58,8 @@ public class BudgetController {
       @PathVariable UUID id,
       @Valid @RequestBody BudgetRequest request,
       @AuthenticationPrincipal AuthenticatedPrincipal principal) {
-    return BudgetResponse.from(budgetService.update(id, request, principal));
+    Budget budget = budgetService.update(id, request, principal);
+    return responseFor(budget);
   }
 
   @DeleteMapping("/api/v1/budgets/{id}")
@@ -60,5 +67,10 @@ public class BudgetController {
   public void delete(
       @PathVariable UUID id, @AuthenticationPrincipal AuthenticatedPrincipal principal) {
     budgetService.delete(id, principal);
+  }
+
+  private BudgetResponse responseFor(Budget budget) {
+    return BudgetResponse.from(
+        budget, budgetService.usageByBudget(List.of(budget)).get(budget.getId()));
   }
 }
