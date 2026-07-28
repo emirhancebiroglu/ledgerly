@@ -12,6 +12,7 @@ import com.ledgerly.api.document.UnsupportedDocumentTypeException;
 import com.ledgerly.api.expense.ExpenseAlreadyResolvedException;
 import com.ledgerly.api.expense.InvalidExpenseListQueryException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
+import com.ledgerly.api.storage.StorageKeyNotFoundException;
 import com.ledgerly.api.policy.IllegalPolicyDocumentTransitionException;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
@@ -33,7 +34,8 @@ public class ApiExceptionHandler {
     NoHandlerFoundException.class,
     NoResourceFoundException.class,
     NoSuchElementException.class,
-    CrossOrganizationAccessException.class
+    CrossOrganizationAccessException.class,
+    StorageKeyNotFoundException.class
   })
   public ProblemDetail handleNotFound() {
     return withCorrelationId(ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Resource not found"));
