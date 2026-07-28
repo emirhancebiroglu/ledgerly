@@ -1,0 +1,15 @@
+<configuration>
+  <turboFilter class="com.ledgerly.api.logging.ApiServiceMdcTurboFilter"/>
+  <springProperty scope="context" name="structuredFormat"
+      source="logging.structured.format.console" defaultValue="logstash"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="org.springframework.boot.logging.logback.StructuredLogEncoder">
+      <format>${structuredFormat}</format>
+    </encoder>
+  </appender>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE"/>
+  </root>
+</configuration>

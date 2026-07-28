@@ -22,21 +22,18 @@ import org.springframework.web.multipart.MultipartFile;
 public class DocumentController {
 
   private final DocumentUploadService documentUploadService;
-  private final DocumentProcessingService documentProcessingService;
   private final StorageClient storageClient;
 
   public DocumentController(
       DocumentUploadService documentUploadService,
-      DocumentProcessingService documentProcessingService,
       StorageClient storageClient) {
     this.documentUploadService = documentUploadService;
-    this.documentProcessingService = documentProcessingService;
     this.storageClient = storageClient;
   }
 
   /**
-   * Uploads a document and returns immediately once it is marked {@code PROCESSING} — the `ai`
-   * call runs off the request thread (architecture Q3, decided at M5). A client polls
+   * Uploads a document and returns immediately with durable {@code PENDING} work. The scheduler
+   * claims it later, so an unavailable `ai` service never makes an upload request fail. A client polls
    * {@code GET /api/v1/documents/{id}} for the terminal status.
    */
   @PostMapping("/api/v1/documents")
@@ -47,8 +44,7 @@ public class DocumentController {
       throws IOException {
     Document uploaded =
         documentUploadService.upload(file.getBytes(), file.getOriginalFilename(), principal);
-    return DocumentResponse.from(
-        documentProcessingService.beginProcessing(uploaded.getId(), principal.organizationId()));
+    return DocumentResponse.from(uploaded);
   }
 
   @GetMapping("/api/v1/documents/{id}")

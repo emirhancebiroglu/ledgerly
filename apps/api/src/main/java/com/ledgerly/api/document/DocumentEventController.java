@@ -115,7 +115,7 @@ public class DocumentEventController {
           objectMapper.readValue(message.getBody(), DocumentStatusChangedEvent.class);
       send(emitter, event, event.status().isTerminal());
     } catch (Exception e) {
-      log.warn("Failed to relay document status event to SSE client: {}", e.toString());
+      log.warn("Failed to relay document status event exceptionType={}", e.getClass().getSimpleName());
       emitter.completeWithError(e);
     }
   }

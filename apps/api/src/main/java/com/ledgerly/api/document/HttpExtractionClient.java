@@ -1,15 +1,17 @@
 package com.ledgerly.api.document;
 
+import com.ledgerly.api.ai.AiRestClientFactory;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
-import java.time.Duration;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -20,17 +22,10 @@ public class HttpExtractionClient implements ExtractionClient {
   private final RestClient restClient;
 
   public HttpExtractionClient(
-      RestClient.Builder builder,
+      AiRestClientFactory clientFactory,
       @Value("${ledgerly.ai.base-url}") String baseUrl,
       @Value("${ledgerly.ai.timeout-seconds:30}") long timeoutSeconds) {
-    // An explicit timeout is the point of this constructor: without one, an `ai` process that
-    // accepts a connection and then stalls would hold this thread indefinitely, and a document
-    // would sit in PROCESSING with nothing ever resolving it.
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
-    requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-
-    this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
+    this.restClient = clientFactory.create(baseUrl, timeoutSeconds);
   }
 
   @Override
@@ -60,10 +55,14 @@ public class HttpExtractionClient implements ExtractionClient {
           .body(parts)
           .retrieve()
           .body(String.class);
-    } catch (RestClientException e) {
-      // Covers timeouts, connection failures and any non-2xx: from this side they are the same
-      // event — no usable proposal came back.
+    } catch (HttpServerErrorException
+        | HttpClientErrorException.TooManyRequests
+        | ResourceAccessException e) {
+      // Transport failures, timeouts, 5xxs and an explicit rate limit are retryable.
       throw new ExtractionUnavailableException("Extraction service call failed", e);
+    } catch (RestClientException e) {
+      // Retrying a permanent 4xx, especially a bad service credential, only makes a queue grow.
+      throw new ExtractionRequestRejectedException("Extraction service rejected the request", e);
     }
   }
 }

@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Lifecycle of an uploaded document: {@code PENDING → PROCESSING → EXTRACTED | NEEDS_REVIEW |
+ * Lifecycle of an uploaded document: {@code PENDING ⇄ PROCESSING → EXTRACTED | NEEDS_REVIEW |
  * FAILED}.
  *
  * <p>The legal transitions live here rather than in the service so that every caller is held to the
@@ -24,7 +24,7 @@ public enum DocumentStatus {
   private static final Map<DocumentStatus, Set<DocumentStatus>> ALLOWED_TRANSITIONS =
       Map.of(
           PENDING, EnumSet.of(PROCESSING, FAILED),
-          PROCESSING, EnumSet.of(EXTRACTED, NEEDS_REVIEW, FAILED),
+          PROCESSING, EnumSet.of(PENDING, EXTRACTED, NEEDS_REVIEW, FAILED),
           EXTRACTED, Collections.emptySet(),
           NEEDS_REVIEW, Collections.emptySet(),
           FAILED, Collections.emptySet());

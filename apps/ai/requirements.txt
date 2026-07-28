@@ -2,10 +2,11 @@ fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic==2.10.4
 pydantic-settings==2.7.1
-python-multipart==0.0.20
+redis==5.2.1
+python-multipart==0.0.30
 jsonschema==4.23.0
-litellm==1.81.10
+litellm==1.84.0
 langgraph==1.2.9
 pypdfium2==5.12.1
 # pypdfium2 renders to a raw bitmap; PNG encoding goes through Pillow (bitmap.to_pil).
-pillow==12.1.1
+pillow==12.3.0

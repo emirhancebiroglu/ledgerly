@@ -61,10 +61,12 @@ public class DocumentExtractionWorker {
     if (correlationId != null) {
       MDC.put(CorrelationIdHolder.MDC_KEY, correlationId);
     }
+    MDC.put("service", "api");
     try {
       extractNow(documentId, organizationId);
     } finally {
       MDC.remove(CorrelationIdHolder.MDC_KEY);
+      MDC.remove("service");
     }
   }
 
@@ -76,11 +78,13 @@ public class DocumentExtractionWorker {
       rawProposal =
           extractionClient.extract(
               document.getId(), content, document.getContentType(), document.getFilename());
-    } catch (RuntimeException e) {
-      // A timeout, a refused connection and a 5xx are the same event from here: no usable answer.
-      log.warn("Extraction call failed for document {}: {}", documentId, e.toString());
-      return transitions.recordFailure(
-          documentId, organizationId, "Extraction service unavailable");
+    } catch (ExtractionUnavailableException e) {
+      // A timeout, a refused connection and a 5xx leave the durable work item PENDING for retry.
+      log.warn("Extraction call failed documentId={} exceptionType={}", documentId, e.getClass().getSimpleName());
+      return transitions.retryAfterTransientFailure(documentId, organizationId);
+    } catch (ExtractionRequestRejectedException e) {
+      log.warn("Extraction request rejected documentId={} exceptionType={}", documentId, e.getClass().getSimpleName());
+      return transitions.recordFailure(documentId, organizationId, "Extraction service rejected the request");
     }
 
     ExtractionProposal proposal;
@@ -121,7 +125,7 @@ public class DocumentExtractionWorker {
     try {
       expensePostingService.categorizeAndPost(organizationId, documentId, actor, proposal);
     } catch (RuntimeException e) {
-      log.warn("Categorization failed for document {}: {}", documentId, e.toString());
+      log.warn("Categorization failed documentId={} exceptionType={}", documentId, e.getClass().getSimpleName());
     }
   }
 }

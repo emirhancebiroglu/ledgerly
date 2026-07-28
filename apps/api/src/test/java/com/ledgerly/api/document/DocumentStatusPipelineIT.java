@@ -34,20 +34,25 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 
 /**
- * The whole M5 pipeline through the real endpoints: upload → `ai` → validate → status.
+ * The whole M5 pipeline through the real endpoints: upload → durable queue → `ai` → validate →
+ * status.
  *
  * <p>The `ai` call is the one thing stubbed, via the {@link ExtractionClient} port. That is
  * deliberate: the failure modes that matter most here — a timeout, a mismatched proposal, an
  * arithmetically broken one — are the ones that cannot be provoked reliably against a live service.
  *
- * <p>Extraction runs {@code @Async} in production so the request thread returns immediately with
- * {@code PROCESSING}; these tests care about the terminal outcome, so {@link
- * SynchronousAsyncConfig} overrides the executor to run on the calling thread instead of polling.
+ * <p>Extraction runs {@code @Async} in production after a queue poller atomically claims the row.
+ * These tests invoke that poller directly and use {@link SynchronousAsyncConfig} so terminal
+ * assertions do not need a sleep or a scheduler tick.
  */
 @AutoConfigureMockMvc
 @Import({DocumentStatusPipelineIT.StubExtractionConfig.class, DocumentStatusPipelineIT.SynchronousAsyncConfig.class})
 @org.springframework.test.context.TestPropertySource(
-    properties = "spring.main.allow-bean-definition-overriding=true")
+    properties = {
+      "spring.main.allow-bean-definition-overriding=true",
+      "ledgerly.document.queue.interval-seconds=3600",
+      "ledgerly.document.queue.max-attempts=2"
+    })
 class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
   private static final byte[] REAL_PDF =
@@ -56,6 +61,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private DocumentRepository documentRepository;
+  @Autowired private DocumentQueuePoller queuePoller;
+  @Autowired private DocumentStatusTransitions transitions;
   @Autowired private StubExtractionClient stubExtractionClient;
   @Autowired private DataSource dataSource;
 
@@ -69,13 +76,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     String token = registerAndGetAccessToken();
     stubExtractionClient.respondWith(DocumentStatusPipelineIT::validProposal);
 
-    MvcResult result =
-        upload(token)
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.status").value("EXTRACTED"))
-            .andExpect(jsonPath("$.proposal.currency").value("EUR"))
-            .andExpect(jsonPath("$.proposal.total_minor").value(12100))
-            .andReturn();
+    MvcResult result = upload(token).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     UUID documentId = documentIdOf(result);
     Document stored = documentRepository.findById(documentId).orElseThrow();
@@ -96,11 +98,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     // Arithmetically broken: lines 10000 + tax 2100 is 12100, not 999999.
     stubExtractionClient.respondWith(id -> proposalWithTotal(id, 999_999L));
 
-    MvcResult result =
-        upload(token)
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.status").value("NEEDS_REVIEW"))
-            .andReturn();
+    MvcResult result = upload(token).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
     assertThat(stored.getStatus()).isEqualTo(DocumentStatus.NEEDS_REVIEW);
@@ -119,7 +118,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     long ledgerTransactionsBefore = countRows("ledger_transaction");
     stubExtractionClient.respondWith(DocumentStatusPipelineIT::validProposal);
 
-    upload(token).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("EXTRACTED"));
+    upload(token).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING"));
+    processQueue();
 
     assertThat(countRows("ledger_entry")).isEqualTo(ledgerEntriesBefore);
     assertThat(countRows("ledger_transaction")).isEqualTo(ledgerTransactionsBefore);
@@ -131,27 +131,134 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     stubExtractionClient.respondWith(
         id -> validProposal(id).replace("\"currency\":\"EUR\"", "\"currency\":\"XXX\""));
 
-    MvcResult result =
-        upload(token).andExpect(jsonPath("$.status").value("NEEDS_REVIEW")).andReturn();
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     assertThat(documentRepository.findById(documentIdOf(result)).orElseThrow().getFailureReason())
         .contains("currency");
   }
 
   @Test
-  void anAiTimeoutLeavesTheDocumentFailedNotHalfUpdated() throws Exception {
+  void anAiTimeoutLeavesTheDocumentPendingForRetry() throws Exception {
     String token = registerAndGetAccessToken();
     stubExtractionClient.failWith(
         () -> new ExtractionUnavailableException("simulated read timeout"));
 
-    MvcResult result =
-        upload(token).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("FAILED"))
-            .andReturn();
+    MvcResult result = upload(token).andExpect(status().isCreated()).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
-    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.FAILED);
+    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.PENDING);
     assertThat(stored.getProposal()).isNull();
-    assertThat(stored.getFailureReason()).isEqualTo("Extraction service unavailable");
+    assertThat(stored.getFailureReason()).isEqualTo("Extraction service unavailable; retry scheduled");
+  }
+
+  @Test
+  void aTransientOutageDoesNotHotLoopAndTheSameDocumentRecoversOnItsNextDueAttempt()
+      throws Exception {
+    String token = registerAndGetAccessToken();
+    stubExtractionClient.failWith(() -> new ExtractionUnavailableException("ai stopped"));
+    MvcResult result =
+        upload(token)
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("PENDING"))
+            .andReturn();
+    UUID documentId = documentIdOf(result);
+
+    processQueue();
+    Document afterOutage = documentRepository.findById(documentId).orElseThrow();
+    assertThat(afterOutage.getStatus()).isEqualTo(DocumentStatus.PENDING);
+    assertThat(afterOutage.getExtractionAttempts()).isEqualTo(1);
+    assertThat(afterOutage.getNextAttemptAt()).isAfter(java.time.Instant.now().minusSeconds(1));
+
+    processQueue();
+    assertThat(stubExtractionClient.callCount()).isEqualTo(1);
+
+    stubExtractionClient.respondWith(DocumentStatusPipelineIT::validProposal);
+    makeRetryDue(documentId);
+    processQueue();
+
+    Document recovered = documentRepository.findById(documentId).orElseThrow();
+    assertThat(recovered.getStatus()).isEqualTo(DocumentStatus.EXTRACTED);
+    assertThat(recovered.getExtractionAttempts()).isEqualTo(2);
+    assertThat(stubExtractionClient.callCount()).isEqualTo(2);
+  }
+
+  @Test
+  void retriesStopAtTheConfiguredAttemptCap() throws Exception {
+    String token = registerAndGetAccessToken();
+    stubExtractionClient.failWith(() -> new ExtractionUnavailableException("ai stopped"));
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    UUID documentId = documentIdOf(result);
+
+    processQueue();
+    makeRetryDue(documentId);
+    processQueue();
+    makeRetryDue(documentId);
+    processQueue();
+
+    Document exhausted = documentRepository.findById(documentId).orElseThrow();
+    assertThat(exhausted.getStatus()).isEqualTo(DocumentStatus.FAILED);
+    assertThat(exhausted.getExtractionAttempts()).isEqualTo(2);
+    assertThat(exhausted.getFailureReason()).isEqualTo("Extraction service unavailable after 2 attempts");
+    assertThat(stubExtractionClient.callCount()).isEqualTo(2);
+  }
+
+  @Test
+  void concurrentPollersCanClaimOneDueDocumentOnlyOnce() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID documentId = documentIdOf(upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn());
+    Document document = documentRepository.findById(documentId).orElseThrow();
+    java.util.concurrent.CountDownLatch ready = new java.util.concurrent.CountDownLatch(2);
+    java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+    java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+    try {
+      java.util.List<java.util.concurrent.Future<Boolean>> claims =
+          java.util.List.of(
+              executor.submit(() -> claimWhenReleased(document, ready, start)),
+              executor.submit(() -> claimWhenReleased(document, ready, start)));
+      assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      start.countDown();
+
+      assertThat(claims.stream().filter(this::resultOf).count()).isEqualTo(1);
+      assertThat(documentRepository.findById(documentId).orElseThrow().getStatus())
+          .isEqualTo(DocumentStatus.PROCESSING);
+      assertThat(stubExtractionClient.callCount()).isZero();
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  void aRejectedWorkerDispatchReturnsTheClaimToPendingWithoutSpendingAnAttempt() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID documentId =
+        documentIdOf(upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn());
+    DocumentExtractionWorker rejectingWorker =
+        org.mockito.Mockito.mock(DocumentExtractionWorker.class);
+    org.mockito.Mockito.doThrow(new org.springframework.core.task.TaskRejectedException("executor full"))
+        .when(rejectingWorker)
+        .extractAsync(
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any());
+    DocumentQueuePoller rejectingPoller =
+        new DocumentQueuePoller(
+            documentRepository,
+            transitions,
+            rejectingWorker,
+            java.time.Clock.systemUTC(),
+            100,
+            5);
+
+    rejectingPoller.processDueDocuments();
+
+    Document released = documentRepository.findById(documentId).orElseThrow();
+    assertThat(released.getStatus()).isEqualTo(DocumentStatus.PENDING);
+    assertThat(released.getExtractionAttempts()).isZero();
+    assertThat(released.getFailureReason())
+        .isEqualTo("Extraction queue is busy; dispatch retry scheduled");
+    assertThat(released.getNextAttemptAt()).isAfter(java.time.Instant.now().minusSeconds(1));
   }
 
   @Test
@@ -159,7 +266,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     String token = registerAndGetAccessToken();
     stubExtractionClient.respondWith(id -> "{this is not json");
 
-    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("FAILED")).andReturn();
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
     assertThat(stored.getFailureReason()).isEqualTo("Extraction returned a malformed proposal");
@@ -172,7 +280,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     stubExtractionClient.respondWith(
         id -> validProposal(id).replace("\"total_minor\":12100", "\"total_minor\":12100.5"));
 
-    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("FAILED")).andReturn();
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     assertThat(documentRepository.findById(documentIdOf(result)).orElseThrow().getFailureReason())
         .isEqualTo("Extraction returned a malformed proposal");
@@ -184,7 +293,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     // Well-formed and internally consistent, but about someone else's document.
     stubExtractionClient.respondWith(id -> validProposal(UUID.randomUUID()));
 
-    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("FAILED")).andReturn();
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
     assertThat(stored.getFailureReason()).isEqualTo("Extraction returned a mismatched proposal");
@@ -195,7 +305,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   void extractedIsTerminalSoProcessingCannotBeReentered() throws Exception {
     String token = registerAndGetAccessToken();
     stubExtractionClient.respondWith(DocumentStatusPipelineIT::validProposal);
-    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("EXTRACTED")).andReturn();
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
 
@@ -206,8 +317,9 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   @Test
   void failedIsTerminalSoNoTransitionOutOfItIsAllowed() throws Exception {
     String token = registerAndGetAccessToken();
-    stubExtractionClient.failWith(() -> new ExtractionUnavailableException("down"));
-    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("FAILED")).andReturn();
+    stubExtractionClient.respondWith(id -> "{malformed");
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
 
@@ -221,7 +333,8 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   void theStatusIsReadableAfterwardsThroughTheGetEndpoint() throws Exception {
     String token = registerAndGetAccessToken();
     stubExtractionClient.respondWith(DocumentStatusPipelineIT::validProposal);
-    MvcResult uploaded = upload(token).andReturn();
+    MvcResult uploaded = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
     String documentId = documentIdOf(uploaded).toString();
 
     mockMvc
@@ -254,6 +367,41 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
             .file(new MockMultipartFile("file", "invoice.pdf", null, REAL_PDF))
             .header("Authorization", "Bearer " + token)
             .header("Idempotency-Key", "key-" + System.nanoTime()));
+  }
+
+  private void processQueue() {
+    queuePoller.processDueDocuments();
+  }
+
+  private void makeRetryDue(UUID documentId) throws Exception {
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement statement =
+            connection.prepareStatement(
+                "UPDATE document SET next_attempt_at = now() - interval '1 second' WHERE id = ?")) {
+      statement.setObject(1, documentId);
+      statement.executeUpdate();
+    }
+  }
+
+  private boolean claimWhenReleased(
+      Document document,
+      java.util.concurrent.CountDownLatch ready,
+      java.util.concurrent.CountDownLatch start)
+      throws Exception {
+    ready.countDown();
+    if (!start.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+      throw new IllegalStateException("Concurrent claim did not start");
+    }
+    return transitions.claimDueDocument(
+        document.getId(), document.getOrganizationId(), java.time.Instant.now());
+  }
+
+  private boolean resultOf(java.util.concurrent.Future<Boolean> claim) {
+    try {
+      return claim.get(5, java.util.concurrent.TimeUnit.SECONDS);
+    } catch (Exception e) {
+      throw new AssertionError("Concurrent claim failed", e);
+    }
   }
 
   private String registerAndGetAccessToken() throws Exception {
@@ -297,10 +445,12 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
     private java.util.function.Function<UUID, String> responder = DocumentStatusPipelineIT::validProposal;
     private java.util.function.Supplier<RuntimeException> failure;
+    private final java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
 
     void reset() {
       this.responder = DocumentStatusPipelineIT::validProposal;
       this.failure = null;
+      this.calls.set(0);
     }
 
     void respondWith(java.util.function.Function<UUID, String> responder) {
@@ -312,8 +462,13 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
       this.failure = failure;
     }
 
+    int callCount() {
+      return calls.get();
+    }
+
     @Override
     public String extract(UUID documentId, byte[] content, String contentType, String filename) {
+      calls.incrementAndGet();
       if (failure != null) {
         throw failure.get();
       }
@@ -332,8 +487,7 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   }
 
   /**
-   * Runs {@code @Async} work on the calling thread instead of a pool thread, so a test can assert
-   * the terminal status in the same HTTP response without polling or sleeping.
+   * Runs {@code @Async} work on the calling thread after the test explicitly polls the queue.
    */
   @TestConfiguration
   static class SynchronousAsyncConfig implements AsyncConfigurer {

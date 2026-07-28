@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,6 +9,18 @@ class Settings(BaseSettings):
     service_version: str = "0.1.0"
     enable_docs: bool = False
     cors_origins: list[str] = ["http://localhost:3000"]
+    service_token: SecretStr
+    rate_limit_enabled: bool = True
+    rate_limit_redis_url: str = "redis://localhost:6379/0"
+    rate_limit_max_requests: int = Field(default=30, gt=0)
+    rate_limit_window_seconds: int = Field(default=60, gt=0)
+
+    @field_validator("service_token")
+    @classmethod
+    def service_token_must_not_be_blank(cls, value: SecretStr) -> SecretStr:
+        if not value.get_secret_value().strip():
+            raise ValueError("AI_SERVICE_TOKEN must not be blank")
+        return value
 
     # Mirrors api's own upload cap. Enforced here too: `ai` must not assume its only caller
     # validated anything, even though today it has exactly one.

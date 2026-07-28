@@ -15,12 +15,15 @@ import com.ledgerly.api.expense.ExpenseAlreadyResolvedException;
 import com.ledgerly.api.expense.InvalidExpenseListQueryException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import com.ledgerly.api.policy.IllegalPolicyDocumentTransitionException;
+import com.ledgerly.api.ratelimit.RateLimitExceededException;
+import com.ledgerly.api.ratelimit.RateLimitUnavailableException;
 import com.ledgerly.api.storage.StorageKeyNotFoundException;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -126,11 +129,24 @@ public class ApiExceptionHandler {
         ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
   }
 
+  @ExceptionHandler(RateLimitExceededException.class)
+  public ResponseEntity<ProblemDetail> handleRateLimitExceeded(RateLimitExceededException exception) {
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header("Retry-After", Long.toString(exception.getRetryAfterSeconds()))
+        .body(withCorrelationId(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, "Rate limit exceeded")));
+  }
+
+  @ExceptionHandler(RateLimitUnavailableException.class)
+  public ProblemDetail handleRateLimitUnavailable() {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, "Rate limiting is temporarily unavailable"));
+  }
+
   @ExceptionHandler(Exception.class)
   public ProblemDetail handleUnexpected(Exception exception) {
     // Logged, never returned: the client gets a correlation id to quote, and the detail stays
     // server-side where it cannot leak internals.
-    log.error("Unhandled exception for correlation id {}", CorrelationIdHolder.current(), exception);
+    log.error("Unhandled exception type={} status=500", exception.getClass().getSimpleName());
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"));
   }

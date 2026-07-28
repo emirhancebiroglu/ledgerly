@@ -100,10 +100,7 @@ class CategorizationService:
 
         errors = sorted(self._validator.iter_errors(response), key=lambda e: e.path)
         if errors:
-            logger.warning(
-                "Categorization produced a schema-invalid response: %s",
-                "; ".join(error.message for error in errors[:5]),
-            )
+            logger.warning("Categorization produced a schema-invalid response")
             raise CategorizationFailedError("Categorization did not satisfy the response schema")
 
         return response

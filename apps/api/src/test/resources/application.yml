@@ -10,3 +10,4 @@ ledgerly:
     # Tests replace the ExtractionClient bean; nothing should reach this address.
     base-url: http://localhost:59999
     timeout-seconds: 2
+    service-token: test-service-token

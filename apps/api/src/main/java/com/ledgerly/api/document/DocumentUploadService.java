@@ -7,6 +7,7 @@ import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.correlation.CorrelationIds;
 import com.ledgerly.api.storage.BlobRollbackCleanup;
 import com.ledgerly.api.storage.StorageClient;
+import com.ledgerly.api.ratelimit.UploadRateLimiter;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -29,6 +30,7 @@ public class DocumentUploadService {
   private final BlobRollbackCleanup blobRollbackCleanup;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
+  private final UploadRateLimiter uploadRateLimiter;
   private final long maxBytes;
 
   public DocumentUploadService(
@@ -37,12 +39,14 @@ public class DocumentUploadService {
       BlobRollbackCleanup blobRollbackCleanup,
       AuditService auditService,
       ObjectMapper objectMapper,
+      UploadRateLimiter uploadRateLimiter,
       @Value("${ledgerly.document.max-bytes:10485760}") long maxBytes) {
     this.documentRepository = documentRepository;
     this.storageClient = storageClient;
     this.blobRollbackCleanup = blobRollbackCleanup;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
+    this.uploadRateLimiter = uploadRateLimiter;
     this.maxBytes = maxBytes;
   }
 
@@ -63,7 +67,10 @@ public class DocumentUploadService {
             .orElseThrow(
                 () ->
                     new UnsupportedDocumentTypeException(
-                        "Unsupported document type; expected PDF, JPEG or PNG"));
+                    "Unsupported document type; expected PDF, JPEG or PNG"));
+
+    // Validation deliberately precedes this check: malformed input must not spend quota.
+    uploadRateLimiter.checkDocumentUpload(principal.organizationId());
 
     String storageKey = storageClient.store(content);
     blobRollbackCleanup.registerOnRollback(storageKey);

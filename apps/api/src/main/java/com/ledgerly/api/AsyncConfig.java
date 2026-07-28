@@ -11,7 +11,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 /**
  * Document extraction runs off the request thread here. A bounded pool is deliberate — Spring's
  * default {@code SimpleAsyncTaskExecutor} creates one thread per task with no ceiling, so a burst
- * of uploads would be an unbounded-thread-creation incident instead of a queue.
+ * of uploads would be an unbounded-thread-creation incident. The durable PostgreSQL queue is the
+ * only work queue: this executor deliberately has no in-memory backlog, so a task either starts
+ * promptly or is rejected and returned to {@code PENDING} by {@code DocumentQueuePoller}.
  */
 @Configuration
 @EnableAsync
@@ -25,7 +27,7 @@ public class AsyncConfig implements AsyncConfigurer {
     ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(4);
     executor.setMaxPoolSize(16);
-    executor.setQueueCapacity(200);
+    executor.setQueueCapacity(0);
     executor.setThreadNamePrefix("doc-extract-");
     executor.initialize();
     return executor;

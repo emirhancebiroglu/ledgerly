@@ -39,7 +39,10 @@ public class DocumentEventPublisher {
       // A dropped notification is not a lost status: the row is already committed, and a client
       // reconnecting or polling GET /documents/{id} still sees it. Never let a Redis hiccup
       // affect a caller of the @Transactional method that already committed successfully.
-      log.warn("Failed to publish document status event for {}: {}", event.documentId(), e.toString());
+      log.warn(
+          "Failed to publish document status event documentId={} exceptionType={}",
+          event.documentId(),
+          e.getClass().getSimpleName());
     }
   }
 }

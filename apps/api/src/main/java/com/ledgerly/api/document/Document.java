@@ -59,6 +59,12 @@ public class Document {
   @Column(name = "failure_reason")
   private String failureReason;
 
+  @Column(name = "extraction_attempts", nullable = false)
+  private int extractionAttempts;
+
+  @Column(name = "next_attempt_at", nullable = false)
+  private Instant nextAttemptAt;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -85,6 +91,7 @@ public class Document {
     this.status = DocumentStatus.PENDING;
     this.createdAt = Instant.now();
     this.updatedAt = this.createdAt;
+    this.nextAttemptAt = this.createdAt;
   }
 
   /**
@@ -93,11 +100,15 @@ public class Document {
    * @throws IllegalDocumentTransitionException if the transition is not legal
    */
   public void transitionTo(DocumentStatus target) {
+    transitionTo(target, Instant.now());
+  }
+
+  private void transitionTo(DocumentStatus target, Instant now) {
     if (!status.canTransitionTo(target)) {
       throw new IllegalDocumentTransitionException(status, target);
     }
     this.status = target;
-    this.updatedAt = Instant.now();
+    this.updatedAt = now;
   }
 
   /** Attaches a validated proposal and moves to {@code EXTRACTED} as one step. */
@@ -120,6 +131,13 @@ public class Document {
   /** Moves to {@code FAILED} — extraction could not produce a proposal at all. */
   public void markFailed(String reason) {
     transitionTo(DocumentStatus.FAILED);
+    this.failureReason = reason;
+  }
+
+  /** Returns a transient extraction failure to the durable queue for a later attempt. */
+  public void markPendingForRetry(Instant retryAt, String reason, Instant now) {
+    transitionTo(DocumentStatus.PENDING, now);
+    this.nextAttemptAt = retryAt;
     this.failureReason = reason;
   }
 
@@ -169,5 +187,13 @@ public class Document {
 
   public Instant getCreatedAt() {
     return createdAt;
+  }
+
+  public int getExtractionAttempts() {
+    return extractionAttempts;
+  }
+
+  public Instant getNextAttemptAt() {
+    return nextAttemptAt;
   }
 }

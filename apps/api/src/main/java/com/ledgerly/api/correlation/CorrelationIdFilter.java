@@ -38,15 +38,17 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
       @NonNull FilterChain filterChain)
       throws ServletException, IOException {
     String incoming = sanitize(request.getHeader(HEADER));
-    String correlationId = (incoming != null && !incoming.isBlank()) ? incoming : UUID.randomUUID().toString();
+    String correlationId = isUuid(incoming) ? incoming : UUID.randomUUID().toString();
 
     MDC.put(CorrelationIdHolder.MDC_KEY, correlationId);
+    MDC.put("service", "api");
     response.setHeader(HEADER, correlationId);
     try {
       log.info("{} {}", request.getMethod(), request.getRequestURI());
       filterChain.doFilter(request, response);
     } finally {
       MDC.remove(CorrelationIdHolder.MDC_KEY);
+      MDC.remove("service");
     }
   }
 
@@ -61,5 +63,14 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
     }
     String stripped = value.replaceAll("[\\p{Cntrl}]", "");
     return stripped.length() > MAX_LENGTH ? stripped.substring(0, MAX_LENGTH) : stripped;
+  }
+
+  private boolean isUuid(String value) {
+    try {
+      UUID.fromString(value);
+      return true;
+    } catch (IllegalArgumentException | NullPointerException ignored) {
+      return false;
+    }
   }
 }

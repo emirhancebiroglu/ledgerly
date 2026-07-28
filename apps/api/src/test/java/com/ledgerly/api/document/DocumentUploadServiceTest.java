@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.audit.AuditService;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
+import com.ledgerly.api.ratelimit.UploadRateLimiter;
 import com.ledgerly.api.storage.BlobRollbackCleanup;
 import com.ledgerly.api.storage.StorageClient;
 import com.ledgerly.api.storage.StorageException;
@@ -30,6 +31,7 @@ class DocumentUploadServiceTest {
   @Mock private StorageClient storageClient;
   @Mock private BlobRollbackCleanup blobRollbackCleanup;
   @Mock private AuditService auditService;
+  @Mock private UploadRateLimiter uploadRateLimiter;
 
   private static final byte[] REAL_PDF =
       ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -44,6 +46,7 @@ class DocumentUploadServiceTest {
             blobRollbackCleanup,
             auditService,
             new ObjectMapper(),
+            uploadRateLimiter,
             10_485_760);
     AuthenticatedPrincipal principal = new AuthenticatedPrincipal(UUID.randomUUID(), UUID.randomUUID());
 

@@ -140,6 +140,7 @@ def test_the_accepted_set_is_genuinely_read_from_the_schema_not_coincidentally_e
             "/extract",
             files={"file": ("invoice.png", PDF_BYTES, "image/png")},
             data={"document_id": str(uuid.uuid4()), "content_type": "image/png"},
+            headers={"Authorization": "Bearer test-service-token"},
         )
         assert response.status_code == 422
     finally:

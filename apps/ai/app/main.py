@@ -16,8 +16,12 @@ from app.extraction import ExtractionFailedError, ExtractionService
 from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
 from app.llm.client import LlmClient
 from app.policy.chunking import EmptyDocumentError
+from app.observability import configure_logging, reset_correlation_id, set_correlation_id
 from app.policy.embedding import PolicyEmbeddingFailedError, PolicyEmbeddingService
+from app.rate_limit import AiRateLimiter, RateLimitExceeded, RateLimitUnavailable
+from app.service_auth import is_cost_bearing_agent_request, require_service_auth
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -34,6 +38,51 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+app.state.rate_limiter = AiRateLimiter(
+    settings.rate_limit_redis_url,
+    settings.rate_limit_max_requests,
+    settings.rate_limit_window_seconds,
+)
+
+
+@app.middleware("http")
+async def request_logging(request: Request, call_next):
+    correlation_id = request.headers.get("X-Correlation-Id")
+    if correlation_id is not None:
+        correlation_id = correlation_id.replace("\r", "").replace("\n", "")[:128]
+    token = set_correlation_id(correlation_id)
+    try:
+        response = await call_next(request)
+        logger.info("HTTP request completed method=%s path=%s status=%s", request.method, request.url.path, response.status_code)
+        return response
+    finally:
+        reset_correlation_id(token)
+
+
+@app.middleware("http")
+async def service_authentication(request: Request, call_next):
+    rejection = await require_service_auth(request, settings.service_token)
+    if rejection is not None:
+        return rejection
+    return await call_next(request)
+
+
+async def enforce_agent_rate_limit(request: Request) -> None:
+    """Charge only requests that already passed FastAPI and endpoint validation."""
+    if not settings.rate_limit_enabled or not is_cost_bearing_agent_request(request):
+        return
+    try:
+        await request.app.state.rate_limiter.check(request.url.path)
+    except RateLimitExceeded as error:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(error.retry_after_seconds)},
+        ) from error
+    except RateLimitUnavailable as error:
+        raise HTTPException(
+            status_code=503, detail="Rate limiting is temporarily unavailable"
+        ) from error
 
 
 def _load_supported_content_types() -> frozenset[str]:
@@ -182,6 +231,7 @@ def health() -> dict:
 
 @app.post("/extract")
 async def extract(
+    request: Request,
     file: UploadFile = File(...),
     document_id: str = Form(...),
     content_type: str = Form(...),
@@ -201,17 +251,20 @@ async def extract(
     if len(content) > settings.max_document_bytes:
         raise HTTPException(status_code=413, detail="Document exceeds the maximum accepted size")
 
+    await enforce_agent_rate_limit(request)
+
     try:
         return service.extract(document_id, content, content_type)
     except ExtractionFailedError as error:
         # A document this service cannot read is a bad request, not a server fault: returning 500
         # would tell `api` to retry something that will fail identically every time.
-        logger.info("Extraction failed for document %s: %s", document_id, error)
+        logger.info("Extraction failed documentId=%s exceptionType=%s", document_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post("/embed-policy")
 async def embed_policy(
+    request: Request,
     file: UploadFile = File(...),
     policy_document_id: str = Form(...),
     content_type: str = Form(...),
@@ -230,22 +283,27 @@ async def embed_policy(
     if len(content) > settings.max_document_bytes:
         raise HTTPException(status_code=413, detail="Document exceeds the maximum accepted size")
 
+    await enforce_agent_rate_limit(request)
+
     try:
         return service.embed_policy(policy_document_id, content)
     except (PolicyEmbeddingFailedError, EmptyDocumentError) as error:
-        logger.info("Policy embedding failed for document %s: %s", policy_document_id, error)
+        logger.info("Policy embedding failed documentId=%s exceptionType=%s", policy_document_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post("/embed-query")
 async def embed_query(
-    body: EmbedQueryRequest, embedding_client: EmbeddingClient = Depends(get_embedding_client)
+    request: Request,
+    body: EmbedQueryRequest,
+    embedding_client: EmbeddingClient = Depends(get_embedding_client),
 ) -> dict:
     """A single embedding vector for `api` to use in a pgvector nearest-neighbor search.
 
     Uses the same embedding model as `POST /embed-policy`, so the returned vector is directly
     comparable to `policy_chunk.embedding`.
     """
+    await enforce_agent_rate_limit(request)
     vectors = embedding_client.embed([body.text])
     return {
         "model": embedding_client.model_name,
@@ -256,6 +314,7 @@ async def embed_query(
 
 @app.post("/categorize")
 async def categorize(
+    request: Request,
     body: CategorizeRequestBody,
     service: CategorizationService = Depends(get_categorization_service),
 ) -> dict:
@@ -263,6 +322,7 @@ async def categorize(
 
     Advisory only — `api` decides whether confidence clears the posting threshold (M6 T7).
     """
+    await enforce_agent_rate_limit(request)
     try:
         return service.categorize(
             document_id=body.document_id,
@@ -274,16 +334,18 @@ async def categorize(
             policy_chunks=[chunk.chunk_text for chunk in body.policy_chunks],
         )
     except CategorizationFailedError as error:
-        logger.info("Categorization failed for document %s: %s", body.document_id, error)
+        logger.info("Categorization failed documentId=%s exceptionType=%s", body.document_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @app.post("/anomaly")
 async def anomaly(
+    request: Request,
     body: AnomalyRequestBody,
     service: AnomalyService = Depends(get_anomaly_service),
 ) -> dict:
     """Return deterministic anomaly facts and an advisory qualitative explanation."""
+    await enforce_agent_rate_limit(request)
     try:
         return service.analyze(
             expense_id=str(body.expense_id),
@@ -292,7 +354,7 @@ async def anomaly(
             budget=body.budget.model_dump(mode="json") if body.budget is not None else None,
         )
     except AnomalyFailedError as error:
-        logger.info("Anomaly assessment failed for expense %s: %s", body.expense_id, error)
+        logger.info("Anomaly assessment failed expenseId=%s exceptionType=%s", body.expense_id, type(error).__name__)
         raise HTTPException(status_code=422, detail=str(error)) from error
 
 
@@ -303,4 +365,5 @@ async def not_found_handler(request: Request, exc: Exception) -> JSONResponse:
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled exception type=%s status=500", type(exc).__name__)
     return JSONResponse(status_code=500, content={"detail": "Unexpected error"})
