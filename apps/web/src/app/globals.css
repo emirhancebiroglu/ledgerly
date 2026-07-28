@@ -5,6 +5,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Shell breakpoint from docs/design/m7/README.md — the sidebar becomes an off-canvas drawer
+     below this width. Not one of Tailwind's default breakpoints. */
+  --breakpoint-shell: 860px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
