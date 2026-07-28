@@ -103,7 +103,99 @@ const EXPENSES = [
     status: "POSTED",
     createdAt: "2026-07-20T08:00:00Z",
   },
+  {
+    id: "exp-6",
+    documentId: "doc-6",
+    vendor: "Rideshare Co.",
+    categoryId: "cat-2",
+    ledgerTransactionId: null,
+    amountMinor: 3200,
+    currency: "EUR",
+    categorizationConfidence: 0.58,
+    citation: "Amount mismatch vs OCR (58% confidence)",
+    status: "NEEDS_REVIEW",
+    createdAt: "2026-07-19T11:00:00Z",
+  },
+  {
+    id: "exp-7",
+    documentId: "doc-7",
+    vendor: "Already Resolved Vendor",
+    categoryId: "cat-3",
+    ledgerTransactionId: null,
+    amountMinor: 9900,
+    currency: "EUR",
+    categorizationConfidence: 0.65,
+    citation: null,
+    // Simulates a race the e2e suite can drive on demand: approving this id returns 409 to
+    // prove "already resolved elsewhere" is reported, not silently swallowed.
+    status: "NEEDS_REVIEW",
+    createdAt: "2026-07-18T11:00:00Z",
+  },
+  // exp-8 through exp-11: each dedicated to exactly one review-queue mutation test (bulk
+  // approve, single approve, keyboard, correct). e2e runs across two Playwright projects
+  // (chromium + mobile-chromium) in parallel workers sharing this same in-memory mock server —
+  // any test that mutates exp-3 ("Office Depot") would corrupt the read-only NEEDS_REVIEW
+  // fixture every other spec file (T4/T5/T6's dashboard/expenses/expense-detail tests) depends
+  // on staying untouched for the life of the whole `npm run e2e` run.
+  {
+    id: "exp-8",
+    documentId: "doc-8",
+    vendor: "Bulk Approve Target",
+    categoryId: "cat-1",
+    ledgerTransactionId: null,
+    amountMinor: 5000,
+    currency: "EUR",
+    categorizationConfidence: 0.6,
+    citation: null,
+    status: "NEEDS_REVIEW",
+    createdAt: "2026-07-17T11:00:00Z",
+  },
+  {
+    id: "exp-9",
+    documentId: "doc-9",
+    vendor: "Single Approve Target",
+    categoryId: "cat-1",
+    ledgerTransactionId: null,
+    amountMinor: 6000,
+    currency: "EUR",
+    categorizationConfidence: 0.6,
+    citation: null,
+    status: "NEEDS_REVIEW",
+    createdAt: "2026-07-16T11:00:00Z",
+  },
+  {
+    id: "exp-10",
+    documentId: "doc-10",
+    vendor: "Keyboard Target",
+    categoryId: "cat-1",
+    ledgerTransactionId: null,
+    amountMinor: 7000,
+    currency: "EUR",
+    categorizationConfidence: 0.6,
+    citation: null,
+    status: "NEEDS_REVIEW",
+    createdAt: "2026-07-15T11:00:00Z",
+  },
+  {
+    id: "exp-11",
+    documentId: "doc-11",
+    vendor: "Correct Target",
+    categoryId: "cat-1",
+    ledgerTransactionId: null,
+    amountMinor: 8000,
+    currency: "EUR",
+    categorizationConfidence: 0.6,
+    citation: null,
+    status: "NEEDS_REVIEW",
+    createdAt: "2026-07-14T11:00:00Z",
+  },
 ];
+
+// Deep-cloned at module load, before any test mutates EXPENSES — /api/v1/test/reset-expense
+// restores one row from this snapshot so review-queue mutation tests are self-healing
+// regardless of execution order across Playwright's multiple projects/workers sharing this one
+// server process, instead of relying on every test touching a never-reused fixture id.
+const EXPENSES_SEED = JSON.parse(JSON.stringify(EXPENSES));
 
 // Smallest-possible valid 1x1 PNG and PDF, real bytes so DocumentViewer's blob: URL actually
 // decodes into something the browser can render, not just a content-type label.
@@ -172,7 +264,46 @@ const DOCUMENTS = {
     createdAt: "2026-07-20T07:58:00Z",
     bytes: TINY_PDF,
   },
+  "doc-6": {
+    id: "doc-6",
+    filename: "rideshare-receipt.png",
+    contentType: "image/png",
+    sizeBytes: TINY_PNG.byteLength,
+    status: "NEEDS_REVIEW",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-19T10:58:00Z",
+    bytes: TINY_PNG,
+  },
+  "doc-7": {
+    id: "doc-7",
+    filename: "already-resolved-receipt.png",
+    contentType: "image/png",
+    sizeBytes: TINY_PNG.byteLength,
+    status: "NEEDS_REVIEW",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-18T10:58:00Z",
+    bytes: TINY_PNG,
+  },
 };
+
+// doc-8..doc-11 back exp-8..exp-11 (each dedicated to one review-queue mutation test) —
+// generated rather than hand-written since none of them need distinct fixture content, only to
+// exist so handleExpenseDetail never 500s if a future test navigates to one of these rows.
+for (let i = 8; i <= 11; i++) {
+  DOCUMENTS[`doc-${i}`] = {
+    id: `doc-${i}`,
+    filename: `review-target-${i}-receipt.png`,
+    contentType: "image/png",
+    sizeBytes: TINY_PNG.byteLength,
+    status: "NEEDS_REVIEW",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-13T10:58:00Z",
+    bytes: TINY_PNG,
+  };
+}
 
 const ACCOUNTS = {
   "cat-1": { id: "acct-expense-software", name: "Software Expense" },
@@ -474,6 +605,73 @@ function handleDocumentContent(req, res, isAuthed, documentId) {
   res.end(document.bytes);
 }
 
+function handleResetExpense(req, res, expenseId) {
+  // Test-only endpoint — not part of the real api's contract. Restores one row to its seeded
+  // state so a mutation test is unaffected by another project's worker having already resolved
+  // the same fixture in this shared server process.
+  const seed = EXPENSES_SEED.find((e) => e.id === expenseId);
+  if (!seed) return send(res, 404, { detail: "No such seed expense" });
+  const index = EXPENSES.findIndex((e) => e.id === expenseId);
+  const restored = JSON.parse(JSON.stringify(seed));
+  if (index === -1) {
+    EXPENSES.push(restored);
+  } else {
+    EXPENSES[index] = restored;
+  }
+  send(res, 200, restored);
+}
+
+function resolveReviewItem(res, expenseId, mutate) {
+  const expense = EXPENSES.find((e) => e.id === expenseId);
+  if (!expense) return send(res, 404, { detail: "Expense not found" });
+  if (expense.status !== "NEEDS_REVIEW") {
+    // Mirrors ExpenseAlreadyResolvedException — approving/correcting something already
+    // resolved (including by a second concurrent request) is a 409, not a silent no-op.
+    return send(res, 409, { detail: "This expense has already been resolved" });
+  }
+  mutate(expense);
+  expense.status = "POSTED";
+  expense.ledgerTransactionId = `txn-${expense.id}`;
+  send(res, 200, { ...expense });
+}
+
+function handleApprove(req, res, isAuthed, expenseId) {
+  if (!isAuthed) return send(res, 401, {});
+  if (!req.headers["idempotency-key"]) {
+    return send(res, 400, { detail: "Idempotency-Key header is required" });
+  }
+  // exp-7 simulates a request that lost a race to a concurrent resolution elsewhere — always
+  // 409s, regardless of how many times it's retried, so the e2e suite can drive this on demand
+  // without needing two real concurrent requests.
+  if (expenseId === "exp-7") {
+    return send(res, 409, { detail: "This expense has already been resolved" });
+  }
+  resolveReviewItem(res, expenseId, () => {});
+}
+
+function handleCorrect(req, res, isAuthed, expenseId) {
+  if (!isAuthed) return send(res, 401, {});
+  if (!req.headers["idempotency-key"]) {
+    return send(res, 400, { detail: "Idempotency-Key header is required" });
+  }
+  readBody(req)
+    .then((body) => {
+      let categoryId;
+      try {
+        categoryId = JSON.parse(body.toString("utf-8")).categoryId;
+      } catch {
+        return send(res, 400, { detail: "Invalid request body" });
+      }
+      if (!categoryId) {
+        return send(res, 400, { detail: "categoryId is required" });
+      }
+      resolveReviewItem(res, expenseId, (expense) => {
+        expense.categoryId = categoryId;
+      });
+    })
+    .catch(() => send(res, 500, { detail: "Correct failed" }));
+}
+
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   const auth = req.headers.authorization;
@@ -508,9 +706,24 @@ const server = createServer((req, res) => {
     return handleExpenseDetail(req, res, isAuthed, detailMatch[1]);
   }
 
+  const approveMatch = url.pathname.match(/^\/api\/v1\/expenses\/([^/]+)\/approve$/);
+  if (req.method === "POST" && approveMatch) {
+    return handleApprove(req, res, isAuthed, approveMatch[1]);
+  }
+
+  const correctMatch = url.pathname.match(/^\/api\/v1\/expenses\/([^/]+)\/correct$/);
+  if (req.method === "POST" && correctMatch) {
+    return handleCorrect(req, res, isAuthed, correctMatch[1]);
+  }
+
   const contentMatch = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/content$/);
   if (contentMatch) {
     return handleDocumentContent(req, res, isAuthed, contentMatch[1]);
+  }
+
+  const resetMatch = url.pathname.match(/^\/api\/v1\/test\/reset-expense\/([^/]+)$/);
+  if (req.method === "POST" && resetMatch) {
+    return handleResetExpense(req, res, resetMatch[1]);
   }
 
   send(res, 404, { message: "not stubbed in e2e mock-api" });

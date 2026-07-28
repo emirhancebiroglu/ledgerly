@@ -161,3 +161,24 @@
     @apply font-sans;
   }
 }
+
+/*
+ * Global kill-switch for docs/design/m7/README.md's "Reduced motion: keep transitions short
+ * (120–400ms) and avoid motion-only affordances" requirement. Applied here rather than only via
+ * per-element `motion-reduce:` classes, since a global rule can't be forgotten on a future
+ * animated element the way an annotation on every className site could — every entrance
+ * animation (tw-animate-css's `animate-in`/`animate-out`, used across the shell/palette/drawer)
+ * and hover/transition effect collapses to an instant, near-zero-duration state change instead
+ * of being disabled outright, since some of those transitions (e.g. the drawer's open state)
+ * carry real information and must still resolve, just without motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -81,7 +81,15 @@ export function AppShell({
           onOpenPalette={openPalette}
           paletteTriggerRef={paletteTriggerRef}
         />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto">
+          {/* Keyed by pathname so the entry animation replays per navigation (a fresh mount),
+              matching the handoff's "card content fades/slides up on view entry" — the global
+              prefers-reduced-motion rule in globals.css collapses this to an instant, no-motion
+              state change rather than disabling it outright. */}
+          <div key={pathname} className="animate-in fade-in slide-in-from-bottom-1 duration-300">
+            {children}
+          </div>
+        </main>
       </div>
 
       <MobileNavDrawer
