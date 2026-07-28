@@ -68,6 +68,17 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+      # Trivy resolves Maven transitive POMs while scanning. Warm the same runner-local
+      # ~/.m2 cache first so the scan does not fan out against Maven Central and trigger a 429.
+      - name: warm Maven dependency cache
+        working-directory: apps/api
+        run: ./mvnw -B -ntp dependency:resolve
       # Trivy reports the library, advisory, installed version and fixed version in its table.
       # There is deliberately no continue-on-error: database download/scan failures and the
       # job timeout must fail closed rather than turn a broken scan into a green check.
@@ -85,3 +96,7 @@ jobs:
           format: table
           timeout: 10m
           skip-dirs: .git,apps/api/target,apps/ai/.venv,apps/web/node_modules
+        env:
+          # All Maven POMs must be present locally before offline mode; otherwise Trivy would
+          # silently omit unresolved transitive dependencies from the security result.
+          TRIVY_OFFLINE_SCAN: "true"
