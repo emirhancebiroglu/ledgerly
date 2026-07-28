@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.ledgerly.api.audit.AuditLogRepository;
 import com.ledgerly.api.alert.AlertRepository;
+import com.ledgerly.api.anomaly.AnomalyHistoryRepository;
 import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
@@ -58,6 +59,7 @@ class ApiApplicationTests {
   @MockitoBean private CategoryRepository categoryRepository;
   @MockitoBean private BudgetRepository budgetRepository;
   @MockitoBean private BudgetSpendRepository budgetSpendRepository;
+  @MockitoBean private AnomalyHistoryRepository anomalyHistoryRepository;
   @MockitoBean private BudgetThresholdEvaluator budgetThresholdEvaluator;
   @MockitoBean private AlertRepository alertRepository;
   @MockitoBean private PolicyDocumentRepository policyDocumentRepository;

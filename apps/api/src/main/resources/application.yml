@@ -61,6 +61,9 @@ ledgerly:
     # Below this, an expense routes to review instead of posting silently (M6 T7). Mirrors the
     # extraction self-check gate's 0.7 threshold in apps/ai/app/llm/extraction_graph.py.
     confidence-threshold: ${CATEGORIZATION_CONFIDENCE_THRESHOLD:0.7}
+  anomaly:
+    # Upper bound on data supplied to one advisory call; the database still applies the 90-day window.
+    history-limit: ${ANOMALY_HISTORY_LIMIT:1000}
 
 logging:
   pattern:
