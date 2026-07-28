@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
@@ -23,6 +23,9 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<RowError[]>([]);
+  const [announcement, setAnnouncement] = useState("");
+  const inFlight = useRef<Set<string>>(new Set());
+  const expensesRef = useRef(initialExpenses);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -48,9 +51,12 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
     });
   }
 
-  function removeOptimistically(id: string): Expense | undefined {
-    const removed = expenses.find((e) => e.id === id);
-    setExpenses((prev) => prev.filter((e) => e.id !== id));
+  function removeOptimistically(id: string): { expense: Expense; index: number } | undefined {
+    const index = expensesRef.current.findIndex((e) => e.id === id);
+    if (index === -1) return undefined;
+    const removed = { expense: expensesRef.current[index], index };
+    expensesRef.current = expensesRef.current.filter((e) => e.id !== id);
+    setExpenses(expensesRef.current);
     setSelected((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -59,21 +65,29 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
     return removed;
   }
 
-  function rollback(removedExpense: Expense, message: string) {
-    setExpenses((prev) => [...prev, removedExpense].sort((a, b) => a.id.localeCompare(b.id)));
+  function rollback(removedExpense: Expense, index: number, message: string) {
+    const next = [...expensesRef.current];
+    next.splice(Math.min(index, next.length), 0, removedExpense);
+    expensesRef.current = next;
+    setExpenses(next);
     setErrors((prev) => [...prev.filter((e) => e.id !== removedExpense.id), { id: removedExpense.id, message }]);
   }
 
   async function approveOne(id: string) {
+    if (inFlight.current.has(id)) return;
+    inFlight.current.add(id);
     markPending(id, true);
     setErrors((prev) => prev.filter((e) => e.id !== id));
     const removed = removeOptimistically(id);
 
     const result = await approveExpense(id);
+    inFlight.current.delete(id);
     markPending(id, false);
 
-    if (!result.ok && removed) {
-      rollback(removed, result.message);
+    if (result.ok && removed) {
+      setAnnouncement(`${removed.expense.vendor ?? "Expense"} approved`);
+    } else if (!result.ok && removed) {
+      rollback(removed.expense, removed.index, result.message);
     }
   }
 
@@ -82,28 +96,43 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
   }
 
   async function correctOne(id: string, categoryId: string) {
+    if (inFlight.current.has(id)) return;
+    inFlight.current.add(id);
     markPending(id, true);
     setErrors((prev) => prev.filter((e) => e.id !== id));
     const removed = removeOptimistically(id);
 
     const result = await correctExpense(id, categoryId);
+    inFlight.current.delete(id);
     markPending(id, false);
 
-    if (!result.ok && removed) {
-      rollback(removed, result.message);
+    if (result.ok && removed) {
+      setAnnouncement(`${removed.expense.vendor ?? "Expense"} corrected and resolved`);
+    } else if (!result.ok && removed) {
+      rollback(removed.expense, removed.index, result.message);
     }
   }
 
+  const liveRegion = (
+    <div role="status" aria-live="polite" className="sr-only">
+      {announcement}
+    </div>
+  );
+
   if (expenses.length === 0) {
     return (
-      <Card className="p-8 text-center text-sm text-muted-foreground">
-        Nothing needs review right now.
-      </Card>
+      <>
+        {liveRegion}
+        <Card className="p-8 text-center text-sm text-muted-foreground">
+          Nothing needs review right now.
+        </Card>
+      </>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {liveRegion}
       <div className="flex items-center justify-between">
         <div className="text-[13px] text-muted-foreground">
           <span className="font-bold text-foreground">{expenses.length} items</span> need review

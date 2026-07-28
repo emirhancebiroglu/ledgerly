@@ -126,6 +126,57 @@ describe("ReviewQueueTable", () => {
     expect(actionMocks.approveExpense).toHaveBeenCalledWith("exp-1");
   });
 
+  it("bulk approving three rows keeps the failed one in place, not resorted or dropped", async () => {
+    actionMocks.approveExpense.mockImplementation((id: string) =>
+      Promise.resolve(
+        id === "exp-2"
+          ? { ok: false, status: 500, message: "Something went wrong." }
+          : { ok: true },
+      ),
+    );
+    render(
+      <ReviewQueueTable
+        initialExpenses={[
+          expense({ id: "exp-1", vendor: "First" }),
+          expense({ id: "exp-2", vendor: "Second" }),
+          expense({ id: "exp-3", vendor: "Third" }),
+        ]}
+        categories={categories}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Select First/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Select Second/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Select Third/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Approve selected" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent("Something went wrong.");
+    });
+
+    expect(screen.queryByText("First", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("Third", { exact: true })).not.toBeInTheDocument();
+    expect(screen.getByText("Second", { exact: true })).toBeInTheDocument();
+    expect(actionMocks.approveExpense).toHaveBeenCalledTimes(3);
+  });
+
+  it("clicking Approve twice before the first request resolves only fires one call", async () => {
+    let resolveFirst: (value: { ok: true }) => void = () => {};
+    actionMocks.approveExpense.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+    render(<ReviewQueueTable initialExpenses={[expense()]} categories={categories} />);
+
+    const button = screen.getByRole("button", { name: "Approve" });
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    expect(actionMocks.approveExpense).toHaveBeenCalledTimes(1);
+    resolveFirst({ ok: true });
+  });
+
   it("correcting a row calls correctExpense with the chosen category", async () => {
     actionMocks.correctExpense.mockResolvedValue({ ok: true });
     render(<ReviewQueueTable initialExpenses={[expense()]} categories={categories} />);
