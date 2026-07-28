@@ -48,9 +48,24 @@ async function handler(
     // `sameSite: "lax"` on the session cookie already blocks a cross-site form POST from
     // carrying it, but that's Chrome/Edge/Firefox behavior, not a guarantee every client
     // honors — an explicit same-origin check is the actual CSRF defense.
+    //
+    // Compared against the request's own Host header, not `request.nextUrl.origin`: the
+    // standalone server (this app's actual deployment shape — see the Dockerfile) binds
+    // 0.0.0.0 by default, and nextUrl derives its origin from that bind address rather than
+    // from what the client actually connected to. Every legitimate same-origin request would
+    // otherwise 403, since "0.0.0.0" never matches a real Origin header from any browser.
     const origin = request.headers.get("origin");
-    if (origin && origin !== request.nextUrl.origin) {
-      return new Response(null, { status: 403 });
+    if (origin) {
+      const host = request.headers.get("host");
+      let originHost: string | undefined;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        // Malformed Origin header — fail closed.
+      }
+      if (!host || originHost !== host) {
+        return new Response(null, { status: 403 });
+      }
     }
   }
 

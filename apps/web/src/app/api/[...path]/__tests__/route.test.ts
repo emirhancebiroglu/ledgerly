@@ -112,13 +112,72 @@ describe("GET/POST /api/[...path]", () => {
     const { POST } = await import("@/app/api/[...path]/route");
     const request = new NextRequest(new URL("http://localhost:3000/api/expenses/1/approve"), {
       method: "POST",
-      headers: { origin: "http://localhost:3000" },
+      headers: { origin: "http://localhost:3000", host: "localhost:3000" },
     });
 
     const response = await POST(request, paramsFor(["expenses", "1", "approve"]));
 
     expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a same-origin request through even when nextUrl's own origin differs from Host (standalone server bound to 0.0.0.0)", async () => {
+    // Regression test: the standalone build (this app's actual deployment shape) binds 0.0.0.0
+    // by default, so request.nextUrl.origin resolves to "http://0.0.0.0:<port>" rather than
+    // whatever the client actually connected to — comparing Origin against nextUrl.origin 403'd
+    // every legitimate same-origin POST in production while every test here passed, because
+    // NextRequest built directly from a URL string doesn't reproduce that mismatch. The fix
+    // compares Origin's host against the request's own Host header instead.
+    sessionMocks.getAccessToken.mockResolvedValue("token-1");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await import("@/app/api/[...path]/route");
+    // Constructed the way the real server sees it: nextUrl reflects the bind address, but the
+    // client's actual Host and Origin headers agree with each other.
+    const request = new NextRequest(new URL("http://0.0.0.0:3100/api/expenses/1/approve"), {
+      method: "POST",
+      headers: { origin: "http://localhost:3100", host: "localhost:3100" },
+    });
+
+    const response = await POST(request, paramsFor(["expenses", "1", "approve"]));
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("still rejects a genuinely cross-origin request when Host and Origin actually disagree", async () => {
+    sessionMocks.getAccessToken.mockResolvedValue("token-1");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await import("@/app/api/[...path]/route");
+    const request = new NextRequest(new URL("http://localhost:3100/api/expenses/1/approve"), {
+      method: "POST",
+      headers: { origin: "https://evil.example", host: "localhost:3100" },
+    });
+
+    const response = await POST(request, paramsFor(["expenses", "1", "approve"]));
+
+    expect(response.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed (403) when Origin is present but Host is missing, rather than allowing through", async () => {
+    sessionMocks.getAccessToken.mockResolvedValue("token-1");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { POST } = await import("@/app/api/[...path]/route");
+    const request = new NextRequest(new URL("http://localhost:3100/api/expenses/1/approve"), {
+      method: "POST",
+      headers: { origin: "http://localhost:3100" },
+    });
+
+    const response = await POST(request, paramsFor(["expenses", "1", "approve"]));
+
+    expect(response.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects a request body larger than the API's 12MB multipart cap", async () => {
