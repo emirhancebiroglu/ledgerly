@@ -1,6 +1,7 @@
 package com.ledgerly.api.dashboard;
 
 import java.util.List;
+import com.ledgerly.api.alert.AlertResponse;
 
 /**
  * {@code GET /api/v1/dashboard/summary} — everything the M7b dashboard's KPI card, category
@@ -26,4 +27,6 @@ public record DashboardSummaryResponse(
     List<CategoryBreakdownEntry> categoryBreakdown,
     List<MonthlySpend> monthlySeries,
     long reviewQueueCount,
-    long documentsProcessedToday) {}
+    long documentsProcessedToday,
+    long alertCount,
+    List<AlertResponse> recentAlerts) {}

@@ -1,6 +1,10 @@
 package com.ledgerly.api.dashboard;
 
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
+import com.ledgerly.api.alert.AlertRepository;
+import com.ledgerly.api.alert.AlertResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -15,10 +19,12 @@ public class DashboardService {
   private static final int SERIES_MONTHS = 6;
 
   private final DashboardRepository dashboardRepository;
+  private final AlertRepository alertRepository;
   private final Clock clock;
 
-  public DashboardService(DashboardRepository dashboardRepository, Clock clock) {
+  public DashboardService(DashboardRepository dashboardRepository, AlertRepository alertRepository, Clock clock) {
     this.dashboardRepository = dashboardRepository;
+    this.alertRepository = alertRepository;
     this.clock = clock;
   }
 
@@ -42,6 +48,9 @@ public class DashboardService {
         dashboardRepository.monthlySeries(organizationId, trailingMonths(currentMonth));
     long reviewQueueCount = dashboardRepository.countByStatus(organizationId, "NEEDS_REVIEW");
     long documentsProcessedToday = dashboardRepository.documentsProcessedSince(organizationId, today);
+    long alertCount = alertRepository.countByOrganizationId(organizationId);
+    var recentAlerts = alertRepository.findByOrganizationId(organizationId,
+        PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt"))).stream().map(AlertResponse::from).toList();
 
     return new DashboardSummaryResponse(
         totalsThisMonth,
@@ -49,7 +58,9 @@ public class DashboardService {
         categoryBreakdown,
         monthlySeries,
         reviewQueueCount,
-        documentsProcessedToday);
+        documentsProcessedToday,
+        alertCount,
+        recentAlerts);
   }
 
   private List<YearMonth> trailingMonths(YearMonth currentMonth) {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.audit.AuditService;
 import com.ledgerly.api.budget.BudgetThresholdEvaluator;
+import com.ledgerly.api.anomaly.ExpensePostedEvent;
 import com.ledgerly.api.category.Category;
 import com.ledgerly.api.correlation.CorrelationIds;
 import com.ledgerly.api.document.ExtractionProposal;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -41,6 +43,7 @@ public class ExpensePostingTransactions {
   private final LedgerTransactionRepository ledgerTransactionRepository;
   private final ExpenseRepository expenseRepository;
   private final BudgetThresholdEvaluator budgetThresholdEvaluator;
+  private final ApplicationEventPublisher eventPublisher;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
 
@@ -49,12 +52,14 @@ public class ExpensePostingTransactions {
       LedgerTransactionRepository ledgerTransactionRepository,
       ExpenseRepository expenseRepository,
       BudgetThresholdEvaluator budgetThresholdEvaluator,
+      ApplicationEventPublisher eventPublisher,
       AuditService auditService,
       ObjectMapper objectMapper) {
     this.ledgerAccountRepository = ledgerAccountRepository;
     this.ledgerTransactionRepository = ledgerTransactionRepository;
     this.expenseRepository = expenseRepository;
     this.budgetThresholdEvaluator = budgetThresholdEvaluator;
+    this.eventPublisher = eventPublisher;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
   }
@@ -102,6 +107,7 @@ public class ExpensePostingTransactions {
     expenseRepository.flush();
 
     budgetThresholdEvaluator.evaluate(expense, postedAt, actor);
+    eventPublisher.publishEvent(new ExpensePostedEvent(organizationId, expense.getId(), postedAt, actor));
 
     auditService.record(
         organizationId,
