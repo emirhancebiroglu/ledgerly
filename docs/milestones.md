@@ -168,6 +168,23 @@ step, and the ledger sums to zero.
 
 The product becomes visible.
 
+> **Split 2026-07-28 into M7a (API) and M7b (UI).** The six screens below need roughly seven
+> endpoints that do not exist — `api` today has only `POST /expenses` and `GET /expenses/{id}`:
+> no list, no dashboard aggregates, no review approve/correct, no ledger-entry read model, no
+> document byte serving, no SSE. As one milestone this was 12+ tasks with nothing verifiable
+> until the end. M7a is `apps/api` (demo: `cd apps/api && ./mvnw clean verify`), M7b is
+> `apps/web` (demo: the browser loop below). Task lists live in the Brain at
+> `projects/ledgerly/todo.md`.
+>
+> **Budgets moved to M8.** The design covers a Budgets screen, but the `budget` table, CRUD and
+> evaluation are all M8 — the screen ships with its API, not before it. M7 shows the nav item
+> disabled, as it already does for Alerts and Policies.
+>
+> Design handoff: `docs/design/m7/README.md` (mirrored from Claude Design project
+> `0c8633c7-9c28-4d78-9089-80d5b3d3fc26`). Accent frozen to indigo/violet
+> `oklch(0.5 0.16 265)`, light theme only. The prototype's `support.js` / `image-slot.js`
+> runtime is a reference, not code to port.
+
 - Auth pages, protected routes.
 - Upload with drag-and-drop and live status.
 - Expense list: filter, sort, search; amounts formatted from minor units correctly.
