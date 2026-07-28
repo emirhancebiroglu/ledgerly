@@ -14,6 +14,7 @@ import com.ledgerly.api.ledger.LedgerTransactionRepository;
 import com.ledgerly.api.ledger.Money;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -86,6 +87,7 @@ public class ExpensePostingTransactions {
             Expense.posted(
                 organizationId,
                 documentId,
+                proposal.vendor(),
                 category.getId(),
                 transaction.id(),
                 proposal.totalMinor(),
@@ -120,6 +122,7 @@ public class ExpensePostingTransactions {
             Expense.needsReview(
                 organizationId,
                 documentId,
+                proposal.vendor(),
                 category.getId(),
                 proposal.totalMinor(),
                 proposal.currency(),
@@ -141,15 +144,16 @@ public class ExpensePostingTransactions {
   }
 
   private String auditPayload(Expense expense) {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("documentId", expense.getDocumentId());
+    payload.put("vendor", expense.getVendor());
+    payload.put("categoryId", expense.getCategoryId());
+    payload.put("amountMinor", expense.getAmountMinor());
+    payload.put("currency", expense.getCurrency());
+    payload.put("confidence", expense.getCategorizationConfidence());
+    payload.put("status", expense.getStatus().name());
     try {
-      return objectMapper.writeValueAsString(
-          Map.of(
-              "documentId", expense.getDocumentId(),
-              "categoryId", expense.getCategoryId(),
-              "amountMinor", expense.getAmountMinor(),
-              "currency", expense.getCurrency(),
-              "confidence", expense.getCategorizationConfidence(),
-              "status", expense.getStatus().name()));
+      return objectMapper.writeValueAsString(payload);
     } catch (JsonProcessingException e) {
       throw new IllegalStateException("Failed to serialize expense for audit trail", e);
     }

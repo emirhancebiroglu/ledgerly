@@ -66,7 +66,8 @@ public class DocumentReaper {
 
     for (Document candidate : candidates) {
       boolean reclaimed =
-          transitions.reclaimStuckDocument(candidate.getId(), cutoff, Instant.now(clock), TIMEOUT_REASON);
+          transitions.reclaimStuckDocument(
+              candidate.getId(), candidate.getOrganizationId(), cutoff, Instant.now(clock), TIMEOUT_REASON);
       if (reclaimed) {
         log.warn("Reaped stuck document {} (PROCESSING since before {})", candidate.getId(), cutoff);
       }

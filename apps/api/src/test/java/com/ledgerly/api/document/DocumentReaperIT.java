@@ -89,8 +89,9 @@ class DocumentReaperIT extends AbstractPostgresIT {
   @Test
   void reclaimingIsIdempotentAcrossTwoInstancesRacingTheSameDocument() throws Exception {
     UUID documentId;
+    UUID orgId;
     try (Connection connection = dataSource.getConnection()) {
-      UUID orgId = insertOrganization(connection);
+      orgId = insertOrganization(connection);
       UUID userId = insertAppUser(connection, orgId);
       documentId =
           insertStuckDocument(connection, orgId, userId, FIXED_NOW.minusSeconds(600));
@@ -100,9 +101,9 @@ class DocumentReaperIT extends AbstractPostgresIT {
     // Simulates two reaper instances racing the same row: the first call reclaims it, the second
     // (identical) call must be a no-op, not a second failure write or an exception.
     boolean first =
-        transitions.reclaimStuckDocument(documentId, cutoff, FIXED_NOW, "first reaper");
+        transitions.reclaimStuckDocument(documentId, orgId, cutoff, FIXED_NOW, "first reaper");
     boolean second =
-        transitions.reclaimStuckDocument(documentId, cutoff, FIXED_NOW, "second reaper");
+        transitions.reclaimStuckDocument(documentId, orgId, cutoff, FIXED_NOW, "second reaper");
 
     assertThat(first).isTrue();
     assertThat(second).isFalse();
@@ -131,7 +132,7 @@ class DocumentReaperIT extends AbstractPostgresIT {
 
     Instant cutoff = FIXED_NOW.minus(java.time.Duration.ofSeconds(300));
     boolean reclaimed =
-        transitions.reclaimStuckDocument(documentId, cutoff, FIXED_NOW, "reaper");
+        transitions.reclaimStuckDocument(documentId, orgId, cutoff, FIXED_NOW, "reaper");
 
     assertThat(reclaimed).isFalse();
     assertThat(documentRepository.findById(documentId).orElseThrow().getStatus())

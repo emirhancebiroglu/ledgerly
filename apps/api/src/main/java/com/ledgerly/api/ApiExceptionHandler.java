@@ -9,8 +9,11 @@ import com.ledgerly.api.correlation.CorrelationIdHolder;
 import com.ledgerly.api.document.DocumentTooLargeException;
 import com.ledgerly.api.document.IllegalDocumentTransitionException;
 import com.ledgerly.api.document.UnsupportedDocumentTypeException;
+import com.ledgerly.api.expense.ExpenseAlreadyResolvedException;
+import com.ledgerly.api.expense.InvalidExpenseListQueryException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import com.ledgerly.api.policy.IllegalPolicyDocumentTransitionException;
+import com.ledgerly.api.storage.StorageKeyNotFoundException;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +34,8 @@ public class ApiExceptionHandler {
     NoHandlerFoundException.class,
     NoResourceFoundException.class,
     NoSuchElementException.class,
-    CrossOrganizationAccessException.class
+    CrossOrganizationAccessException.class,
+    StorageKeyNotFoundException.class
   })
   public ProblemDetail handleNotFound() {
     return withCorrelationId(ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Resource not found"));
@@ -41,6 +45,18 @@ public class ApiExceptionHandler {
   public ProblemDetail handleUnauthorized(RuntimeException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, exception.getMessage()));
+  }
+
+  @ExceptionHandler(ExpenseAlreadyResolvedException.class)
+  public ProblemDetail handleExpenseAlreadyResolved(ExpenseAlreadyResolvedException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidExpenseListQueryException.class)
+  public ProblemDetail handleInvalidExpenseListQuery(InvalidExpenseListQueryException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
   }
 
   @ExceptionHandler(IdempotencyConflictException.class)

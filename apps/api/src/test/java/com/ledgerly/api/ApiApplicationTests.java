@@ -10,6 +10,7 @@ import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
 import com.ledgerly.api.category.CategoryRepository;
+import com.ledgerly.api.dashboard.DashboardRepository;
 import com.ledgerly.api.document.DocumentRepository;
 import com.ledgerly.api.expense.ExpenseRepository;
 import com.ledgerly.api.expense.ExpenseStubRepository;
@@ -22,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -32,6 +35,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
           + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
           + "org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration,"
           + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
+          + "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,"
+          + "org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration,"
           + "org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration"
     })
 @AutoConfigureMockMvc
@@ -52,6 +57,9 @@ class ApiApplicationTests {
   @MockitoBean private ExpenseRepository expenseRepository;
   @MockitoBean private LedgerAccountRepository ledgerAccountRepository;
   @MockitoBean private LedgerTransactionRepository ledgerTransactionRepository;
+  @MockitoBean private DashboardRepository dashboardRepository;
+  @MockitoBean private RedisConnectionFactory redisConnectionFactory;
+  @MockitoBean private StringRedisTemplate stringRedisTemplate;
 
   @Test
   void contextLoads() {}
