@@ -39,6 +39,13 @@ services:
       - "${API_PORT:-8080}:8080"
     environment:
       SPRING_DATA_REDIS_HOST: redis
+      DATABASE_URL: ${DATABASE_URL:-jdbc:postgresql://postgres:5432/ledgerly}
+      POSTGRES_USER: ${POSTGRES_USER:-ledgerly}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      AI_BASE_URL: http://ai:8000
+    volumes:
+      - api-storage:/app/var/storage
 
   ai:
     build:
@@ -47,9 +54,13 @@ services:
     restart: unless-stopped
     ports:
       - "${AI_PORT:-8000}:8000"
+    volumes:
+      - ../docs/contracts:/docs/contracts:ro
     environment:
       AI_LLM_PROVIDER: ${AI_LLM_PROVIDER:-litellm}
       AI_LLM_API_KEY: ${AI_LLM_API_KEY:?AI_LLM_API_KEY must be set}
+      AI_EMBEDDING_PROVIDER: ${AI_EMBEDDING_PROVIDER:-litellm}
+      AI_EMBEDDING_API_KEY: ${AI_EMBEDDING_API_KEY:?AI_EMBEDDING_API_KEY must be set}
     # AI_LLM_MODEL / AI_LLM_API_BASE / AI_LLM_SUPPORTS_NATIVE_PDF are deliberately not set here —
     # Settings' own defaults (app/config.py) are the single source of truth, so this file cannot
     # drift out of sync with them the way it did when the Q1 provider changed mid-milestone. To
@@ -68,3 +79,4 @@ services:
 
 volumes:
   postgres-data:
+  api-storage:
