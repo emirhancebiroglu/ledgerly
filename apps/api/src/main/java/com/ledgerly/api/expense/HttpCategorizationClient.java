@@ -1,13 +1,12 @@
 package com.ledgerly.api.expense;
 
+import com.ledgerly.api.ai.AiRestClientFactory;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -19,14 +18,10 @@ public class HttpCategorizationClient implements CategorizationClient {
   private final RestClient restClient;
 
   public HttpCategorizationClient(
-      RestClient.Builder builder,
+      AiRestClientFactory clientFactory,
       @Value("${ledgerly.ai.base-url}") String baseUrl,
       @Value("${ledgerly.ai.timeout-seconds:30}") long timeoutSeconds) {
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
-    requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-
-    this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
+    this.restClient = clientFactory.create(baseUrl, timeoutSeconds);
   }
 
   @Override

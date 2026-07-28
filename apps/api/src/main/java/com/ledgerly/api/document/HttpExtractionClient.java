@@ -1,12 +1,11 @@
 package com.ledgerly.api.document;
 
+import com.ledgerly.api.ai.AiRestClientFactory;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
-import java.time.Duration;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -20,17 +19,10 @@ public class HttpExtractionClient implements ExtractionClient {
   private final RestClient restClient;
 
   public HttpExtractionClient(
-      RestClient.Builder builder,
+      AiRestClientFactory clientFactory,
       @Value("${ledgerly.ai.base-url}") String baseUrl,
       @Value("${ledgerly.ai.timeout-seconds:30}") long timeoutSeconds) {
-    // An explicit timeout is the point of this constructor: without one, an `ai` process that
-    // accepts a connection and then stalls would hold this thread indefinitely, and a document
-    // would sit in PROCESSING with nothing ever resolving it.
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
-    requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-
-    this.restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
+    this.restClient = clientFactory.create(baseUrl, timeoutSeconds);
   }
 
   @Override

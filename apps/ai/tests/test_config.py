@@ -57,3 +57,17 @@ def test_fake_provider_never_requires_an_api_key():
     result = run_import(env)
 
     assert result.returncode == 0, result.stderr
+
+
+def test_blank_service_token_fails_at_import():
+    import os
+
+    env = dict(os.environ)
+    env["AI_LLM_PROVIDER"] = "fake"
+    env["AI_EMBEDDING_PROVIDER"] = "fake"
+    env["AI_SERVICE_TOKEN"] = "  "
+
+    result = run_import(env)
+
+    assert result.returncode != 0
+    assert "AI_SERVICE_TOKEN must not be blank" in result.stderr

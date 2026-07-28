@@ -17,6 +17,7 @@ from app.llm import FakeLlmClient, LiteLlmClient, ResilientLlmClient
 from app.llm.client import LlmClient
 from app.policy.chunking import EmptyDocumentError
 from app.policy.embedding import PolicyEmbeddingFailedError, PolicyEmbeddingService
+from app.service_auth import require_service_auth
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,14 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def service_authentication(request: Request, call_next):
+    rejection = await require_service_auth(request, settings.service_token)
+    if rejection is not None:
+        return rejection
+    return await call_next(request)
 
 
 def _load_supported_content_types() -> frozenset[str]:

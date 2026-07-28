@@ -1,14 +1,13 @@
 package com.ledgerly.api.anomaly;
 
+import com.ledgerly.api.ai.AiRestClientFactory;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
-import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -20,13 +19,10 @@ public class HttpAnomalyClient implements AnomalyClient {
   private final RestClient restClient;
 
   public HttpAnomalyClient(
-      RestClient.Builder builder,
+      AiRestClientFactory clientFactory,
       @Value("${ledgerly.ai.base-url}") String baseUrl,
       @Value("${ledgerly.ai.timeout-seconds:30}") long timeoutSeconds) {
-    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
-    requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-    restClient = builder.baseUrl(baseUrl).requestFactory(requestFactory).build();
+    restClient = clientFactory.create(baseUrl, timeoutSeconds);
   }
 
   @Override
