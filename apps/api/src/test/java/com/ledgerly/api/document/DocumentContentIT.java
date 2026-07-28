@@ -55,8 +55,33 @@ class DocumentContentIT extends AbstractPostgresIT {
             .andReturn();
 
     String disposition = result.getResponse().getHeader("Content-Disposition");
-    assertThat(disposition).contains("attachment").contains("invoice.pdf");
+    assertThat(disposition).isEqualTo("attachment; filename=\"invoice.pdf\"");
     assertThat(result.getResponse().getContentAsByteArray()).isEqualTo(content);
+  }
+
+  @Test
+  void aFilenameContainingCrlfCannotInjectAResponseHeader() throws Exception {
+    // FilenameSanitizer strips control characters (including CR/LF) at upload time --
+    // ContentDisposition itself does not, so this endpoint's safety against response splitting
+    // depends entirely on that upload-time step. This pins the two together: if a future change
+    // ever weakens the sanitizer, this fails instead of silently reopening the injection.
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    byte[] content = "%PDF-1.7 fake pdf bytes".getBytes(StandardCharsets.UTF_8);
+    String storageKey = storageClient.store(content);
+    String sanitizedFilename =
+        FilenameSanitizer.sanitize("evil\r\nX-Injected: yes.pdf", "invoice.pdf");
+    UUID documentId = insertDocument(org, storageKey, sanitizedFilename, "application/pdf");
+
+    MvcResult result =
+        mockMvc
+            .perform(get("/api/v1/documents/" + documentId + "/content").header("Authorization", "Bearer " + token))
+            .andExpect(status().isOk())
+            .andReturn();
+
+    String disposition = result.getResponse().getHeader("Content-Disposition");
+    assertThat(disposition).doesNotContain("\r").doesNotContain("\n");
+    assertThat(result.getResponse().getHeader("X-Injected")).isNull();
   }
 
   @Test
