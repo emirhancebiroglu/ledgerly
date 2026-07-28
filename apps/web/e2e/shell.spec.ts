@@ -60,23 +60,47 @@ test.describe("app shell", () => {
     expect(hasHorizontalScroll).toBe(false);
   });
 
-  test("Ctrl+K and Cmd+K both open the command palette, Escape closes it, focus returns", async ({
-    page,
-    browserName,
-  }) => {
+  test("Ctrl+K opens the command palette, Escape closes it, focus returns", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
     const trigger = page.getByRole("button", { name: "Search or jump to..." });
     await trigger.focus();
 
-    await page.keyboard.press(browserName === "webkit" ? "Meta+k" : "Control+k");
+    await page.keyboard.press("Control+k");
     const palette = page.getByRole("dialog");
     await expect(palette).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(palette).toBeHidden();
     await expect(trigger).toBeFocused();
+  });
+
+  test("Cmd+K (Meta+K) also opens the command palette", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page);
+
+    await page.keyboard.press("Meta+k");
+    await expect(page.getByRole("dialog")).toBeVisible();
+  });
+
+  test("arrow keys move the active row in the palette and Enter navigates to it", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page);
+
+    await page.getByRole("button", { name: "Search or jump to..." }).click();
+    const firstOption = page.getByRole("option", { name: "Go to Dashboard" });
+    const secondOption = page.getByRole("option", { name: "Upload a document" });
+    await expect(firstOption).toHaveAttribute("aria-selected", "true");
+
+    await page.keyboard.press("ArrowDown");
+    await expect(secondOption).toHaveAttribute("aria-selected", "true");
+    await expect(firstOption).toHaveAttribute("aria-selected", "false");
+
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/upload/);
   });
 
   test("a click on a quick-jump row navigates and closes the palette", async ({ page }) => {
@@ -90,7 +114,7 @@ test.describe("app shell", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  test("disabled nav items (Budgets, Alerts, Policies) are not focusable links", async ({
+  test("disabled nav items (Budgets, Alerts, Policies) are aria-disabled and not focusable links", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -99,9 +123,45 @@ test.describe("app shell", () => {
     for (const label of ["Budgets", "Alerts", "Policies"]) {
       const item = page.getByText(label, { exact: true });
       await expect(item).toBeVisible();
-      const tagName = await item.evaluate((el) => el.closest("a") !== null);
-      expect(tagName).toBe(false);
+      const isInsideAnchor = await item.evaluate((el) => el.closest("a") !== null);
+      expect(isInsideAnchor).toBe(false);
+      const disabledAncestor = item.locator("xpath=ancestor-or-self::*[@aria-disabled='true']");
+      await expect(disabledAncestor).toHaveCount(1);
     }
+  });
+
+  test("mobile drawer traps focus while open and restores it to the hamburger on close", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await login(page);
+
+    const hamburger = page.getByRole("button", { name: "Open navigation" });
+    await hamburger.click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer).toBeVisible();
+    // Base UI's focus trap uses hidden focus-guard sentinels that redirect focus back inside via
+    // a JS handler fired on the guard's own focus event — reading document.activeElement in the
+    // same tick as the Tab keypress can observe focus mid-transit on the guard itself. A short
+    // wait per Tab lets that redirect complete before asserting.
+    await page.waitForTimeout(300);
+
+    // Tab far past the number of focusable elements inside the drawer (logo, 4 nav links, the
+    // disabled org row is not focusable) — if the trap holds, focus never leaves the dialog.
+    for (let i = 0; i < 10; i++) {
+      await page.keyboard.press("Tab");
+      await page.waitForTimeout(50);
+      const activeElementInsideDialog = await page.evaluate(() => {
+        const active = document.activeElement;
+        const dialog = document.querySelector('[role="dialog"]');
+        return dialog ? dialog.contains(active) : false;
+      });
+      expect(activeElementInsideDialog).toBe(true);
+    }
+
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(hamburger).toBeFocused();
   });
 
   test("review queue nav item shows the count from the dashboard summary", async ({ page }) => {

@@ -95,9 +95,13 @@ export function Sidebar({
         <span>Settings</span>
       </div>
 
-      <button
-        type="button"
-        className="mt-1.5 flex items-center gap-2 border-t border-sidebar-border px-2 pt-2.5 pb-1 text-left hover:opacity-80"
+      {/* Not wired to anything: there is no multi-org membership in the data model yet (a user
+          belongs to exactly one organization), so there is nothing to switch to. Disabled like
+          Budgets/Alerts/Policies rather than left as a button that looks interactive and isn't. */}
+      <div
+        aria-disabled="true"
+        title="Organization switching isn't available yet"
+        className="mt-1.5 flex cursor-not-allowed items-center gap-2 border-t border-sidebar-border px-2 pt-2.5 pb-1"
       >
         <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-accent text-[11px] font-bold text-accent-foreground">
           {orgInitial}
@@ -106,7 +110,7 @@ export function Sidebar({
           <div className="truncate text-[12.5px] font-semibold">{orgName}</div>
         </div>
         <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-      </button>
+      </div>
     </nav>
   );
 }
