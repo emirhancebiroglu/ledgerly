@@ -1,5 +1,6 @@
 package com.ledgerly.api.dashboard;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -38,8 +39,8 @@ public class DashboardRepository {
             + "ORDER BY currency",
         (rs, rowNum) -> new CurrencyTotal(rs.getString("currency"), rs.getLong("total")),
         organizationId,
-        java.sql.Timestamp.valueOf(from.atStartOfDay()),
-        java.sql.Timestamp.valueOf(to.atStartOfDay()));
+        startOfDayUtc(from),
+        startOfDayUtc(to));
   }
 
   /** POSTED spend by category, for the current calendar month, highest amount first. */
@@ -57,17 +58,16 @@ public class DashboardRepository {
         (rs, rowNum) ->
             new CategoryBreakdownEntry(
                 (UUID) rs.getObject("category_id"), rs.getString("category_name"), rs.getLong("total")),
-        java.sql.Timestamp.valueOf(monthStart.atStartOfDay()),
-        java.sql.Timestamp.valueOf(monthEnd.atStartOfDay()),
+        startOfDayUtc(monthStart),
+        startOfDayUtc(monthEnd),
         organizationId);
   }
 
   /**
-   * POSTED spend per month for the given contiguous range of months, in the org's most common
-   * currency for that window — callers with a genuinely mixed-currency history should treat this
-   * series as approximate, same caveat as the rest of this milestone's currency handling. Every
-   * month in {@code months} appears in the result, zero-filled if it has no POSTED spend; the
-   * caller supplies the month list so this method has no month-count assumption baked in.
+   * POSTED spend per month for the given contiguous range of months, summed across whatever
+   * currencies appear — same caveat as {@link #categoryBreakdown}, no per-currency split here.
+   * Every month in {@code months} appears in the result, zero-filled if it has no POSTED spend;
+   * the caller supplies the month list so this method has no month-count assumption baked in.
    */
   public List<MonthlySpend> monthlySeries(UUID organizationId, List<YearMonth> months) {
     if (months.isEmpty()) {
@@ -77,19 +77,20 @@ public class DashboardRepository {
     YearMonth latest = months.get(months.size() - 1);
     List<Object[]> rows =
         jdbcTemplate.query(
-            "SELECT date_trunc('month', created_at) AS month, SUM(amount_minor) AS total "
+            "SELECT date_trunc('month', created_at AT TIME ZONE 'UTC') AS month, "
+                + "SUM(amount_minor) AS total "
                 + "FROM expense "
                 + "WHERE organization_id = ? AND status = 'POSTED' "
                 + "AND created_at >= ? AND created_at < ? "
-                + "GROUP BY date_trunc('month', created_at)",
+                + "GROUP BY date_trunc('month', created_at AT TIME ZONE 'UTC')",
             (rs, rowNum) ->
                 new Object[] {
                   YearMonth.from(rs.getTimestamp("month").toInstant().atZone(ZoneOffset.UTC)),
                   rs.getLong("total")
                 },
             organizationId,
-            java.sql.Timestamp.valueOf(earliest.atDay(1).atStartOfDay()),
-            java.sql.Timestamp.valueOf(latest.plusMonths(1).atDay(1).atStartOfDay()));
+            startOfMonthUtc(earliest),
+            startOfMonthUtc(latest.plusMonths(1)));
 
     Map<YearMonth, Long> byMonth = new LinkedHashMap<>();
     for (Object[] row : rows) {
@@ -123,7 +124,23 @@ public class DashboardRepository {
                 + "AND updated_at >= ?",
             Long.class,
             organizationId,
-            java.sql.Timestamp.valueOf(since.atStartOfDay()));
+            startOfDayUtc(since));
     return count == null ? 0 : count;
+  }
+
+  /**
+   * Binds as a UTC instant rather than {@code java.sql.Timestamp.valueOf(LocalDateTime)}, which
+   * interprets the local date/time in the JVM's default timezone. Every {@code created_at}/{@code
+   * updated_at} column here is {@code TIMESTAMPTZ}, and {@link DashboardService} computes its
+   * month/day boundaries against {@code Clock.systemUTC()} — binding through the JVM default zone
+   * would silently shift both bounds by the host's UTC offset, misattributing hours of spend
+   * across a month or day boundary on any non-UTC host.
+   */
+  private static java.sql.Timestamp startOfDayUtc(LocalDate date) {
+    return java.sql.Timestamp.from(date.atStartOfDay(ZoneOffset.UTC).toInstant());
+  }
+
+  private static java.sql.Timestamp startOfMonthUtc(YearMonth month) {
+    return java.sql.Timestamp.from(Instant.from(month.atDay(1).atStartOfDay(ZoneOffset.UTC)));
   }
 }

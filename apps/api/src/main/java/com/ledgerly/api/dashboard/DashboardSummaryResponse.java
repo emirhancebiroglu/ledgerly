@@ -15,7 +15,8 @@ import java.util.List;
  *     will see them summed here. Narrower than {@code totalsThisMonth}'s guarantee; revisit if a
  *     real org hits this.
  * @param monthlySeries the trailing 6 months (oldest first), zero-filled for any month with no
- *     POSTED spend.
+ *     POSTED spend. Same currency caveat as {@code categoryBreakdown} — sums across currencies,
+ *     no per-currency split.
  * @param reviewQueueCount count of {@code NEEDS_REVIEW} expenses.
  * @param documentsProcessedToday documents that reached a terminal status today.
  */

@@ -1,6 +1,5 @@
 package com.ledgerly.api.dashboard;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -13,8 +12,13 @@ import com.ledgerly.api.ledger.AbstractPostgresIT;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
+import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.util.TimeZone;
 import java.util.UUID;
 import javax.crypto.SecretKey;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -34,6 +38,50 @@ class DashboardSummaryIT extends AbstractPostgresIT {
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private JdbcTemplate jdbcTemplate;
+
+  private TimeZone originalDefaultTimeZone;
+
+  @BeforeEach
+  void captureDefaultTimeZone() {
+    originalDefaultTimeZone = TimeZone.getDefault();
+  }
+
+  @AfterEach
+  void restoreDefaultTimeZone() {
+    TimeZone.setDefault(originalDefaultTimeZone);
+  }
+
+  @Test
+  void monthBoundaryIsComputedInUtcRegardlessOfJvmDefaultTimeZone() throws Exception {
+    // A host east of UTC (Europe/Istanbul, UTC+3) is what this codebase actually runs on. If a
+    // date bound were ever built through the JVM default zone instead of UTC
+    // (java.sql.Timestamp.valueOf(LocalDateTime) does exactly that), "start of this month" would
+    // be computed 3 hours before the true UTC month boundary -- pulling the last 3 hours of last
+    // month's spend into this month's total.
+    TimeZone.setDefault(TimeZone.getTimeZone("Europe/Istanbul"));
+
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+
+    ZonedDateTime startOfThisMonthUtc =
+        ZonedDateTime.now(ZoneOffset.UTC)
+            .withDayOfMonth(1)
+            .withHour(0)
+            .withMinute(0)
+            .withSecond(0)
+            .withNano(0);
+    // 1 hour before the true UTC boundary: still last month by UTC, so it must be excluded from
+    // "this month". The buggy Europe/Istanbul-shifted bound would have already rolled over to
+    // this month by this point (3-hour shift > 1-hour margin), wrongly including it.
+    insertPostedExpenseAt(org, categoryId, "EUR", 4200, startOfThisMonthUtc.minusHours(1));
+
+    mockMvc
+        .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalsThisMonth").isArray())
+        .andExpect(jsonPath("$.totalsThisMonth.length()").value(0));
+  }
 
   @Test
   void totalsEqualTheSumOfPostedExpensesInMinorUnits() throws Exception {
@@ -132,6 +180,32 @@ class DashboardSummaryIT extends AbstractPostgresIT {
 
   private void insertPostedExpense(UUID orgId, UUID categoryId, String currency, long amountMinor) {
     insertExpense(orgId, categoryId, currency, amountMinor, "POSTED");
+  }
+
+  private void insertPostedExpenseAt(
+      UUID orgId, UUID categoryId, String currency, long amountMinor, ZonedDateTime createdAt) {
+    UUID userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM app_user WHERE organization_id = ?", UUID.class, orgId);
+    UUID documentId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO document (id, organization_id, uploaded_by, filename, content_type, "
+            + "size_bytes, storage_key, content_hash, status) "
+            + "VALUES (?, ?, ?, 'invoice.pdf', 'application/pdf', 100, ?, 'hash', 'EXTRACTED')",
+        documentId,
+        orgId,
+        userId,
+        UUID.randomUUID().toString());
+    jdbcTemplate.update(
+        "INSERT INTO expense (organization_id, document_id, vendor, category_id, amount_minor, "
+            + "currency, categorization_confidence, status, created_at) "
+            + "VALUES (?, ?, 'Acme Corp', ?, ?, ?, 0.9, 'POSTED', ?)",
+        orgId,
+        documentId,
+        categoryId,
+        amountMinor,
+        currency,
+        java.sql.Timestamp.from(createdAt.toInstant()));
   }
 
   private void insertExpense(
