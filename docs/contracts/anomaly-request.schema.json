@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ledgerly.dev/contracts/anomaly-request.schema.json",
+  "title": "AnomalyRequest",
+  "description": "The full body of `POST /anomaly`. `api` supplies an already org-scoped, category/currency-matched 90-day history. All monetary facts are integer minor units; `ai` has no database access.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["expense_id", "category_id", "currency", "amount_minor", "history", "budget"],
+  "properties": {
+    "expense_id": {"type": "string", "format": "uuid"},
+    "category_id": {"type": "string", "format": "uuid"},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "amount_minor": {"description": "Candidate amount in currency minor units.", "type": "integer", "minimum": 1},
+    "history": {
+      "description": "Posted expenses from the same category and currency, excluding the candidate and bounded by `api` to 90 days.",
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["amount_minor", "posted_at"],
+        "properties": {
+          "amount_minor": {"type": "integer", "minimum": 1},
+          "posted_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    },
+    "budget": {
+      "description": "The matching monthly budget at evaluation time, or null when no budget exists.",
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["period", "limit_minor", "spent_minor"],
+          "properties": {
+            "period": {"type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$"},
+            "limit_minor": {"type": "integer", "minimum": 1},
+            "spent_minor": {"type": "integer", "minimum": 0}
+          }
+        }
+      ]
+    },
+    "correlation_id": {"type": ["string", "null"], "maxLength": 128}
+  }
+}

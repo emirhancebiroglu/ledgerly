@@ -77,6 +77,19 @@ test.describe("dashboard", () => {
     await expect(page).toHaveURL(/\/expenses$/);
   });
 
+  test("recent threshold and anomaly alerts show persisted figures and link to the expense", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page);
+
+    const alerts = page.getByTestId("recent-alerts");
+    await expect(alerts.getByText("80% budget threshold")).toBeVisible();
+    await expect(alerts.getByText("€8,400.00 of €10,000.00").first()).toBeVisible();
+    await expect(alerts.getByText("Unusual expense")).toBeVisible();
+
+    await alerts.getByRole("link", { name: /80% budget threshold/ }).click();
+    await expect(page).toHaveURL(/\/expenses\/exp-1$/);
+  });
+
   test("no horizontal scroll and single-column layout below the shell breakpoint (768px)", async ({
     page,
   }) => {

@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +53,11 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1536
     embedding_timeout_seconds: float = 30.0
     embedding_api_base: str | None = "https://opencode.ai/zen/go"
+
+    anomaly_medium_z_score: float = Field(default=2.0, gt=0)
+    anomaly_high_z_score: float = Field(default=3.0, gt=0)
+    anomaly_medium_burn_rate: float = Field(default=0.80, ge=0)
+    anomaly_high_burn_rate: float = Field(default=1.0, ge=0)
 
 
 settings = Settings()

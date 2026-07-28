@@ -17,6 +17,7 @@ import re
 from datetime import date, timedelta
 
 from app.categorization.prompt_markers import CATEGORIES_MARKER, POLICY_CHUNKS_MARKER
+from app.anomaly.prompt_markers import ANOMALY_FACTS_MARKER
 from app.llm.client import LlmClient, LlmError, VisionPrompt
 
 # A document this small cannot be a real invoice, image or PDF. Anything at or below this is
@@ -34,10 +35,20 @@ class FakeLlmClient(LlmClient):
         return self.MODEL_NAME
 
     def complete(self, prompt: str) -> str:
+        anomaly = self._try_anomaly(prompt)
+        if anomaly is not None:
+            return anomaly
         categorization = self._try_categorize(prompt)
         if categorization is not None:
             return categorization
         return f"fake completion for: {prompt[:64]}"
+
+    def _try_anomaly(self, prompt: str) -> str | None:
+        if ANOMALY_FACTS_MARKER not in prompt:
+            return None
+        return json.dumps(
+            {"explanation": "The expense differs materially from the established spending pattern."}
+        )
 
     def _try_categorize(self, prompt: str) -> str | None:
         """Deterministic categorization for prompts carrying

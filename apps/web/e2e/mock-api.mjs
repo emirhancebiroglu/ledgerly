@@ -35,7 +35,29 @@ const DASHBOARD_SUMMARY = {
   ],
   reviewQueueCount: 3,
   documentsProcessedToday: 17,
+  alertCount: 2,
+  recentAlerts: [
+    {
+      id: "alert-1", expenseId: "exp-1", categoryId: "cat-2", period: "2026-07", currency: "EUR",
+      alertType: "BUDGET_THRESHOLD", thresholdPercent: 80, spentMinor: 840000, limitMinor: 1000000,
+      historyCount: null, zScore: null, budgetBurnRate: 0.84, explanation: null, createdAt: "2026-07-24T10:00:00Z",
+    },
+    {
+      id: "alert-2", expenseId: "exp-2", categoryId: "cat-1", period: "2026-07", currency: "EUR",
+      alertType: "ANOMALY_HIGH", thresholdPercent: null, spentMinor: null, limitMinor: null,
+      historyCount: 32, zScore: 3.2, budgetBurnRate: 0.42, explanation: "Spend is unusual for this category.", createdAt: "2026-07-23T09:00:00Z",
+    },
+  ],
 };
+
+let budgetCounter = 5;
+const BUDGETS = [
+  { id: "budget-1", categoryId: "cat-1", period: "2026-07", limitMinor: "500000", currency: "EUR", spentMinor: "0", burnRate: 0, status: "ON_TRACK", createdAt: "2026-07-01T00:00:00Z", updatedAt: "2026-07-01T00:00:00Z" },
+  { id: "budget-2", categoryId: "cat-2", period: "2026-07", limitMinor: "1000000", currency: "EUR", spentMinor: "790000", burnRate: 0.79, status: "ON_TRACK", createdAt: "2026-07-01T00:00:00Z", updatedAt: "2026-07-01T00:00:00Z" },
+  { id: "budget-3", categoryId: "cat-3", period: "2026-07", limitMinor: "1000000", currency: "EUR", spentMinor: "840000", burnRate: 0.84, status: "NEAR_THRESHOLD", createdAt: "2026-07-01T00:00:00Z", updatedAt: "2026-07-01T00:00:00Z" },
+  { id: "budget-4", categoryId: "cat-1", period: "2026-08", limitMinor: "1000000", currency: "EUR", spentMinor: "1000000", burnRate: 1, status: "OVER_BUDGET", createdAt: "2026-08-01T00:00:00Z", updatedAt: "2026-08-01T00:00:00Z" },
+];
+const BUDGETS_SEED = JSON.parse(JSON.stringify(BUDGETS));
 
 const EXPENSES = [
   {
@@ -572,6 +594,43 @@ function handleCategories(req, res, isAuthed) {
   send(res, 200, CATEGORIES);
 }
 
+function handleBudgets(req, res, isAuthed, url) {
+  if (!isAuthed) return send(res, 401, {});
+  if (req.method === "GET") return send(res, 200, BUDGETS);
+
+  const budgetMatch = url.pathname.match(/^\/api\/v1\/budgets\/([^/]+)$/);
+  const budgetId = budgetMatch?.[1];
+  readBody(req).then((body) => {
+    let input;
+    try { input = JSON.parse(body.toString("utf-8")); } catch { return send(res, 400, { detail: "Invalid request body" }); }
+    if (!input.categoryId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(input.period) || !/^\d+$/.test(input.limitMinor) || BigInt(input.limitMinor) <= 0n || !/^[A-Z]{3}$/.test(input.currency)) {
+      return send(res, 400, { detail: "Invalid budget input" });
+    }
+    const existing = budgetId ? BUDGETS.find((budget) => budget.id === budgetId) : undefined;
+    if (budgetId && !existing) return send(res, 404, { detail: "Budget not found" });
+    const duplicate = BUDGETS.find((budget) => budget.id !== budgetId && budget.categoryId === input.categoryId && budget.period === input.period && budget.currency === input.currency);
+    if (duplicate) return send(res, 409, { detail: "A budget already exists for this category, period and currency" });
+    const next = { id: existing?.id ?? `budget-${budgetCounter++}`, ...input, spentMinor: existing?.spentMinor ?? 0, burnRate: existing?.burnRate ?? 0, status: existing?.status ?? "ON_TRACK", createdAt: existing?.createdAt ?? new Date().toISOString(), updatedAt: new Date().toISOString() };
+    if (existing) Object.assign(existing, next); else BUDGETS.push(next);
+    send(res, existing ? 200 : 201, next);
+  }).catch(() => send(res, 500, { detail: "Budget save failed" }));
+}
+
+function handleBudgetDelete(req, res, isAuthed, id) {
+  if (!isAuthed) return send(res, 401, {});
+  const index = BUDGETS.findIndex((budget) => budget.id === id);
+  if (index === -1) return send(res, 404, { detail: "Budget not found" });
+  BUDGETS.splice(index, 1);
+  res.writeHead(204);
+  res.end();
+}
+
+function handleResetBudgets(req, res) {
+  BUDGETS.splice(0, BUDGETS.length, ...JSON.parse(JSON.stringify(BUDGETS_SEED)));
+  budgetCounter = 5;
+  send(res, 200, BUDGETS);
+}
+
 function handleExpenseDetail(req, res, isAuthed, expenseId) {
   if (!isAuthed) return send(res, 401, {});
   const expense = EXPENSES.find((e) => e.id === expenseId);
@@ -699,6 +758,20 @@ const server = createServer((req, res) => {
   }
   if (url.pathname === "/api/v1/categories") {
     return handleCategories(req, res, isAuthed);
+  }
+
+  if (url.pathname === "/api/v1/budgets" && (req.method === "GET" || req.method === "POST")) {
+    return handleBudgets(req, res, isAuthed, url);
+  }
+  if (url.pathname === "/api/v1/test/reset-budgets" && req.method === "POST") {
+    return handleResetBudgets(req, res);
+  }
+  const budgetMatch = url.pathname.match(/^\/api\/v1\/budgets\/([^/]+)$/);
+  if (budgetMatch && req.method === "PUT") {
+    return handleBudgets(req, res, isAuthed, url);
+  }
+  if (budgetMatch && req.method === "DELETE") {
+    return handleBudgetDelete(req, res, isAuthed, budgetMatch[1]);
   }
 
   const detailMatch = url.pathname.match(/^\/api\/v1\/expenses\/([^/]+)\/detail$/);

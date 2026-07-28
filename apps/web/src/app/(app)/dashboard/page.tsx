@@ -6,6 +6,7 @@ import { SummaryCard } from "@/components/dashboard/summary-card";
 import { CategoryBreakdown } from "@/components/dashboard/category-breakdown";
 import { SpendOverTimeChart } from "@/components/dashboard/spend-over-time-chart";
 import { RecentExpenses } from "@/components/dashboard/recent-expenses";
+import { RecentAlerts } from "@/components/dashboard/recent-alerts";
 
 export default async function DashboardPage() {
   const [summary, recentExpensesResult, categories] = await Promise.all([
@@ -55,6 +56,8 @@ export default async function DashboardPage() {
       </div>
 
       <RecentExpenses expenses={recentExpenses} categoryName={categoryName} />
+
+      <RecentAlerts alerts={summary.recentAlerts} totalCount={summary.alertCount} />
     </div>
   );
 }

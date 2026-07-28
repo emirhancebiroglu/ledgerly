@@ -2,6 +2,7 @@ package com.ledgerly.api.expense;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,6 +20,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
 import javax.crypto.SecretKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +70,83 @@ class ExpenseReviewIT extends AbstractPostgresIT {
             Long.class,
             transactionId);
     assertThat(balance).isZero();
+  }
+
+  @Test
+  void approveCrossing80PercentCreatesAnAuditedThresholdAlertAndUpdatesBudgetUsage()
+      throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    UUID budgetId = insertBudget(org, categoryId, currentPeriod(), 6_250);
+    UUID expenseId = insertNeedsReviewExpense(org, categoryId, "Acme Corp", 5_000);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "budget-approve-" + System.nanoTime()))
+        .andExpect(status().isOk());
+
+    assertThat(alertCount(budgetId, 80)).isEqualTo(1);
+    assertThat(alertCount(budgetId, 100)).isZero();
+    assertThat(alertAuditCount(budgetId, 80)).isEqualTo(1);
+    mockMvc
+        .perform(get("/api/v1/budgets").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].spentMinor").value(5_000))
+        .andExpect(jsonPath("$[0].burnRate").value(0.8))
+        .andExpect(jsonPath("$[0].status").value("NEAR_THRESHOLD"));
+  }
+
+  @Test
+  void correctEvaluatesTheHumanSelectedCategoryBudget() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID originalCategory = createCategory(org);
+    UUID correctedCategory = createCategory(org);
+    UUID budgetId = insertBudget(org, correctedCategory, currentPeriod(), 1_000);
+    UUID expenseId = insertNeedsReviewExpense(org, originalCategory, "Acme Corp", 1_000);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/correct")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "budget-correct-" + System.nanoTime())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(new CorrectExpenseRequest(correctedCategory))))
+        .andExpect(status().isOk());
+
+    assertThat(alertCount(budgetId, 80)).isEqualTo(1);
+    assertThat(alertCount(budgetId, 100)).isEqualTo(1);
+  }
+
+  @Test
+  void concurrentPostsAgainstOneBudgetCreateEachThresholdOnlyOnce() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    UUID budgetId = insertBudget(org, categoryId, currentPeriod(), 6_250);
+    UUID firstExpense = insertNeedsReviewExpense(org, categoryId, "First", 5_000);
+    UUID secondExpense = insertNeedsReviewExpense(org, categoryId, "Second", 5_000);
+    insertPostingAccounts(org, categoryId);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      List<Future<Integer>> futures =
+          executor.invokeAll(
+              List.of(
+                  () -> approveStatus(token, firstExpense, "budget-race-a-"),
+                  () -> approveStatus(token, secondExpense, "budget-race-b-")));
+      assertThat(futures.stream().map(this::statusOf).toList()).containsExactlyInAnyOrder(200, 200);
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
+
+    assertThat(alertCount(budgetId, 80)).isEqualTo(1);
+    assertThat(alertCount(budgetId, 100)).isEqualTo(1);
   }
 
   @Test
@@ -355,6 +435,76 @@ class ExpenseReviewIT extends AbstractPostgresIT {
         categoryId,
         amountMinor);
     return expenseId;
+  }
+
+  private UUID insertBudget(UUID organizationId, UUID categoryId, String period, long limitMinor) {
+    UUID budgetId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO budget (id, organization_id, category_id, period, limit_minor, currency) "
+            + "VALUES (?, ?, ?, ?, ?, 'EUR')",
+        budgetId,
+        organizationId,
+        categoryId,
+        period,
+        limitMinor);
+    return budgetId;
+  }
+
+  private String currentPeriod() {
+    return YearMonth.now(ZoneOffset.UTC).toString();
+  }
+
+  private int alertCount(UUID budgetId, int threshold) {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM alert WHERE budget_id = ? AND threshold_percent = ?",
+        Integer.class,
+        budgetId,
+        threshold);
+  }
+
+  private int alertAuditCount(UUID budgetId, int threshold) {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM audit_log WHERE entity_type = 'alert' "
+            + "AND after ->> 'budgetId' = ? AND after ->> 'thresholdPercent' = ?",
+        Integer.class,
+        budgetId.toString(),
+        Integer.toString(threshold));
+  }
+
+  private void insertPostingAccounts(UUID organizationId, UUID categoryId) {
+    String categoryName =
+        jdbcTemplate.queryForObject(
+            "SELECT name FROM category WHERE id = ?", String.class, categoryId);
+    jdbcTemplate.update(
+        "INSERT INTO account (id, organization_id, name, account_type, currency) "
+            + "VALUES (?, ?, ?, 'EXPENSE', 'EUR')",
+        UUID.randomUUID(),
+        organizationId,
+        categoryName);
+    jdbcTemplate.update(
+        "INSERT INTO account (id, organization_id, name, account_type, currency) "
+            + "VALUES (?, ?, 'Accounts Payable', 'LIABILITY', 'EUR')",
+        UUID.randomUUID(),
+        organizationId);
+  }
+
+  private int approveStatus(String token, UUID expenseId, String keyPrefix) throws Exception {
+    return mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", keyPrefix + System.nanoTime()))
+        .andReturn()
+        .getResponse()
+        .getStatus();
+  }
+
+  private int statusOf(Future<Integer> future) {
+    try {
+      return future.get(10, TimeUnit.SECONDS);
+    } catch (Exception exception) {
+      throw new RuntimeException(exception);
+    }
   }
 
   private UUID createCategory(UUID orgId) {

@@ -61,7 +61,10 @@ ledgerly:
     # Below this, an expense routes to review instead of posting silently (M6 T7). Mirrors the
     # extraction self-check gate's 0.7 threshold in apps/ai/app/llm/extraction_graph.py.
     confidence-threshold: ${CATEGORIZATION_CONFIDENCE_THRESHOLD:0.7}
-
+  anomaly:
+    # The request schema bounds one advisory payload to the newest 1,000 comparable postings;
+    # the database predicate still restricts every sample to the preceding 90 days.
+    history-limit: ${ANOMALY_HISTORY_LIMIT:1000}
 logging:
   pattern:
     console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%X{correlationId}] [%thread] %logger{36} - %msg%n"

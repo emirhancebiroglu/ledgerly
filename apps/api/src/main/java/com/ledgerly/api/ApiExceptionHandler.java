@@ -3,6 +3,8 @@ package com.ledgerly.api;
 import com.ledgerly.api.auth.CrossOrganizationAccessException;
 import com.ledgerly.api.auth.InvalidCredentialsException;
 import com.ledgerly.api.auth.InvalidRefreshTokenException;
+import com.ledgerly.api.budget.DuplicateBudgetException;
+import com.ledgerly.api.budget.InvalidBudgetRequestException;
 import com.ledgerly.api.category.CategoryInUseException;
 import com.ledgerly.api.category.DuplicateCategoryNameException;
 import com.ledgerly.api.correlation.CorrelationIdHolder;
@@ -21,6 +23,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -69,6 +72,24 @@ public class ApiExceptionHandler {
   public ProblemDetail handleDuplicateCategoryName(DuplicateCategoryNameException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
+  }
+
+  @ExceptionHandler(DuplicateBudgetException.class)
+  public ProblemDetail handleDuplicateBudget(DuplicateBudgetException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidBudgetRequestException.class)
+  public ProblemDetail handleInvalidBudgetRequest(InvalidBudgetRequestException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
+  }
+
+  @ExceptionHandler(MethodArgumentNotValidException.class)
+  public ProblemDetail handleInvalidRequest(MethodArgumentNotValidException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Request validation failed"));
   }
 
   @ExceptionHandler(CategoryInUseException.class)

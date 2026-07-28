@@ -1,0 +1,9 @@
+{
+  "expense_id": "9ce65a88-5de3-4f9a-a1ec-8e75e75873cd",
+  "risk": "HIGH",
+  "history_count": 2,
+  "z_score": 69.29646455628166,
+  "budget_burn_rate": 0.6,
+  "explanation": "This expense is materially outside the recent pattern and budget consumption is elevated.",
+  "model": "fake-llm-v1"
+}

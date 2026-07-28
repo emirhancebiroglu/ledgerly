@@ -1,0 +1,12 @@
+{
+  "expense_id": "9ce65a88-5de3-4f9a-a1ec-8e75e75873cd",
+  "category_id": "c30e774e-5b4a-46c9-a4ba-9b6aab4fe7b9",
+  "currency": "EUR",
+  "amount_minor": 250000,
+  "history": [
+    {"amount_minor": 10000, "posted_at": "2026-07-01T10:00:00Z"},
+    {"amount_minor": 12000, "posted_at": "2026-07-10T10:00:00Z"}
+  ],
+  "budget": {"period": "2026-07", "limit_minor": 500000, "spent_minor": 300000},
+  "correlation_id": "req-anomaly-1"
+}

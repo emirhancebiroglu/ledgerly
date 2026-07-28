@@ -6,9 +6,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.ledgerly.api.audit.AuditLogRepository;
+import com.ledgerly.api.alert.AlertRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
+import com.ledgerly.api.anomaly.AnomalyHistoryRepository;
 import com.ledgerly.api.auth.AppUserRepository;
 import com.ledgerly.api.auth.OrganizationRepository;
 import com.ledgerly.api.auth.RefreshTokenRepository;
+import com.ledgerly.api.budget.BudgetRepository;
+import com.ledgerly.api.budget.BudgetSpendRepository;
+import com.ledgerly.api.budget.BudgetThresholdEvaluator;
 import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.dashboard.DashboardRepository;
 import com.ledgerly.api.document.DocumentRepository;
@@ -52,6 +58,12 @@ class ApiApplicationTests {
   @MockitoBean private AuditLogRepository auditLogRepository;
   @MockitoBean private DocumentRepository documentRepository;
   @MockitoBean private CategoryRepository categoryRepository;
+  @MockitoBean private BudgetRepository budgetRepository;
+  @MockitoBean private BudgetSpendRepository budgetSpendRepository;
+  @MockitoBean private AnomalyHistoryRepository anomalyHistoryRepository;
+  @MockitoBean private JdbcTemplate jdbcTemplate;
+  @MockitoBean private BudgetThresholdEvaluator budgetThresholdEvaluator;
+  @MockitoBean private AlertRepository alertRepository;
   @MockitoBean private PolicyDocumentRepository policyDocumentRepository;
   @MockitoBean private PolicyChunkRepository policyChunkRepository;
   @MockitoBean private ExpenseRepository expenseRepository;

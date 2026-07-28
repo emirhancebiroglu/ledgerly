@@ -15,6 +15,8 @@ fails that side's contract test.
 | `embed-query-response.schema.json` | A single embedding vector for `api` to use in a pgvector nearest-neighbor search. |
 | `categorize-request.schema.json` | The full body of `POST /categorize` on `ai` — extracted fields, org taxonomy, and `api`'s already-retrieved policy chunks. |
 | `categorize-response.schema.json` | What `ai` returns — category, confidence, and the citation that justified it. Advisory only. |
+| `anomaly-request.schema.json` | The full body of `POST /anomaly` — candidate, bounded same-category/currency history, and optional budget snapshot. |
+| `anomaly-response.schema.json` | Deterministic risk statistics plus an LLM-written qualitative explanation. |
 
 `examples/` holds golden fixtures used by the contract tests on both sides:
 
