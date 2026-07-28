@@ -4,10 +4,10 @@ import java.util.UUID;
 
 /**
  * A read-only projection of one {@code ledger_entry} row for display — account id/name alongside
- * the native amount actually posted, not the full {@link LedgerEntry} domain object. Reconstructing
- * {@link LedgerEntry} from a read would mean re-running {@link LedgerTransaction#post}'s balance
- * validation against a row that is already-committed and already-valid; this sidesteps that by
- * never routing a read through the write-side factory at all.
+ * the native amount actually posted, not the full {@link LedgerEntry} domain object. {@link
+ * LedgerEntry} has no account name (only {@code accountId}), which the expense-detail screen's
+ * ledger-entry rows need to display; a separate read model is simpler than adding a display-only
+ * field to the write-side domain type.
  */
 public record LedgerEntryView(
     UUID accountId,

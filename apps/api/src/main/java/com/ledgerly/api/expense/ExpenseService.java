@@ -54,7 +54,8 @@ public class ExpenseService {
     List<LedgerEntryView> ledgerEntries =
         expense.getLedgerTransactionId() == null
             ? List.of()
-            : ledgerTransactionRepository.findEntriesByTransactionId(expense.getLedgerTransactionId());
+            : ledgerTransactionRepository.findEntriesByTransactionId(
+                expense.getLedgerTransactionId(), principal.organizationId());
 
     Document document =
         documentRepository

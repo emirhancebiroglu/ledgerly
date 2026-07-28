@@ -73,14 +73,23 @@ class ExpenseDetailIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.ledgerEntries[1].direction").value("CREDIT"))
         .andExpect(jsonPath("$.document.filename").value("invoice.pdf"));
 
+    // amountMinor is the native amount, always positive on both sides -- direction carries the
+    // sign. Comparing the two magnitudes alone would pass even if both rows were DEBIT, so this
+    // asserts each row's own direction+magnitude and sums them signed, the actual zero-sum claim.
     MvcResult result =
         mockMvc
             .perform(get("/api/v1/expenses/" + expenseId + "/detail").header("Authorization", "Bearer " + token))
             .andReturn();
     var json = objectMapper.readTree(result.getResponse().getContentAsString());
-    long debit = json.get("ledgerEntries").get(0).get("amountMinor").asLong();
-    long credit = json.get("ledgerEntries").get(1).get("amountMinor").asLong();
-    assertThat(debit).isEqualTo(credit);
+    var entries = json.get("ledgerEntries");
+    long signedSum = 0;
+    for (var entry : entries) {
+      long magnitude = entry.get("amountMinor").asLong();
+      String direction = entry.get("direction").asText();
+      assertThat(direction).isIn("DEBIT", "CREDIT");
+      signedSum += direction.equals("DEBIT") ? magnitude : -magnitude;
+    }
+    assertThat(signedSum).isZero();
   }
 
   @Test
