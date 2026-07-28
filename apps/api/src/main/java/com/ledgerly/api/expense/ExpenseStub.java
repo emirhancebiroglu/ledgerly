@@ -25,7 +25,7 @@ public class ExpenseStub {
   @Column(name = "amount_minor", nullable = false)
   private long amountMinor;
 
-  @Column(nullable = false)
+  @Column(nullable = false, columnDefinition = "bpchar(3)")
   private String currency;
 
   @Column(name = "created_at", nullable = false)
