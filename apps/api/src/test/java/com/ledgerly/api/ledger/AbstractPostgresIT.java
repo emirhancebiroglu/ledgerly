@@ -1,5 +1,6 @@
 package com.ledgerly.api.ledger;
 
+import com.redis.testcontainers.RedisContainer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -12,11 +13,11 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 /**
- * Singleton-container pattern: one Postgres container for the whole JVM, started once and never
- * stopped by JUnit — Testcontainers' Ryuk sidecar reaps it at JVM exit. Letting {@code
- * @Testcontainers}/{@code @Container} manage the lifecycle instead starts and stops a fresh
- * container per test class, which is both slow and, on this machine, prone to connection
- * timeouts under the resulting churn.
+ * Singleton-container pattern: one Postgres (and, since M7a T6, one Redis) container for the
+ * whole JVM, started once and never stopped by JUnit — Testcontainers' Ryuk sidecar reaps them at
+ * JVM exit. Letting {@code @Testcontainers}/{@code @Container} manage the lifecycle instead
+ * starts and stops a fresh container per test class, which is both slow and, on this machine,
+ * prone to connection timeouts under the resulting churn.
  */
 @Tag("integration")
 @SpringBootTest
@@ -29,8 +30,11 @@ public abstract class AbstractPostgresIT {
           .withUsername("ledgerly")
           .withPassword("ledgerly");
 
+  static final RedisContainer REDIS = new RedisContainer(DockerImageName.parse("redis:7-alpine"));
+
   static {
     POSTGRES.start();
+    REDIS.start();
   }
 
   @DynamicPropertySource
@@ -38,6 +42,8 @@ public abstract class AbstractPostgresIT {
     registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
     registry.add("spring.datasource.username", POSTGRES::getUsername);
     registry.add("spring.datasource.password", POSTGRES::getPassword);
+    registry.add("spring.data.redis.host", REDIS::getHost);
+    registry.add("spring.data.redis.port", () -> REDIS.getFirstMappedPort());
   }
 
   protected UUID insertOrganization(Connection connection) throws SQLException {

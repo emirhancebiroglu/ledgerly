@@ -23,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -33,6 +35,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
           + "org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration,"
           + "org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration,"
           + "org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,"
+          + "org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration,"
+          + "org.springframework.boot.autoconfigure.data.redis.RedisReactiveAutoConfiguration,"
           + "org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration"
     })
 @AutoConfigureMockMvc
@@ -54,6 +58,8 @@ class ApiApplicationTests {
   @MockitoBean private LedgerAccountRepository ledgerAccountRepository;
   @MockitoBean private LedgerTransactionRepository ledgerTransactionRepository;
   @MockitoBean private DashboardRepository dashboardRepository;
+  @MockitoBean private RedisConnectionFactory redisConnectionFactory;
+  @MockitoBean private StringRedisTemplate stringRedisTemplate;
 
   @Test
   void contextLoads() {}
