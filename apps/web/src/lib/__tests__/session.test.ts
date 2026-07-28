@@ -36,6 +36,33 @@ describe("session cookies", () => {
     );
   });
 
+  it("marks the cookie secure in production and not secure in dev/test", async () => {
+    const originalEnv = process.env.NODE_ENV;
+
+    vi.stubEnv("NODE_ENV", "production");
+    vi.resetModules();
+    const prod = await import("@/lib/session");
+    await prod.setSessionCookies({ accessToken: "a", refreshToken: "r" });
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      "ledgerly_access_token",
+      "a",
+      expect.objectContaining({ secure: true }),
+    );
+
+    cookieStore.set.mockClear();
+    vi.stubEnv("NODE_ENV", "development");
+    vi.resetModules();
+    const dev = await import("@/lib/session");
+    await dev.setSessionCookies({ accessToken: "a", refreshToken: "r" });
+    expect(cookieStore.set).toHaveBeenCalledWith(
+      "ledgerly_access_token",
+      "a",
+      expect.objectContaining({ secure: false }),
+    );
+
+    vi.stubEnv("NODE_ENV", originalEnv ?? "test");
+  });
+
   it("deletes both cookies on clear", async () => {
     const { clearSessionCookies } = await import("@/lib/session");
 
