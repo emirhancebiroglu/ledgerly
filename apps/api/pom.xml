@@ -7,7 +7,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.5.4</version>
+    <version>3.5.14</version>
     <relativePath/>
   </parent>
 
@@ -25,6 +25,10 @@
     <jqwik.version>1.9.1</jqwik.version>
     <jjwt.version>0.12.6</jjwt.version>
     <json-schema-validator.version>1.5.6</json-schema-validator.version>
+    <postgresql.version>42.7.12</postgresql.version>
+    <jackson-bom.version>2.21.4</jackson-bom.version>
+    <netty.version>4.1.136.Final</netty.version>
+    <tomcat.version>10.1.55</tomcat.version>
   </properties>
 
   <dependencies>
