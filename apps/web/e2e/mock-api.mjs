@@ -105,6 +105,104 @@ const EXPENSES = [
   },
 ];
 
+// Smallest-possible valid 1x1 PNG and PDF, real bytes so DocumentViewer's blob: URL actually
+// decodes into something the browser can render, not just a content-type label.
+const TINY_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+const TINY_PDF = Buffer.from(
+  "%PDF-1.1\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]>>endobj\ntrailer<</Root 1 0 R>>",
+  "utf-8",
+);
+
+const DOCUMENTS = {
+  "doc-1": {
+    id: "doc-1",
+    filename: "northwind-invoice.pdf",
+    contentType: "application/pdf",
+    sizeBytes: TINY_PDF.byteLength,
+    status: "EXTRACTED",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-24T09:58:00Z",
+    bytes: TINY_PDF,
+  },
+  "doc-2": {
+    id: "doc-2",
+    filename: "cloudbase-receipt.png",
+    contentType: "image/png",
+    sizeBytes: TINY_PNG.byteLength,
+    status: "EXTRACTED",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-23T08:58:00Z",
+    bytes: TINY_PNG,
+  },
+  "doc-3": {
+    id: "doc-3",
+    filename: "office-depot-receipt.png",
+    contentType: "image/png",
+    sizeBytes: TINY_PNG.byteLength,
+    status: "NEEDS_REVIEW",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-22T13:58:00Z",
+    bytes: TINY_PNG,
+  },
+  "doc-4": {
+    id: "doc-4",
+    filename: "skyline-air-ticket.txt",
+    contentType: "text/plain",
+    sizeBytes: 11,
+    status: "EXTRACTED",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-21T07:58:00Z",
+    bytes: Buffer.from("plain text", "utf-8"),
+  },
+  "doc-5": {
+    id: "doc-5",
+    filename: "figma-invoice.pdf",
+    contentType: "application/pdf",
+    sizeBytes: TINY_PDF.byteLength,
+    status: "EXTRACTED",
+    proposal: null,
+    failureReason: null,
+    createdAt: "2026-07-20T07:58:00Z",
+    bytes: TINY_PDF,
+  },
+};
+
+const ACCOUNTS = {
+  "cat-1": { id: "acct-expense-software", name: "Software Expense" },
+  "cat-2": { id: "acct-expense-travel", name: "Travel Expense" },
+  "cat-3": { id: "acct-expense-office", name: "Office Supplies Expense" },
+};
+
+function ledgerEntriesFor(expense) {
+  if (!expense.ledgerTransactionId) {
+    return [];
+  }
+  const account = ACCOUNTS[expense.categoryId] ?? { id: "acct-unknown", name: "Unknown" };
+  return [
+    {
+      accountId: account.id,
+      accountName: account.name,
+      direction: "DEBIT",
+      amountMinor: expense.amountMinor,
+      currency: expense.currency,
+    },
+    {
+      accountId: "acct-cash",
+      accountName: "Cash / Bank",
+      direction: "CREDIT",
+      amountMinor: expense.amountMinor,
+      currency: expense.currency,
+    },
+  ];
+}
+
 function send(res, status, body) {
   const json = JSON.stringify(body);
   res.writeHead(status, { "content-type": "application/json", "content-length": Buffer.byteLength(json) });
@@ -175,6 +273,41 @@ const server = createServer((req, res) => {
   if (url.pathname === "/api/v1/categories") {
     if (!isAuthed) return send(res, 401, {});
     return send(res, 200, CATEGORIES);
+  }
+
+  const detailMatch = url.pathname.match(/^\/api\/v1\/expenses\/([^/]+)\/detail$/);
+  if (detailMatch) {
+    if (!isAuthed) return send(res, 401, {});
+    const expense = EXPENSES.find((e) => e.id === detailMatch[1]);
+    if (!expense) return send(res, 404, { detail: "Expense not found" });
+    const document = DOCUMENTS[expense.documentId];
+    return send(res, 200, {
+      ...expense,
+      ledgerEntries: ledgerEntriesFor(expense),
+      document: {
+        id: document.id,
+        filename: document.filename,
+        contentType: document.contentType,
+        sizeBytes: document.sizeBytes,
+        status: document.status,
+        proposal: document.proposal,
+        failureReason: document.failureReason,
+        createdAt: document.createdAt,
+      },
+    });
+  }
+
+  const contentMatch = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/content$/);
+  if (contentMatch) {
+    if (!isAuthed) return send(res, 401, {});
+    const document = Object.values(DOCUMENTS).find((d) => d.id === contentMatch[1]);
+    if (!document) return send(res, 404, { detail: "Document not found" });
+    res.writeHead(200, {
+      "content-type": document.contentType,
+      "content-disposition": `attachment; filename="${document.filename}"`,
+      "content-length": document.bytes.byteLength,
+    });
+    return res.end(document.bytes);
   }
 
   send(res, 404, { message: "not stubbed in e2e mock-api" });
