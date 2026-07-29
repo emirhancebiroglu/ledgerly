@@ -2,6 +2,7 @@ package com.ledgerly.api.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -61,6 +62,70 @@ class AuthEndpointsIT extends AbstractPostgresIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json(new LoginRequest(email, "wrong-password"))))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void authenticatedMeReturnsOnlyTheTokenOwnersIdentityAndOrganization() throws Exception {
+    String email = "profile-" + System.nanoTime() + "@example.com";
+    AuthResponse response = registerAndExpectCreated(email, "correct-horse-battery-staple");
+
+    mockMvc
+        .perform(get("/api/v1/me").header("Authorization", "Bearer " + response.accessToken()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.fullName").value("Ledgerly Test User"))
+        .andExpect(jsonPath("$.email").value(email))
+        .andExpect(jsonPath("$.organizationName").value(orgName(email)));
+
+    mockMvc.perform(get("/api/v1/me")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void registrationRejectsMissingNameAndShortPassword() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/v1/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"company\":\"Example\",\"email\":\"invalid@example.com\",\"password\":\"too-short\"}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void loginQuotaAllowsSuccessBeforeItRejectsFurtherAttempts() throws Exception {
+    String email = "quota-" + System.nanoTime() + "@example.com";
+    registerAndExpectCreated(email, "correct-horse-battery-staple");
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              post("/api/v1/auth/login")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(json(new LoginRequest(email, "wrong-password"))))
+          .andExpect(status().isUnauthorized());
+    }
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(new LoginRequest(email, "correct-horse-battery-staple"))))
+        .andExpect(status().isOk());
+
+    for (int attempt = 0; attempt < 2; attempt++) {
+      mockMvc
+          .perform(
+              post("/api/v1/auth/login")
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content(json(new LoginRequest(email, "wrong-password"))))
+          .andExpect(status().isUnauthorized());
+    }
+
+    mockMvc
+        .perform(
+            post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json(new LoginRequest(email, "wrong-password"))))
+        .andExpect(status().isTooManyRequests())
+        .andExpect(result -> assertThat(result.getResponse().getHeader("Retry-After")).isNotBlank());
   }
 
   @Test
@@ -148,7 +213,7 @@ class AuthEndpointsIT extends AbstractPostgresIT {
                     .content(
                         json(
                             new RegisterRequest(
-                                "org-" + System.nanoTime(), email, password))))
+                                "Ledgerly Test User", orgName(email), email, password))))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.accessToken").exists())
             .andExpect(jsonPath("$.refreshToken").exists())
@@ -158,6 +223,10 @@ class AuthEndpointsIT extends AbstractPostgresIT {
 
   private String json(Object value) throws Exception {
     return objectMapper.writeValueAsString(value);
+  }
+
+  private String orgName(String email) {
+    return "org-" + email.substring(0, email.indexOf('@'));
   }
 
   private SecretKey testKey() {
