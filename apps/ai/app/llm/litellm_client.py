@@ -36,11 +36,13 @@ class LiteLlmClient(LlmClient):
         timeout_seconds: float,
         api_base: str | None = None,
         supports_native_pdf: bool = True,
+        thinking_enabled: bool | None = None,
     ) -> None:
         self._model = model
         self._api_key = api_key
         self._timeout_seconds = timeout_seconds
         self._api_base = api_base
+        self._thinking_enabled = thinking_enabled
         # Only Gemini's native API accepts a PDF as a `file` content block through LiteLLM — every
         # OpenAI-compatible gateway tried (OpenCode Go, every OpenRouter free vision model) rejects
         # it outright. Providers other than Gemini get pages rendered to PNG instead.
@@ -85,14 +87,22 @@ class LiteLlmClient(LlmClient):
         return self._call([{"role": "user", "content": content}])
 
     def _call(self, messages: list[dict]) -> str:
+        completion_kwargs: dict = {
+            "model": self._model,
+            "messages": messages,
+            "api_key": self._api_key,
+            "timeout": self._timeout_seconds,
+            "api_base": self._api_base,
+        }
+        if self._thinking_enabled is not None:
+            # LiteLLM's Anthropic adapter does not advertise Qwen's compatible `thinking` field.
+            # This explicit allow-list forwards Qwen's documented toggle through OpenCode Go.
+            completion_kwargs["thinking"] = {
+                "type": "enabled" if self._thinking_enabled else "disabled"
+            }
+            completion_kwargs["allowed_openai_params"] = ["thinking"]
         try:
-            response = litellm.completion(
-                model=self._model,
-                messages=messages,
-                api_key=self._api_key,
-                timeout=self._timeout_seconds,
-                api_base=self._api_base,
-            )
+            response = litellm.completion(**completion_kwargs)
         except _RETRYABLE_EXCEPTIONS as error:
             raise RetryableLlmError(str(error)) from error
         except openai.APIStatusError as error:

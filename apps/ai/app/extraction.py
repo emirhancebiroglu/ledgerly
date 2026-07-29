@@ -51,10 +51,62 @@ label like \\"Sipariş Tarihi\\" or \\"Son Ödeme Tarihi\\" is more prominent on
 "lines" may be an empty array if the document has no itemisation. Every line amount_minor is the \
 pre-tax/net line total: DO NOT include tax in it. When lines are present, their sum plus tax_minor \
 MUST equal total_minor exactly. If you cannot derive reliable pre-tax line values, return an empty \
-lines array rather than guessing. Every amount is an integer in minor units — never a float \
+lines array rather than guessing. Before returning lines, calculate that equality; if it fails \
+because the document has tax-inclusive amounts or multiple document-level taxes, return an empty \
+lines array. Every amount is an integer in minor units — never a float \
 anywhere. A refund or credit note has a negative total_minor and tax_minor, with every line \
 amount_minor also negative.\
 """
+
+_UNRECONCILED_LINE_WARNING = (
+    "Line items were omitted because they did not reconcile with the invoice-level totals."
+)
+
+
+def _is_integer(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _normalize_unreconciled_lines(extracted: dict) -> dict:
+    """Drop advisory line items that cannot safely support the invoice totals.
+
+    The ledger posts the verified document total, not individual source lines. Some invoices expose
+    tax-inclusive service amounts alongside a document-level tax breakdown, so asking the model to
+    allocate pre-tax values can produce internally inconsistent lines despite correct header data.
+    An empty list is an explicit schema-supported representation for that case; fabricating a
+    balancing allocation would be less trustworthy than preserving the invoice-level facts.
+    """
+    lines = extracted.get("lines")
+    if not isinstance(lines, list) or not lines:
+        return extracted
+
+    total_minor = extracted.get("total_minor")
+    tax_minor = extracted.get("tax_minor")
+    if not _is_integer(total_minor) or not _is_integer(tax_minor):
+        return extracted
+
+    line_amounts: list[int] = []
+    for line in lines:
+        if not isinstance(line, dict) or not _is_integer(line.get("amount_minor")):
+            return extracted
+        line_amounts.append(line["amount_minor"])
+
+    is_refund = total_minor < 0
+    signs_match = all(amount <= 0 if is_refund else amount >= 0 for amount in line_amounts)
+    reconciles = sum(line_amounts) + tax_minor == total_minor
+    if signs_match and reconciles:
+        return extracted
+
+    warnings = extracted.get("warnings")
+    if warnings is not None and (
+        not isinstance(warnings, list) or not all(isinstance(warning, str) for warning in warnings)
+    ):
+        return extracted
+
+    normalized = {**extracted, "lines": []}
+    normalized["warnings"] = [*(warnings or []), _UNRECONCILED_LINE_WARNING]
+    logger.info("Omitted unreconciled advisory line items from extraction proposal")
+    return normalized
 
 
 class ExtractionFailedError(RuntimeError):
@@ -82,7 +134,7 @@ class ExtractionService:
         except GraphExtractionFailedError as error:
             raise ExtractionFailedError(str(error)) from error
 
-        extracted = result["extracted"]
+        extracted = _normalize_unreconciled_lines(result["extracted"])
         if result["self_checked_fields"]:
             logger.info(
                 "Self-check ran for document %s on fields: %s",

@@ -10,7 +10,12 @@ from jsonschema import Draft202012Validator
 
 from app.config import settings
 from app.contracts import EXTRACT_REQUEST_SCHEMA, EXTRACTION_PROPOSAL_SCHEMA, contracts_directory, load_schema
-from app.extraction import EXTRACTION_INSTRUCTION, ExtractionFailedError, ExtractionService
+from app.extraction import (
+    EXTRACTION_INSTRUCTION,
+    _UNRECONCILED_LINE_WARNING,
+    ExtractionFailedError,
+    ExtractionService,
+)
 from app.llm import FakeLlmClient
 from app.llm.client import LlmClient, LlmError, VisionPrompt
 from app.main import app
@@ -80,6 +85,7 @@ def test_every_monetary_value_in_the_response_is_an_integer():
 def test_extraction_instruction_defines_net_line_amounts_and_the_total_invariant():
     assert "pre-tax/net line total" in EXTRACTION_INSTRUCTION
     assert "sum plus tax_minor MUST equal total_minor exactly" in EXTRACTION_INSTRUCTION
+    assert "calculate that equality" in EXTRACTION_INSTRUCTION
 
 
 def test_identical_bytes_produce_an_identical_proposal():
@@ -275,3 +281,59 @@ def test_the_model_cannot_choose_the_document_id_or_the_model_name():
 
     assert proposal["document_id"] == real_document_id
     assert proposal["model"] == "honest-v1"
+
+
+def test_unreconciled_lines_are_omitted_without_losing_valid_invoice_level_facts():
+    class UnreconciledLinesLlmClient(LlmClient):
+        @property
+        def model_name(self) -> str:
+            return "test-v1"
+
+        def complete(self, prompt: str) -> str:
+            return "{}"
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            return (
+                '{"vendor":"TurkNet","currency":"TRY","total_minor":108377,'
+                '"tax_minor":20651,"document_date":"2025-01-27",'
+                '"lines":[{"description":"Service","amount_minor":41658},'
+                '{"description":"Installation","amount_minor":50000},'
+                '{"description":"Discount","amount_minor":-1386}],'
+                '"confidence":{"currency":1,"total_minor":1,"tax_minor":1,'
+                '"document_date":1}}'
+            )
+
+    proposal = ExtractionService(UnreconciledLinesLlmClient()).extract(
+        str(uuid.uuid4()), PDF_BYTES, "application/pdf"
+    )
+
+    assert proposal["total_minor"] == 108377
+    assert proposal["tax_minor"] == 20651
+    assert proposal["lines"] == []
+    assert proposal["warnings"] == [_UNRECONCILED_LINE_WARNING]
+
+
+def test_reconciled_lines_are_preserved():
+    class ReconciledLinesLlmClient(LlmClient):
+        @property
+        def model_name(self) -> str:
+            return "test-v1"
+
+        def complete(self, prompt: str) -> str:
+            return "{}"
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            return (
+                '{"vendor":"V","currency":"EUR","total_minor":121,'
+                '"tax_minor":21,"document_date":"2026-07-14",'
+                '"lines":[{"description":"Service","amount_minor":100}],'
+                '"confidence":{"currency":1,"total_minor":1,"tax_minor":1,'
+                '"document_date":1}}'
+            )
+
+    proposal = ExtractionService(ReconciledLinesLlmClient()).extract(
+        str(uuid.uuid4()), PDF_BYTES, "application/pdf"
+    )
+
+    assert proposal["lines"] == [{"description": "Service", "amount_minor": 100}]
+    assert "warnings" not in proposal

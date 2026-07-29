@@ -199,6 +199,27 @@ def test_the_configured_timeout_and_api_key_are_forwarded_to_litellm(monkeypatch
     assert captured["model"] == "gemini/gemini-3.6-flash"
 
 
+def test_explicit_thinking_setting_is_forwarded_through_litellm(monkeypatch):
+    captured = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return make_response("ok")
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+
+    client = LiteLlmClient(
+        model="anthropic/qwen3.7-plus",
+        api_key="k",
+        timeout_seconds=5,
+        thinking_enabled=False,
+    )
+    client.complete("classify this invoice")
+
+    assert captured["thinking"] == {"type": "disabled"}
+    assert captured["allowed_openai_params"] == ["thinking"]
+
+
 def test_a_custom_api_base_is_forwarded_to_litellm(monkeypatch):
     captured = {}
 
