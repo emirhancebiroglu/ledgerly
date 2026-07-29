@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 
 from app.config import settings
 from app.contracts import EXTRACT_REQUEST_SCHEMA, EXTRACTION_PROPOSAL_SCHEMA, contracts_directory, load_schema
-from app.extraction import ExtractionFailedError, ExtractionService
+from app.extraction import EXTRACTION_INSTRUCTION, ExtractionFailedError, ExtractionService
 from app.llm import FakeLlmClient
 from app.llm.client import LlmClient, LlmError, VisionPrompt
 from app.main import app
@@ -75,6 +75,11 @@ def test_every_monetary_value_in_the_response_is_an_integer():
     assert isinstance(body["tax_minor"], int)
     for line in body["lines"]:
         assert isinstance(line["amount_minor"], int)
+
+
+def test_extraction_instruction_defines_net_line_amounts_and_the_total_invariant():
+    assert "pre-tax/net line total" in EXTRACTION_INSTRUCTION
+    assert "sum plus tax_minor MUST equal total_minor exactly" in EXTRACTION_INSTRUCTION
 
 
 def test_identical_bytes_produce_an_identical_proposal():

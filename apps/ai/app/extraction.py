@@ -37,7 +37,7 @@ or \\"Invoice Date\\". NEVER the due date, order date, dispatch date or upload d
 label like \\"Sipariş Tarihi\\" or \\"Son Ödeme Tarihi\\" is more prominent on the page.>",
   "lines": [
     {"description": "<line text>", "quantity": <integer, thousandths — so 1.5 units is 1500>, \
-"amount_minor": <integer, minor units>}
+"amount_minor": <integer, pre-tax/net minor units>}
   ],
   "confidence": {
     "vendor": <float 0-1>,
@@ -48,9 +48,12 @@ label like \\"Sipariş Tarihi\\" or \\"Son Ödeme Tarihi\\" is more prominent on
   }
 }
 
-"lines" may be an empty array if the document has no itemisation. Every amount is an integer in \
-minor units — never a float anywhere. A refund or credit note has a negative total_minor and \
-tax_minor, with every line amount_minor also negative.\
+"lines" may be an empty array if the document has no itemisation. Every line amount_minor is the \
+pre-tax/net line total: DO NOT include tax in it. When lines are present, their sum plus tax_minor \
+MUST equal total_minor exactly. If you cannot derive reliable pre-tax line values, return an empty \
+lines array rather than guessing. Every amount is an integer in minor units — never a float \
+anywhere. A refund or credit note has a negative total_minor and tax_minor, with every line \
+amount_minor also negative.\
 """
 
 

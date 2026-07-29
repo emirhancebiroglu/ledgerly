@@ -119,11 +119,12 @@ public class Document {
   }
 
   /**
-   * Records a proposal that failed validation and moves to {@code NEEDS_REVIEW}. The proposal is
-   * kept deliberately: a human reviewing the queue needs to see what the agent actually claimed.
+   * Records a proposal that failed validation and moves to {@code EXTRACTION_NEEDS_REVIEW}. The
+   * proposal is kept deliberately: a human reviewing the queue needs to see what the agent
+   * actually claimed.
    */
-  public void markNeedsReview(String proposalJson, String reason) {
-    transitionTo(DocumentStatus.NEEDS_REVIEW);
+  public void markExtractionNeedsReview(String proposalJson, String reason) {
+    transitionTo(DocumentStatus.EXTRACTION_NEEDS_REVIEW);
     this.proposal = proposalJson;
     this.failureReason = reason;
   }

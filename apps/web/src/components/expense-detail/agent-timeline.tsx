@@ -10,12 +10,18 @@ const labels: Record<DocumentActivityStage, string> = {
   DRAFTING_LEDGER: "Drafting ledger entries",
   POSTED: "Posted to ledger",
   NEEDS_REVIEW: "Needs review",
+  EXTRACTION_NEEDS_REVIEW: "Extraction needs review",
   FAILED: "Processing failed",
   CATEGORIZATION_FAILED: "Categorization could not be completed",
 };
 
 function isFlagged(stage: DocumentActivityStage) {
-  return stage === "NEEDS_REVIEW" || stage === "FAILED" || stage === "CATEGORIZATION_FAILED";
+  return (
+    stage === "NEEDS_REVIEW" ||
+    stage === "EXTRACTION_NEEDS_REVIEW" ||
+    stage === "FAILED" ||
+    stage === "CATEGORIZATION_FAILED"
+  );
 }
 
 export function AgentTimeline({ activity }: { activity: DocumentActivity[] }) {

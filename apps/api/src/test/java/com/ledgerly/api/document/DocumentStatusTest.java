@@ -28,13 +28,13 @@ class DocumentStatusTest {
   }
 
   @Test
-  void needsReviewKeepsTheProposalAndTheReason() {
+  void extractionNeedsReviewKeepsTheProposalAndTheReason() {
     Document document = newDocument();
     document.transitionTo(DocumentStatus.PROCESSING);
 
-    document.markNeedsReview("{\"currency\":\"XXX\"}", "Unknown currency");
+    document.markExtractionNeedsReview("{\"currency\":\"XXX\"}", "Unknown currency");
 
-    assertThat(document.getStatus()).isEqualTo(DocumentStatus.NEEDS_REVIEW);
+    assertThat(document.getStatus()).isEqualTo(DocumentStatus.EXTRACTION_NEEDS_REVIEW);
     assertThat(document.getProposal()).isEqualTo("{\"currency\":\"XXX\"}");
     assertThat(document.getFailureReason()).isEqualTo("Unknown currency");
   }
@@ -75,7 +75,7 @@ class DocumentStatusTest {
   @Test
   void terminalStatusesAreTerminalAndTheOthersAreNot() {
     assertThat(DocumentStatus.EXTRACTED.isTerminal()).isTrue();
-    assertThat(DocumentStatus.NEEDS_REVIEW.isTerminal()).isTrue();
+    assertThat(DocumentStatus.EXTRACTION_NEEDS_REVIEW.isTerminal()).isTrue();
     assertThat(DocumentStatus.FAILED.isTerminal()).isTrue();
     assertThat(DocumentStatus.PENDING.isTerminal()).isFalse();
     assertThat(DocumentStatus.PROCESSING.isTerminal()).isFalse();
