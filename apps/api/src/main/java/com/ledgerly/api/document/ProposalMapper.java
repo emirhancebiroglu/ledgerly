@@ -45,6 +45,13 @@ public class ProposalMapper {
             .withCoercionConfig(
                 LogicalType.Integer,
                 config -> config.setCoercion(CoercionInputShape.Float, CoercionAction.Fail))
+            .withCoercionConfig(
+                LogicalType.Textual,
+                config -> {
+                  config.setCoercion(CoercionInputShape.Integer, CoercionAction.Fail);
+                  config.setCoercion(CoercionInputShape.Float, CoercionAction.Fail);
+                  config.setCoercion(CoercionInputShape.Boolean, CoercionAction.Fail);
+                })
             .build();
   }
 

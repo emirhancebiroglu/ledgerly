@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ledgerly.api.document.DocumentResponse;
 import com.ledgerly.api.ledger.LedgerEntryView;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,10 +30,16 @@ public record ExpenseDetailResponse(
     ExpenseStatus status,
     Instant createdAt,
     List<LedgerEntryView> ledgerEntries,
-    DocumentResponse document) {
+    DocumentResponse document,
+    String invoiceNumber,
+    LocalDate documentDate,
+    String taxMinor) {
 
   public static ExpenseDetailResponse from(
-      Expense expense, List<LedgerEntryView> ledgerEntries, DocumentResponse document) {
+      Expense expense,
+      List<LedgerEntryView> ledgerEntries,
+      DocumentResponse document,
+      ExtractedDocumentFields fields) {
     return new ExpenseDetailResponse(
         expense.getId(),
         expense.getDocumentId(),
@@ -46,6 +53,17 @@ public record ExpenseDetailResponse(
         expense.getStatus(),
         expense.getCreatedAt(),
         ledgerEntries,
-        document);
+        document,
+        fields.invoiceNumber(),
+        fields.documentDate(),
+        fields.taxMinor());
+  }
+
+  /** Read-only fields from the validated extraction proposal; never a second ledger write model. */
+  public record ExtractedDocumentFields(
+      String invoiceNumber, LocalDate documentDate, String taxMinor) {
+    public static ExtractedDocumentFields unavailable() {
+      return new ExtractedDocumentFields(null, null, null);
+    }
   }
 }

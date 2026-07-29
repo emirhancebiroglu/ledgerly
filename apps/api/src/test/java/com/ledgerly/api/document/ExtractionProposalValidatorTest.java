@@ -280,7 +280,8 @@ class ExtractionProposalValidatorTest {
           lines,
           Map.of("currency", 0.99, "total_minor", 0.95),
           "fake-llm-v1",
-          List.of());
+          List.of(),
+          null);
     }
   }
 

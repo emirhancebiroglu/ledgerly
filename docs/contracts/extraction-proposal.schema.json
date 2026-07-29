@@ -26,6 +26,11 @@
       "type": ["string", "null"],
       "maxLength": 512
     },
+    "invoice_number": {
+      "description": "Invoice or receipt number as printed on the document. Absent when it could not be read or does not exist.",
+      "type": ["string", "null"],
+      "maxLength": 128
+    },
     "currency": {
       "description": "ISO 4217 alphabetic code. `api` rejects any code outside its own allowed set.",
       "type": "string",
