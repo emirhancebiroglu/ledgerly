@@ -4,7 +4,7 @@ async function login(page: Page): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Work email").fill("owner@example.com");
   await page.getByLabel("Password", { exact: true }).fill("password123");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
@@ -60,7 +60,7 @@ test.describe("expense detail", () => {
     await page.goto("/expenses/exp-3");
 
     await expect(page.getByText(/Not posted yet/)).toBeVisible();
-    await expect(page.getByText("Needs review")).toBeVisible();
+    await expect(page.getByText("Needs review", { exact: true }).first()).toBeVisible();
   });
 
   test("the timeline marks the flagged step distinctly by text, not color alone", async ({
@@ -70,7 +70,8 @@ test.describe("expense detail", () => {
     await login(page);
     await page.goto("/expenses/exp-3");
 
-    await expect(page.getByText("Flagged for review")).toBeVisible();
+    await expect(page.getByText("Needs review", { exact: true }).last()).toBeVisible();
+    await expect(page.getByText("Flagged", { exact: true })).toBeVisible();
   });
 
   test("Back to expenses returns to the list", async ({ page }) => {

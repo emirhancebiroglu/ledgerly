@@ -4,7 +4,7 @@ async function login(page: Page): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Work email").fill("owner@example.com");
   await page.getByLabel("Password", { exact: true }).fill("password123");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
@@ -40,7 +40,7 @@ test.describe("budgets", () => {
     await page.getByRole("button", { name: "New budget" }).click();
     await page.getByLabel("Category").selectOption("cat-3");
     await page.getByLabel("Month", { exact: true }).fill("2026-08");
-    await page.getByLabel("Monthly limit (minor units)").fill("250000");
+    await page.getByLabel("Monthly limit").fill("2500.00");
     await page.getByLabel("Currency").fill("EUR");
     await page.getByRole("button", { name: "Save budget" }).click();
     const created = page.getByTestId("budget-card").filter({ hasText: "Office supplies2026-08" });
@@ -49,7 +49,7 @@ test.describe("budgets", () => {
     await page.getByRole("button", { name: "New budget" }).click();
     await page.getByLabel("Category").selectOption("cat-3");
     await page.getByLabel("Month", { exact: true }).fill("2026-08");
-    await page.getByLabel("Monthly limit (minor units)").fill("250000");
+    await page.getByLabel("Monthly limit").fill("2500.00");
     await page.getByRole("button", { name: "Save budget" }).click();
     await expect(page.getByText("A budget already exists for this category, period and currency")).toBeVisible();
     await expect(created).toBeVisible();
