@@ -27,7 +27,8 @@ public record ExtractionProposal(
     List<Line> lines,
     Map<String, Double> confidence,
     String model,
-    List<String> warnings) {
+    List<String> warnings,
+    @JsonProperty("invoice_number") String invoiceNumber) {
 
   /** Sum of the line amounts, in minor units. */
   public long lineTotalMinor() {

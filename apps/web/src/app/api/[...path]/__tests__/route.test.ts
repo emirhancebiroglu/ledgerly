@@ -198,7 +198,7 @@ describe("GET/POST /api/[...path]", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("preserves SSE-relevant response headers for the document events stream", async () => {
+  it("forwards the SSE replay cursor and preserves event-stream response headers", async () => {
     sessionMocks.getAccessToken.mockResolvedValue("token-1");
     const fetchMock = vi.fn().mockResolvedValue(
       new Response("data: hello\n\n", {
@@ -213,14 +213,16 @@ describe("GET/POST /api/[...path]", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { GET } = await import("@/app/api/[...path]/route");
-    const request = new NextRequest(
-      new URL("http://localhost:3000/api/documents/1/events"),
-    );
+    const request = new NextRequest(new URL("http://localhost:3000/api/documents/1/events"), {
+      headers: { "last-event-id": "42" },
+    });
 
     const response = await GET(request, paramsFor(["documents", "1", "events"]));
 
     expect(response.headers.get("content-type")).toBe("text/event-stream");
     expect(response.headers.get("cache-control")).toBe("no-cache");
     expect(response.headers.get("connection")).toBe("keep-alive");
+    const [, upstreamInit] = fetchMock.mock.calls[0];
+    expect(new Headers(upstreamInit.headers).get("last-event-id")).toBe("42");
   });
 });

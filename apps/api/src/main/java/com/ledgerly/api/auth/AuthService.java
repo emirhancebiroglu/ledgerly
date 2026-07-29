@@ -17,32 +17,37 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
   private final JwtService jwtService;
   private final RefreshTokenService refreshTokenService;
+  private final AuthRateLimiter authRateLimiter;
 
   public AuthService(
       AppUserRepository appUserRepository,
       OrganizationRepository organizationRepository,
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
-      RefreshTokenService refreshTokenService) {
+      RefreshTokenService refreshTokenService,
+      AuthRateLimiter authRateLimiter) {
     this.appUserRepository = appUserRepository;
     this.organizationRepository = organizationRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
     this.refreshTokenService = refreshTokenService;
+    this.authRateLimiter = authRateLimiter;
   }
 
   @Transactional
   public AuthResponse register(RegisterRequest request) {
+    authRateLimiter.checkRegistration(request.email());
     Organization organization = organizationRepository.save(
-        new Organization(request.organizationName(), "EUR"));
+        new Organization(request.company(), "EUR"));
     AppUser user = appUserRepository.save(
         new AppUser(
-            organization.getId(), request.email(), passwordEncoder.encode(request.password())));
+            organization.getId(), request.fullName(), request.email(), passwordEncoder.encode(request.password())));
     return issueTokens(user);
   }
 
   @Transactional
   public AuthResponse login(LoginRequest request) {
+    authRateLimiter.checkLogin(request.email());
     AppUser user = appUserRepository.findByEmail(request.email()).orElse(null);
     String hashToCheck = user != null ? user.getPasswordHash() : DUMMY_HASH;
     boolean matches = passwordEncoder.matches(request.password(), hashToCheck);

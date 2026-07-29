@@ -2,8 +2,13 @@ package com.ledgerly.api.expense;
 
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.document.Document;
+import com.ledgerly.api.document.DocumentActivityService;
+import com.ledgerly.api.document.DocumentActivityResponse;
 import com.ledgerly.api.document.DocumentRepository;
 import com.ledgerly.api.document.DocumentResponse;
+import com.ledgerly.api.document.ExtractionProposal;
+import com.ledgerly.api.document.MalformedProposalException;
+import com.ledgerly.api.document.ProposalMapper;
 import com.ledgerly.api.expense.ExpenseListQuery.ExpenseSortField;
 import com.ledgerly.api.ledger.LedgerEntryView;
 import com.ledgerly.api.ledger.LedgerTransactionRepository;
@@ -25,14 +30,20 @@ public class ExpenseService {
   private final ExpenseRepository expenseRepository;
   private final DocumentRepository documentRepository;
   private final LedgerTransactionRepository ledgerTransactionRepository;
+  private final ProposalMapper proposalMapper;
+  private final DocumentActivityService documentActivityService;
 
   public ExpenseService(
       ExpenseRepository expenseRepository,
       DocumentRepository documentRepository,
-      LedgerTransactionRepository ledgerTransactionRepository) {
+      LedgerTransactionRepository ledgerTransactionRepository,
+      ProposalMapper proposalMapper,
+      DocumentActivityService documentActivityService) {
     this.expenseRepository = expenseRepository;
     this.documentRepository = documentRepository;
     this.ledgerTransactionRepository = ledgerTransactionRepository;
+    this.proposalMapper = proposalMapper;
+    this.documentActivityService = documentActivityService;
   }
 
   @Transactional(readOnly = true)
@@ -63,7 +74,29 @@ public class ExpenseService {
             .orElseThrow(
                 () -> new NoSuchElementException("Document not found: " + expense.getDocumentId()));
 
-    return ExpenseDetailResponse.from(expense, ledgerEntries, DocumentResponse.from(document));
+    return ExpenseDetailResponse.from(
+        expense,
+        ledgerEntries,
+        DocumentResponse.from(document),
+        extractedFields(document),
+        documentActivityService.replay(document.getId(), principal.organizationId(), 0L));
+  }
+
+  private ExpenseDetailResponse.ExtractedDocumentFields extractedFields(Document document) {
+    if (document.getProposal() == null) {
+      return ExpenseDetailResponse.ExtractedDocumentFields.unavailable();
+    }
+    try {
+      ExtractionProposal proposal = proposalMapper.parse(document.getProposal());
+      return new ExpenseDetailResponse.ExtractedDocumentFields(
+          proposal.invoiceNumber(),
+          proposal.documentDate(),
+          Long.toString(proposal.taxMinor()));
+    } catch (MalformedProposalException ignored) {
+      // Legacy rows can predate a persisted, schema-valid proposal. Their core expense data is
+      // still usable; exposing fabricated extracted fields would be less honest than leaving them empty.
+      return ExpenseDetailResponse.ExtractedDocumentFields.unavailable();
+    }
   }
 
   @Transactional(readOnly = true)

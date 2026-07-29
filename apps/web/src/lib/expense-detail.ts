@@ -36,6 +36,27 @@ export interface ExpenseDetail {
   createdAt: string;
   ledgerEntries: LedgerEntryView[];
   document: DocumentMeta;
+  invoiceNumber: string | null;
+  documentDate: string | null;
+  taxMinor: string | null;
+  activity: DocumentActivity[];
+}
+
+export type DocumentActivityStage =
+  | "UPLOADED"
+  | "EXTRACTING"
+  | "CATEGORIZING"
+  | "DRAFTING_LEDGER"
+  | "POSTED"
+  | "NEEDS_REVIEW"
+  | "FAILED"
+  | "CATEGORIZATION_FAILED";
+
+export interface DocumentActivity {
+  id: number;
+  stage: DocumentActivityStage;
+  detail: string | null;
+  createdAt: string;
 }
 
 export type GetExpenseDetailResult =

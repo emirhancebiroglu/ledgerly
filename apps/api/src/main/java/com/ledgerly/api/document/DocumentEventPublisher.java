@@ -32,7 +32,7 @@ public class DocumentEventPublisher {
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onDocumentStatusChanged(DocumentStatusChangedEvent event) {
-    String channel = DocumentEventChannels.channelFor(event.documentId());
+    String channel = DocumentEventChannels.statusChannelFor(event.documentId());
     try {
       redisTemplate.convertAndSend(channel, objectMapper.writeValueAsString(event));
     } catch (Exception e) {

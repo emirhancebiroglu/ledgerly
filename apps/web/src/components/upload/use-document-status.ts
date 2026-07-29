@@ -1,23 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import type { DocumentStatus } from "@/lib/document-upload";
+import type { DocumentActivity, DocumentActivityStage } from "@/lib/expense-detail";
 
 export type ConnectionState = "connecting" | "open" | "stalled";
 
 export interface DocumentStatusState {
-  status: DocumentStatus | null;
+  activity: DocumentActivity[];
   failureReason: string | null;
   connection: ConnectionState;
 }
 
-interface StatusEventPayload {
-  documentId: string;
-  organizationId: string;
-  status: DocumentStatus;
-  detail: string | null;
-}
-
 const RECONNECT_DELAY_MS = 3000;
-const TERMINAL_STATUSES: DocumentStatus[] = ["EXTRACTED", "NEEDS_REVIEW", "FAILED"];
+const TERMINAL_STAGES: DocumentActivityStage[] = ["POSTED", "NEEDS_REVIEW", "FAILED", "CATEGORIZATION_FAILED"];
 
 /**
  * Subscribes to `GET /api/v1/documents/{id}/events` (M7a T6) through the BFF proxy —
@@ -29,7 +22,7 @@ const TERMINAL_STATUSES: DocumentStatus[] = ["EXTRACTED", "NEEDS_REVIEW", "FAILE
  */
 export function useDocumentStatus(documentId: string | null): DocumentStatusState {
   const [state, setState] = useState<DocumentStatusState>({
-    status: null,
+    activity: [],
     failureReason: null,
     connection: "connecting",
   });
@@ -43,19 +36,25 @@ export function useDocumentStatus(documentId: string | null): DocumentStatusStat
 
     let cancelled = false;
     let source: EventSource | undefined;
-    let lastStatus: DocumentStatus | null = null;
+    let lastStage: DocumentActivityStage | null = null;
 
     function connect() {
       if (cancelled) return;
       setState((s) => ({ ...s, connection: "connecting" }));
       source = new EventSource(`/api/documents/${documentId}/events`);
 
-      source.addEventListener("status", (event) => {
+      source.addEventListener("activity", (event) => {
         if (cancelled) return;
-        const payload = JSON.parse((event as MessageEvent).data) as StatusEventPayload;
-        lastStatus = payload.status;
-        setState({ status: payload.status, failureReason: payload.detail, connection: "open" });
-        if (TERMINAL_STATUSES.includes(payload.status)) {
+        const payload = JSON.parse((event as MessageEvent).data) as DocumentActivity;
+        lastStage = payload.stage;
+        setState((current) => ({
+          activity: current.activity.some((item) => item.id === payload.id)
+            ? current.activity
+            : [...current.activity, payload].sort((a, b) => a.id - b.id),
+          failureReason: TERMINAL_STAGES.includes(payload.stage) ? payload.detail : current.failureReason,
+          connection: "open",
+        }));
+        if (TERMINAL_STAGES.includes(payload.stage)) {
           source?.close();
         }
       });
@@ -71,7 +70,7 @@ export function useDocumentStatus(documentId: string | null): DocumentStatusStat
         source?.close();
         // A disconnect after a terminal status already arrived is the stream's own normal
         // close, not a stall — nothing further is coming either way, so no reconnect.
-        if (lastStatus !== null && TERMINAL_STATUSES.includes(lastStatus)) {
+        if (lastStage !== null && TERMINAL_STAGES.includes(lastStage)) {
           return;
         }
         setState((s) => ({ ...s, connection: "stalled" }));

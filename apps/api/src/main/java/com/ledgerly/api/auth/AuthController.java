@@ -2,6 +2,8 @@ package com.ledgerly.api.auth;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -11,9 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private final AuthService authService;
+  private final AppUserService appUserService;
 
-  public AuthController(AuthService authService) {
+  public AuthController(AuthService authService, AppUserService appUserService) {
     this.authService = authService;
+    this.appUserService = appUserService;
   }
 
   @PostMapping("/api/v1/auth/register")
@@ -30,5 +34,10 @@ public class AuthController {
   @PostMapping("/api/v1/auth/refresh")
   public AuthResponse refresh(@Valid @RequestBody RefreshRequest request) {
     return authService.refresh(request);
+  }
+
+  @GetMapping("/api/v1/me")
+  public MeResponse me(@AuthenticationPrincipal AuthenticatedPrincipal principal) {
+    return appUserService.currentProfile(principal);
   }
 }

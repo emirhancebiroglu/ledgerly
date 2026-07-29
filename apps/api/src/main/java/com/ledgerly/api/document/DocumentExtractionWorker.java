@@ -36,6 +36,7 @@ public class DocumentExtractionWorker {
   private final ExtractionProposalValidator validator;
   private final DocumentStatusTransitions transitions;
   private final ExpensePostingService expensePostingService;
+  private final DocumentActivityService documentActivityService;
 
   public DocumentExtractionWorker(
       StorageClient storageClient,
@@ -43,13 +44,15 @@ public class DocumentExtractionWorker {
       ProposalMapper proposalMapper,
       ExtractionProposalValidator validator,
       DocumentStatusTransitions transitions,
-      ExpensePostingService expensePostingService) {
+      ExpensePostingService expensePostingService,
+      DocumentActivityService documentActivityService) {
     this.storageClient = storageClient;
     this.extractionClient = extractionClient;
     this.proposalMapper = proposalMapper;
     this.validator = validator;
     this.transitions = transitions;
     this.expensePostingService = expensePostingService;
+    this.documentActivityService = documentActivityService;
   }
 
   /**
@@ -126,6 +129,11 @@ public class DocumentExtractionWorker {
       expensePostingService.categorizeAndPost(organizationId, documentId, actor, proposal);
     } catch (RuntimeException e) {
       log.warn("Categorization failed documentId={} exceptionType={}", documentId, e.getClass().getSimpleName());
+      documentActivityService.record(
+          documentId,
+          organizationId,
+          DocumentActivityStage.CATEGORIZATION_FAILED,
+          "Categorization could not be completed");
     }
   }
 }

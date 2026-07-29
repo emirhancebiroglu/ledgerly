@@ -8,29 +8,26 @@ describe("UploadSteps", () => {
       <UploadSteps
         filename="receipt.pdf"
         sizeLabel="247 KB"
-        documentStatus={null}
-        failed={false}
+        activity={[]}
         connection="connecting"
       />,
     );
 
     expect(screen.getByRole("status", { name: "In progress" })).toBeInTheDocument();
-    expect(screen.getByText("Processing")).toBeInTheDocument();
+    expect(screen.getByText("Extracting document data")).toBeInTheDocument();
   });
 
-  it("marks Uploading done and Processing active once PENDING/PROCESSING arrives", () => {
+  it("marks observed activity done without inventing later stages", () => {
     render(
       <UploadSteps
         filename="receipt.pdf"
         sizeLabel="247 KB"
-        documentStatus="PROCESSING"
-        failed={false}
+        activity={[{ id: 1, stage: "UPLOADED", detail: null, createdAt: "2026-01-01T00:00:00Z" }, { id: 2, stage: "EXTRACTING", detail: null, createdAt: "2026-01-01T00:00:01Z" }]}
         connection="open"
       />,
     );
 
-    // Exactly one spinner (Processing) once uploading is done.
-    expect(screen.getAllByRole("status", { name: "In progress" })).toHaveLength(1);
+    expect(screen.getByText("Extracting document data")).toBeInTheDocument();
   });
 
   it("marks every step done on a terminal success status", () => {
@@ -38,13 +35,12 @@ describe("UploadSteps", () => {
       <UploadSteps
         filename="receipt.pdf"
         sizeLabel="247 KB"
-        documentStatus="EXTRACTED"
-        failed={false}
+        activity={[{ id: 1, stage: "UPLOADED", detail: null, createdAt: "2026-01-01T00:00:00Z" }, { id: 2, stage: "EXTRACTING", detail: null, createdAt: "2026-01-01T00:00:01Z" }, { id: 3, stage: "CATEGORIZING", detail: null, createdAt: "2026-01-01T00:00:02Z" }, { id: 4, stage: "DRAFTING_LEDGER", detail: null, createdAt: "2026-01-01T00:00:03Z" }, { id: 5, stage: "POSTED", detail: null, createdAt: "2026-01-01T00:00:04Z" }]}
         connection="open"
       />,
     );
 
-    expect(screen.getByText("Complete")).toBeInTheDocument();
+    expect(screen.getByText("Posted to ledger")).toBeInTheDocument();
     expect(container.querySelectorAll('[role="status"]')).toHaveLength(0);
   });
 
@@ -53,8 +49,7 @@ describe("UploadSteps", () => {
       <UploadSteps
         filename="receipt.pdf"
         sizeLabel="247 KB"
-        documentStatus="FAILED"
-        failed={true}
+        activity={[{ id: 1, stage: "UPLOADED", detail: null, createdAt: "2026-01-01T00:00:00Z" }, { id: 2, stage: "FAILED", detail: "Unreadable scan", createdAt: "2026-01-01T00:00:01Z" }]}
         connection="open"
       />,
     );
@@ -67,8 +62,7 @@ describe("UploadSteps", () => {
       <UploadSteps
         filename="receipt.pdf"
         sizeLabel="247 KB"
-        documentStatus="PROCESSING"
-        failed={false}
+        activity={[]}
         connection="stalled"
       />,
     );

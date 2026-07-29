@@ -5,9 +5,9 @@ const FIXTURES_DIR = path.join(process.cwd(), "e2e", "fixtures");
 
 async function login(page: Page): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("owner@example.com");
-  await page.getByLabel("Password").fill("password123");
-  await page.getByRole("button", { name: "Log in" }).click();
+  await page.getByLabel("Work email").fill("owner@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("password123");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
@@ -26,10 +26,10 @@ test.describe("upload", () => {
 
     await expect(page.getByText("receipt.pdf")).toBeVisible();
 
-    // Uploading -> done, Processing -> active, then Processing -> done, Complete -> done, in
-    // that order, driven entirely by the mock's real SSE events (300ms then 900ms later).
+    // Persisted activity advances the visible stages through the terminal ledger outcome,
+    // driven entirely by the mock's real SSE events.
     await expect(page.getByRole("status", { name: "In progress" })).toBeVisible();
-    await expect(page.getByText("Complete")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Posted to ledger", { exact: true })).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole("link", { name: /View in expenses/ })).toBeVisible();
   });
 
@@ -81,7 +81,7 @@ test.describe("upload", () => {
 
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(path.join(FIXTURES_DIR, "receipt.pdf"));
-    await expect(page.getByText("Complete")).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText("Posted to ledger", { exact: true })).toBeVisible({ timeout: 5000 });
 
     // After completion, no eventsource request should still be pending/open.
     const openConnections = await page.evaluate(

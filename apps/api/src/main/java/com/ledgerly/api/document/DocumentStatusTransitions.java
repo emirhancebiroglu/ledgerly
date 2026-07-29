@@ -27,6 +27,7 @@ public class DocumentStatusTransitions {
 
   private final DocumentRepository documentRepository;
   private final ApplicationEventPublisher eventPublisher;
+  private final DocumentActivityService documentActivityService;
   private final Clock clock;
   private final int maxAttempts;
   private final Duration retryInitialDelay;
@@ -35,6 +36,7 @@ public class DocumentStatusTransitions {
   public DocumentStatusTransitions(
       DocumentRepository documentRepository,
       ApplicationEventPublisher eventPublisher,
+      DocumentActivityService documentActivityService,
       Clock clock,
       @org.springframework.beans.factory.annotation.Value("${ledgerly.document.queue.max-attempts:5}")
           int maxAttempts,
@@ -44,6 +46,7 @@ public class DocumentStatusTransitions {
           long retryMaxSeconds) {
     this.documentRepository = documentRepository;
     this.eventPublisher = eventPublisher;
+    this.documentActivityService = documentActivityService;
     this.clock = clock;
     if (maxAttempts < 1 || retryInitialSeconds < 1 || retryMaxSeconds < retryInitialSeconds) {
       throw new IllegalArgumentException("Document queue retry configuration is invalid");
@@ -57,6 +60,7 @@ public class DocumentStatusTransitions {
   public void markProcessing(UUID documentId, UUID organizationId) {
     Document document = load(documentId, organizationId);
     document.transitionTo(DocumentStatus.PROCESSING);
+    activity(document, DocumentActivityStage.EXTRACTING, "Extracting document data");
     publish(document, null);
   }
 
@@ -78,6 +82,7 @@ public class DocumentStatusTransitions {
       // No ledger write happens on either branch at M4. When posting arrives at M6 it goes behind
       // this same condition, so a proposal that failed validation can never reach it.
       document.markNeedsReview(proposalJson, validation.summary());
+      activity(document, DocumentActivityStage.NEEDS_REVIEW, validation.summary());
       publish(document, validation.summary());
     }
     return document;
@@ -87,6 +92,7 @@ public class DocumentStatusTransitions {
   public Document recordFailure(UUID documentId, UUID organizationId, String reason) {
     Document document = load(documentId, organizationId);
     document.markFailed(reason);
+    activity(document, DocumentActivityStage.FAILED, reason);
     publish(document, reason);
     return document;
   }
@@ -101,6 +107,7 @@ public class DocumentStatusTransitions {
     Document document = load(documentId, organizationId);
     if (document.getExtractionAttempts() >= maxAttempts) {
       document.markFailed("Extraction service unavailable after " + maxAttempts + " attempts");
+      activity(document, DocumentActivityStage.FAILED, document.getFailureReason());
       publish(document, document.getFailureReason());
       return document;
     }
@@ -117,6 +124,8 @@ public class DocumentStatusTransitions {
   public boolean claimDueDocument(UUID documentId, UUID organizationId, Instant now) {
     boolean claimed = documentRepository.claimDueDocument(documentId, now, maxAttempts) > 0;
     if (claimed) {
+      Document document = load(documentId, organizationId);
+      activity(document, DocumentActivityStage.EXTRACTING, "Extracting document data");
       eventPublisher.publishEvent(
           new DocumentStatusChangedEvent(
               documentId, organizationId, DocumentStatus.PROCESSING, null));
@@ -173,6 +182,8 @@ public class DocumentStatusTransitions {
                 documentId, DocumentStatus.PROCESSING, cutoff, now, reason)
             > 0;
     if (reclaimed) {
+      documentActivityService.record(
+          documentId, organizationId, DocumentActivityStage.FAILED, reason);
       eventPublisher.publishEvent(
           new DocumentStatusChangedEvent(documentId, organizationId, DocumentStatus.FAILED, reason));
     }
@@ -183,6 +194,10 @@ public class DocumentStatusTransitions {
     eventPublisher.publishEvent(
         new DocumentStatusChangedEvent(
             document.getId(), document.getOrganizationId(), document.getStatus(), detail));
+  }
+
+  private void activity(Document document, DocumentActivityStage stage, String detail) {
+    documentActivityService.record(document.getId(), document.getOrganizationId(), stage, detail);
   }
 
   private Duration backoffForAttempt(int attempt) {

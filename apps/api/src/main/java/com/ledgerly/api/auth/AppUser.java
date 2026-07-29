@@ -23,6 +23,9 @@ public class AppUser {
   @Column(nullable = false)
   private String email;
 
+  @Column(name = "full_name", nullable = false)
+  private String fullName;
+
   @Column(name = "password_hash", nullable = false)
   private String passwordHash;
 
@@ -31,11 +34,17 @@ public class AppUser {
 
   protected AppUser() {}
 
-  public AppUser(UUID organizationId, String email, String passwordHash) {
+  public AppUser(UUID organizationId, String fullName, String email, String passwordHash) {
     this.organizationId = organizationId;
+    this.fullName = fullName;
     this.email = email;
     this.passwordHash = passwordHash;
     this.createdAt = Instant.now();
+  }
+
+  /** Preserves pre-M9 fixtures and programmatic callers while existing rows use the same fallback. */
+  public AppUser(UUID organizationId, String email, String passwordHash) {
+    this(organizationId, "Ledgerly user", email, passwordHash);
   }
 
   public UUID getId() {
@@ -48,6 +57,10 @@ public class AppUser {
 
   public String getEmail() {
     return email;
+  }
+
+  public String getFullName() {
+    return fullName;
   }
 
   public String getPasswordHash() {

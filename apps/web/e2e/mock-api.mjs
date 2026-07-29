@@ -426,9 +426,9 @@ function publishStatus(documentId, status, detail) {
     doc.status = status;
     doc.failureReason = detail ?? null;
   }
-  const payload = { documentId, organizationId: "org-1", status, detail: detail ?? null };
-  for (const res of eventSubscribers.get(documentId) ?? []) {
-    res.write(`event: status\ndata: ${JSON.stringify(payload)}\n\n`);
+  const stages = status === "PROCESSING" ? [[2, "EXTRACTING", "Extracting document data"]] : status === "EXTRACTED" ? [[3, "CATEGORIZING", "Categorizing expense"], [4, "DRAFTING_LEDGER", "Drafting ledger entries"], [5, "POSTED", "Expense posted to the ledger"]] : [[3, "FAILED", detail ?? "Processing failed"]];
+  for (const [id, stage, activityDetail] of stages) for (const res of eventSubscribers.get(documentId) ?? []) {
+    res.write(`id: ${id}\nevent: activity\ndata: ${JSON.stringify({ id, stage, detail: activityDetail, createdAt: new Date().toISOString() })}\n\n`);
   }
   if (["EXTRACTED", "NEEDS_REVIEW", "FAILED"].includes(status)) {
     for (const res of eventSubscribers.get(documentId) ?? []) {
@@ -442,8 +442,32 @@ function handleLogin(req, res) {
   send(res, 200, TOKENS);
 }
 
+function handleRegister(req, res) {
+  readBody(req)
+    .then((body) => {
+      const { fullName, company, email, password } = JSON.parse(body.toString("utf-8"));
+      if (!fullName || !company || !email || !password || password.length < 12) {
+        return send(res, 400, { message: "Complete every field and use a 12-character password." });
+      }
+      return send(res, 201, TOKENS);
+    })
+    .catch(() => send(res, 400, { message: "Invalid request body." }));
+}
+
 function handleRefresh(req, res) {
   send(res, 200, TOKENS);
+}
+
+function handleMe(req, res, isAuthed) {
+  if (!isAuthed) return send(res, 401, {});
+  send(res, 200, {
+    userId: "user-1",
+    fullName: "Elif Kaya",
+    email: "owner@example.com",
+    organizationId: "org-1",
+    organizationName: "Northwind Co.",
+    baseCurrency: "EUR",
+  });
 }
 
 function handleUpload(req, res, isAuthed) {
@@ -505,17 +529,12 @@ function handleDocumentEvents(req, res, isAuthed, documentId) {
     "cache-control": "no-cache",
     connection: "keep-alive",
   });
+  res.write(`id: 1\nevent: activity\ndata: ${JSON.stringify({ id: 1, stage: "UPLOADED", detail: "Document uploaded", createdAt: doc.createdAt })}\n\n`);
 
   const terminal = ["EXTRACTED", "NEEDS_REVIEW", "FAILED"].includes(doc.status);
   if (terminal) {
-    res.write(
-      `event: status\ndata: ${JSON.stringify({
-        documentId,
-        organizationId: "org-1",
-        status: doc.status,
-        detail: doc.failureReason,
-      })}\n\n`,
-    );
+    const stage = doc.status === "EXTRACTED" ? "POSTED" : "FAILED";
+    res.write(`id: 5\nevent: activity\ndata: ${JSON.stringify({ id: 5, stage, detail: doc.failureReason, createdAt: doc.createdAt })}\n\n`);
     res.end();
     return;
   }
@@ -638,6 +657,16 @@ function handleExpenseDetail(req, res, isAuthed, expenseId) {
   const document = DOCUMENTS[expense.documentId];
   send(res, 200, {
     ...expense,
+    invoiceNumber: "INV-2026-0714",
+    documentDate: "2026-07-14",
+    taxMinor: "1200",
+    activity: [
+      { id: 1, stage: "UPLOADED", detail: "Document uploaded", createdAt: document.createdAt },
+      { id: 2, stage: "EXTRACTING", detail: "Extracting document data", createdAt: document.createdAt },
+      { id: 3, stage: "CATEGORIZING", detail: "Categorizing expense", createdAt: document.createdAt },
+      { id: 4, stage: "DRAFTING_LEDGER", detail: "Drafting ledger entries", createdAt: document.createdAt },
+      { id: 5, stage: expense.status === "POSTED" ? "POSTED" : "NEEDS_REVIEW", detail: expense.status === "POSTED" ? "Expense posted to the ledger" : "Expense needs review", createdAt: document.createdAt },
+    ],
     ledgerEntries: ledgerEntriesFor(expense),
     document: {
       id: document.id,
@@ -739,8 +768,14 @@ const server = createServer((req, res) => {
   if (req.method === "POST" && url.pathname === "/api/v1/auth/login") {
     return handleLogin(req, res);
   }
+  if (req.method === "POST" && url.pathname === "/api/v1/auth/register") {
+    return handleRegister(req, res);
+  }
   if (req.method === "POST" && url.pathname === "/api/v1/auth/refresh") {
     return handleRefresh(req, res);
+  }
+  if (req.method === "GET" && url.pathname === "/api/v1/me") {
+    return handleMe(req, res, isAuthed);
   }
   if (req.method === "POST" && url.pathname === "/api/v1/documents") {
     return handleUpload(req, res, isAuthed);

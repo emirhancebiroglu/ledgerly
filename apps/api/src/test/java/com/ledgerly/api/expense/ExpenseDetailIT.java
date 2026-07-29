@@ -109,6 +109,24 @@ class ExpenseDetailIT extends AbstractPostgresIT {
   }
 
   @Test
+  void detailProjectsInvoiceDateAndExactSignedTaxFromTheValidatedProposal() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    UUID documentId = insertDocument(org);
+    storeProposal(documentId);
+    UUID expenseId =
+        insertExpense(org, documentId, categoryId, null, "Acme Corp", 1200, "NEEDS_REVIEW");
+
+    mockMvc
+        .perform(get("/api/v1/expenses/" + expenseId + "/detail").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.invoiceNumber").value("CRN-42"))
+        .andExpect(jsonPath("$.documentDate").value("2026-07-22"))
+        .andExpect(jsonPath("$.taxMinor").value("-120"));
+  }
+
+  @Test
   void anotherOrganizationsExpenseReturns404() throws Exception {
     String tokenA = registerAndGetAccessToken();
     String tokenB = registerAndGetAccessToken();
@@ -171,6 +189,17 @@ class ExpenseDetailIT extends AbstractPostgresIT {
         userId,
         UUID.randomUUID().toString());
     return documentId;
+  }
+
+  private void storeProposal(UUID documentId) {
+    String proposal =
+        """
+        {"document_id":"%s","vendor":"Acme Corp","invoice_number":"CRN-42","currency":"EUR",
+        "total_minor":-1200,"tax_minor":-120,"document_date":"2026-07-22",
+        "lines":[{"description":"credit","quantity":1000,"amount_minor":-1080}],
+        "confidence":{"currency":0.99},"model":"fake-llm-v1","warnings":[]}
+        """.formatted(documentId);
+    jdbcTemplate.update("UPDATE document SET proposal = CAST(? AS jsonb) WHERE id = ?", proposal, documentId);
   }
 
   private UUID insertExpense(

@@ -21,7 +21,7 @@ type FlowState =
 export function UploadFlow() {
   const [flow, setFlow] = useState<FlowState>({ phase: "idle" });
   const trackingId = flow.phase === "tracking" ? flow.document.id : null;
-  const { status, failureReason, connection } = useDocumentStatus(trackingId);
+  const { activity, failureReason, connection } = useDocumentStatus(trackingId);
 
   async function handleFile(file: File) {
     setFlow({ phase: "uploading", filename: file.name, sizeBytes: file.size });
@@ -36,8 +36,9 @@ export function UploadFlow() {
   }
 
   const isBusy = flow.phase === "uploading" || flow.phase === "tracking";
-  const failed = status === "FAILED";
-  const terminal = status === "EXTRACTED" || status === "NEEDS_REVIEW" || status === "FAILED";
+  const terminalStage = activity.at(-1)?.stage;
+  const failed = terminalStage === "FAILED" || terminalStage === "CATEGORIZATION_FAILED";
+  const terminal = terminalStage === "POSTED" || terminalStage === "NEEDS_REVIEW" || failed;
 
   return (
     <div className="mx-auto flex max-w-[640px] flex-col gap-5">
@@ -57,8 +58,7 @@ export function UploadFlow() {
         <UploadSteps
           filename={flow.filename}
           sizeLabel={formatSize(flow.sizeBytes)}
-          documentStatus={null}
-          failed={false}
+          activity={[]}
           connection="connecting"
         />
       )}
@@ -68,8 +68,7 @@ export function UploadFlow() {
           <UploadSteps
             filename={flow.document.filename}
             sizeLabel={formatSize(flow.document.sizeBytes)}
-            documentStatus={status}
-            failed={failed}
+            activity={activity}
             connection={connection}
           />
           {failed && (

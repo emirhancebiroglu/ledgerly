@@ -18,6 +18,7 @@ import com.ledgerly.api.budget.BudgetThresholdEvaluator;
 import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.dashboard.DashboardRepository;
 import com.ledgerly.api.document.DocumentRepository;
+import com.ledgerly.api.document.DocumentActivityRepository;
 import com.ledgerly.api.expense.ExpenseRepository;
 import com.ledgerly.api.expense.ExpenseStubRepository;
 import com.ledgerly.api.idempotency.IdempotencyRecordRepository;
@@ -57,6 +58,7 @@ class ApiApplicationTests {
   @MockitoBean private IdempotencyRecordRepository idempotencyRecordRepository;
   @MockitoBean private AuditLogRepository auditLogRepository;
   @MockitoBean private DocumentRepository documentRepository;
+  @MockitoBean private DocumentActivityRepository documentActivityRepository;
   @MockitoBean private CategoryRepository categoryRepository;
   @MockitoBean private BudgetRepository budgetRepository;
   @MockitoBean private BudgetSpendRepository budgetSpendRepository;

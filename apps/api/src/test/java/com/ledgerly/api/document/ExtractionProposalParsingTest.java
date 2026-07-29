@@ -24,6 +24,7 @@ class ExtractionProposalParsingTest {
     assertThat(proposal.taxMinor()).isEqualTo(2100L);
     assertThat(proposal.lineTotalMinor()).isEqualTo(10000L);
     assertThat(proposal.currency()).isEqualTo("EUR");
+    assertThat(proposal.invoiceNumber()).isEqualTo("INV-2026-0714");
     assertThat(proposal.model()).isEqualTo("fake-llm-v1");
   }
 
@@ -82,6 +83,33 @@ class ExtractionProposalParsingTest {
         """;
 
     assertThatThrownBy(() -> proposalMapper.parse(extraField))
+        .isInstanceOf(MalformedProposalException.class);
+  }
+
+  @Test
+  void acceptsAProposalWithoutAnInvoiceNumberForLegacyDocuments() {
+    String noInvoiceNumber =
+        """
+        {"document_id":"3f1a8c2e-9b4d-4e7a-8f16-2c5d7e9a1b30","vendor":"V","currency":"EUR",
+         "total_minor":121,"tax_minor":21,"document_date":"2026-07-14",
+         "lines":[{"description":"a","quantity":1000,"amount_minor":100}],
+         "confidence":{"currency":1.0},"model":"m","warnings":[]}
+        """;
+
+    assertThat(proposalMapper.parse(noInvoiceNumber).invoiceNumber()).isNull();
+  }
+
+  @Test
+  void refusesANonStringInvoiceNumberRatherThanCoercingIt() {
+    String numericInvoiceNumber =
+        """
+        {"document_id":"3f1a8c2e-9b4d-4e7a-8f16-2c5d7e9a1b30","vendor":"V","invoice_number":42,"currency":"EUR",
+         "total_minor":121,"tax_minor":21,"document_date":"2026-07-14",
+         "lines":[{"description":"a","quantity":1000,"amount_minor":100}],
+         "confidence":{"currency":1.0},"model":"m","warnings":[]}
+        """;
+
+    assertThatThrownBy(() -> proposalMapper.parse(numericInvoiceNumber))
         .isInstanceOf(MalformedProposalException.class);
   }
 

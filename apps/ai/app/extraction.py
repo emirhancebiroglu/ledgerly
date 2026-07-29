@@ -25,6 +25,7 @@ commentary before or after — matching exactly this shape:
 
 {
   "vendor": "<name as printed, or null if unreadable>",
+  "invoice_number": "<invoice or receipt number as printed, or null if unreadable or absent>",
   "currency": "<ISO 4217 alphabetic code, e.g. TRY, USD, EUR, GBP, MYR — never a symbol like $ or a \
 local abbreviation like TL>",
   "total_minor": <integer, the final payable amount in minor units (cents/kuruş), e.g. 12.10 -> \

@@ -21,13 +21,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class AppUserServiceTest {
 
   @Mock private AppUserRepository appUserRepository;
+  @Mock private OrganizationRepository organizationRepository;
 
   private final OrganizationAccessGuard organizationAccessGuard =
       spy(new OrganizationAccessGuard());
 
   @Test
   void servicePrincipalFromOrgACannotReadUserOwnedByOrgB() {
-    AppUserService service = new AppUserService(appUserRepository, organizationAccessGuard);
+    AppUserService service =
+        new AppUserService(appUserRepository, organizationRepository, organizationAccessGuard);
 
     UUID orgAId = UUID.randomUUID();
     UUID orgBId = UUID.randomUUID();
@@ -43,7 +45,8 @@ class AppUserServiceTest {
 
   @Test
   void servicePrincipalFromSameOrgCanReadTheUser() {
-    AppUserService service = new AppUserService(appUserRepository, organizationAccessGuard);
+    AppUserService service =
+        new AppUserService(appUserRepository, organizationRepository, organizationAccessGuard);
 
     UUID orgId = UUID.randomUUID();
     UUID userId = UUID.randomUUID();

@@ -3,6 +3,8 @@ package com.ledgerly.api.expense;
 import com.ledgerly.api.category.Category;
 import com.ledgerly.api.category.CategoryRepository;
 import com.ledgerly.api.document.ExtractionProposal;
+import com.ledgerly.api.document.DocumentActivityService;
+import com.ledgerly.api.document.DocumentActivityStage;
 import com.ledgerly.api.policy.PolicyChunk;
 import com.ledgerly.api.policy.PolicyChunkRepository;
 import java.util.List;
@@ -37,6 +39,7 @@ public class ExpensePostingService {
   private final CategorizationClient categorizationClient;
   private final AiResponseMapper aiResponseMapper;
   private final ExpensePostingTransactions transactions;
+  private final DocumentActivityService documentActivityService;
   private final double confidenceThreshold;
 
   public ExpensePostingService(
@@ -46,6 +49,7 @@ public class ExpensePostingService {
       CategorizationClient categorizationClient,
       AiResponseMapper aiResponseMapper,
       ExpensePostingTransactions transactions,
+      DocumentActivityService documentActivityService,
       @Value("${ledgerly.categorization.confidence-threshold:0.7}") double confidenceThreshold) {
     this.categoryRepository = categoryRepository;
     this.policyChunkRepository = policyChunkRepository;
@@ -53,6 +57,7 @@ public class ExpensePostingService {
     this.categorizationClient = categorizationClient;
     this.aiResponseMapper = aiResponseMapper;
     this.transactions = transactions;
+    this.documentActivityService = documentActivityService;
     this.confidenceThreshold = confidenceThreshold;
   }
 
@@ -71,6 +76,8 @@ public class ExpensePostingService {
    */
   public Expense categorizeAndPost(
       UUID organizationId, UUID documentId, UUID actor, ExtractionProposal proposal) {
+    documentActivityService.record(
+        documentId, organizationId, DocumentActivityStage.CATEGORIZING, "Categorizing expense");
     List<Category> categories =
         categoryRepository.findByOrganizationIdOrderByNameAsc(organizationId);
     if (categories.isEmpty()) {

@@ -1,6 +1,7 @@
 {
   "document_id": "3f1a8c2e-9b4d-4e7a-8f16-2c5d7e9a1b30",
   "vendor": "Contoso Office Supplies BV",
+  "invoice_number": "INV-2026-0714",
   "currency": "EUR",
   "total_minor": 12100,
   "tax_minor": 2100,

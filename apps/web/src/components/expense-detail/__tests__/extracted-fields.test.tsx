@@ -15,6 +15,10 @@ const baseExpense = {
   status: "POSTED" as const,
   createdAt: "2026-07-01T00:00:00Z",
   ledgerEntries: [],
+  invoiceNumber: "INV-42",
+  documentDate: "2026-07-01",
+  taxMinor: "1200",
+  activity: [],
   document: {
     id: "d1",
     filename: "receipt.png",
@@ -28,10 +32,12 @@ const baseExpense = {
 };
 
 describe("ExtractedFields", () => {
-  it("renders vendor, amount, and confidence as a percentage", () => {
+  it("renders the validated proposal fields, amount, tax and confidence", () => {
     render(<ExtractedFields expense={baseExpense} />);
 
     expect(screen.getByText("$123.45")).toBeInTheDocument();
+    expect(screen.getByText("$12.00")).toBeInTheDocument();
+    expect(screen.getByText("INV-42")).toBeInTheDocument();
     expect(screen.getByText("87%")).toBeInTheDocument();
   });
 

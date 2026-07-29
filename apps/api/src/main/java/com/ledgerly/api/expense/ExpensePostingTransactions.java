@@ -8,6 +8,8 @@ import com.ledgerly.api.anomaly.ExpensePostedEvent;
 import com.ledgerly.api.category.Category;
 import com.ledgerly.api.correlation.CorrelationIds;
 import com.ledgerly.api.document.ExtractionProposal;
+import com.ledgerly.api.document.DocumentActivityService;
+import com.ledgerly.api.document.DocumentActivityStage;
 import com.ledgerly.api.ledger.EntryDirection;
 import com.ledgerly.api.ledger.LedgerAccountRepository;
 import com.ledgerly.api.ledger.LedgerEntry;
@@ -46,6 +48,7 @@ public class ExpensePostingTransactions {
   private final ApplicationEventPublisher eventPublisher;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
+  private final DocumentActivityService documentActivityService;
 
   public ExpensePostingTransactions(
       LedgerAccountRepository ledgerAccountRepository,
@@ -54,7 +57,8 @@ public class ExpensePostingTransactions {
       BudgetThresholdEvaluator budgetThresholdEvaluator,
       ApplicationEventPublisher eventPublisher,
       AuditService auditService,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      DocumentActivityService documentActivityService) {
     this.ledgerAccountRepository = ledgerAccountRepository;
     this.ledgerTransactionRepository = ledgerTransactionRepository;
     this.expenseRepository = expenseRepository;
@@ -62,6 +66,7 @@ public class ExpensePostingTransactions {
     this.eventPublisher = eventPublisher;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
+    this.documentActivityService = documentActivityService;
   }
 
   @Transactional
@@ -72,6 +77,8 @@ public class ExpensePostingTransactions {
       Category category,
       ExtractionProposal proposal,
       CategorizeResponse response) {
+    documentActivityService.record(
+        documentId, organizationId, DocumentActivityStage.DRAFTING_LEDGER, "Drafting ledger entries");
     UUID expenseAccountId =
         ledgerAccountRepository.findOrCreate(
             organizationId, category.getName(), "EXPENSE", proposal.currency());
@@ -119,6 +126,9 @@ public class ExpensePostingTransactions {
         auditPayload(expense),
         CorrelationIds.current());
 
+    documentActivityService.record(
+        documentId, organizationId, DocumentActivityStage.POSTED, "Expense posted to the ledger");
+
     return expense;
   }
 
@@ -152,6 +162,12 @@ public class ExpensePostingTransactions {
         null,
         auditPayload(expense),
         CorrelationIds.current());
+
+    documentActivityService.record(
+        documentId,
+        organizationId,
+        DocumentActivityStage.NEEDS_REVIEW,
+        "Expense needs review");
 
     return expense;
   }
