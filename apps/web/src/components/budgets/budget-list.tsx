@@ -125,9 +125,9 @@ export function BudgetList({ initialBudgets, categories }: BudgetListProps) {
                   </span>
                 </div>
                 <div>
-                  <div className="flex items-baseline justify-between gap-3 font-mono text-sm tabular-nums">
-                    <span>{formatMoney(budget.spentMinor, budget.currency)}</span>
-                    <span className="text-muted-foreground">of {formatMoney(budget.limitMinor, budget.currency)}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-mono text-sm tabular-nums"><span>{formatMoney(budget.spentMinor, budget.currency)}</span><span className="ml-2 text-muted-foreground">of {formatMoney(budget.limitMinor, budget.currency)}</span></div>
+                    <div aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(var(--${budget.status === "OVER_BUDGET" ? "danger" : budget.status === "NEAR_THRESHOLD" ? "warning" : "success"}) ${Math.min(percentage, 100)}%, var(--muted) 0)` }}><div className="grid size-8 place-items-center rounded-full bg-card font-mono text-[10px] tabular-nums">{percentage}%</div></div>
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`${categoryLabel(categories, budget.categoryId)} budget usage`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(percentage, 100)}>
                     <div className={`h-full rounded-full ${state.progress}`} style={{ width: `${Math.min(percentage, 100)}%` }} />
