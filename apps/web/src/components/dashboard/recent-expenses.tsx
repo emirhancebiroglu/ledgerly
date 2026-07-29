@@ -25,16 +25,16 @@ export function RecentExpenses({ expenses, categoryName }: RecentExpensesProps) 
           <Link
             key={expense.id}
             href={`/expenses/${expense.id}`}
-            className="grid grid-cols-[1.5fr_1fr_auto_auto] items-center gap-3 border-t border-border/60 px-6 py-3 transition-colors hover:bg-muted/60"
+            className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border/60 px-5 py-3 transition-colors hover:bg-muted/60 shell:grid-cols-[1.5fr_1fr_auto_auto] shell:items-center shell:gap-3 shell:px-6"
           >
             <div className="truncate text-[13px] font-medium">{expense.vendor ?? "Unknown vendor"}</div>
-            <div className="truncate text-[12.5px] text-muted-foreground">
+            <div className="truncate text-right text-[12.5px] text-muted-foreground shell:text-left">
               {categoryName(expense.categoryId)}
             </div>
-            <div className="font-mono text-[13px] tabular-nums">
+            <div className="font-mono text-[13px] tabular-nums shell:col-auto">
               {formatMoney(expense.amountMinor, expense.currency)}
             </div>
-            <StatusChip status={expense.status} />
+            <div className="justify-self-end shell:justify-self-auto"><StatusChip status={expense.status} /></div>
           </Link>
         ))
       )}

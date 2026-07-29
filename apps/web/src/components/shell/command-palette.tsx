@@ -48,6 +48,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 function PaletteBody({ onNavigate }: { onNavigate: () => void }) {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
+  const [query, setQuery] = useState("");
+  const items = QUICK_JUMP_ITEMS.filter((item) => item.label.toLowerCase().includes(query.toLowerCase()));
 
   function go(href: string) {
     onNavigate();
@@ -57,13 +59,13 @@ function PaletteBody({ onNavigate }: { onNavigate: () => void }) {
   function onInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveIndex((index) => (index + 1) % QUICK_JUMP_ITEMS.length);
+      setActiveIndex((index) => (index + 1) % Math.max(items.length, 1));
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((index) => (index - 1 + QUICK_JUMP_ITEMS.length) % QUICK_JUMP_ITEMS.length);
-    } else if (event.key === "Enter") {
+      setActiveIndex((index) => (index - 1 + Math.max(items.length, 1)) % Math.max(items.length, 1));
+    } else if (event.key === "Enter" && items[activeIndex]) {
       event.preventDefault();
-      go(QUICK_JUMP_ITEMS[activeIndex].href);
+      go(items[activeIndex].href);
     }
   }
 
@@ -79,11 +81,12 @@ function PaletteBody({ onNavigate }: { onNavigate: () => void }) {
           aria-activedescendant={`palette-option-${activeIndex}`}
           placeholder="Jump to a page or expense..."
           onKeyDown={onInputKeyDown}
+          onChange={(event) => { setQuery(event.target.value); setActiveIndex(0); }}
           className="flex-1 border-none text-sm outline-none placeholder:text-muted-foreground"
         />
       </div>
       <div id="palette-listbox" className="p-2" role="listbox" aria-label="Quick jump">
-        {QUICK_JUMP_ITEMS.map((item, index) => (
+        {items.length === 0 ? <p className="px-3 py-5 text-sm text-muted-foreground">No matching pages.</p> : items.map((item, index) => (
           <button
             key={item.href}
             id={`palette-option-${index}`}

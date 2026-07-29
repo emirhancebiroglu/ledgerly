@@ -9,7 +9,7 @@ describe("CategoryBreakdown", () => {
     expect(screen.getByText(/No categorized spend yet/)).toBeInTheDocument();
   });
 
-  it("renders each category's amount and a progress bar sized to its share of the max", () => {
+  it("renders each category's amount and a progress bar sized to its share of total spend", () => {
     render(
       <CategoryBreakdown
         categories={[
@@ -24,7 +24,7 @@ describe("CategoryBreakdown", () => {
     expect(screen.getByText("$400.00")).toBeInTheDocument();
 
     const bars = screen.getAllByRole("progressbar");
-    expect(bars[0]).toHaveAttribute("aria-valuenow", "100");
-    expect(bars[1]).toHaveAttribute("aria-valuenow", "50");
+    expect(bars[0]).toHaveAttribute("aria-valuenow", "67");
+    expect(bars[1]).toHaveAttribute("aria-valuenow", "33");
   });
 });

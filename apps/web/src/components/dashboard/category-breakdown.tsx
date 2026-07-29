@@ -22,7 +22,7 @@ export function CategoryBreakdown({ categories, currency }: CategoryBreakdownPro
     );
   }
 
-  const max = Math.max(...categories.map((c) => c.amountMinor), 1);
+  const total = categories.reduce((sum, category) => sum + category.amountMinor, 0);
 
   return (
     <Card data-testid="category-breakdown" className="p-[22px_24px]">
@@ -31,7 +31,7 @@ export function CategoryBreakdown({ categories, currency }: CategoryBreakdownPro
       </div>
       <div className="flex flex-col gap-3">
         {categories.map((category) => {
-          const pct = Math.round((category.amountMinor / max) * 100);
+          const pct = total === 0 ? 0 : Math.round((category.amountMinor / total) * 100);
           return (
             <div key={category.categoryId}>
               <div className="mb-1.5 flex justify-between text-[12.5px]">
@@ -42,7 +42,7 @@ export function CategoryBreakdown({ categories, currency }: CategoryBreakdownPro
               </div>
               <div
                 role="progressbar"
-                aria-label={`${category.categoryName}: ${pct}% of the highest category`}
+                aria-label={`${category.categoryName}: ${pct}% of total spend`}
                 aria-valuenow={pct}
                 aria-valuemin={0}
                 aria-valuemax={100}
