@@ -7,13 +7,9 @@ import com.ledgerly.api.budget.BudgetThresholdEvaluator;
 import com.ledgerly.api.anomaly.ExpensePostedEvent;
 import com.ledgerly.api.category.Category;
 import com.ledgerly.api.correlation.CorrelationIds;
-import com.ledgerly.api.ledger.EntryDirection;
 import com.ledgerly.api.ledger.LedgerAccountRepository;
-import com.ledgerly.api.ledger.LedgerEntry;
 import com.ledgerly.api.ledger.LedgerTransaction;
 import com.ledgerly.api.ledger.LedgerTransactionRepository;
-import com.ledgerly.api.ledger.Money;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -107,17 +103,17 @@ public class ExpenseReviewTransactions {
         ledgerAccountRepository.findOrCreate(
             organizationId, LIABILITY_ACCOUNT_NAME, "LIABILITY", expense.getCurrency());
 
-    Money amount = Money.of(expense.getAmountMinor(), expense.getCurrency());
     Instant postedAt = Instant.now();
     LedgerTransaction transaction =
         LedgerTransaction.post(
             organizationId,
             expense.getCurrency(),
             postedAt,
-            List.of(
-                LedgerEntry.of(expenseAccountId, EntryDirection.DEBIT, amount, amount, BigDecimal.ONE),
-                LedgerEntry.of(
-                    liabilityAccountId, EntryDirection.CREDIT, amount, amount, BigDecimal.ONE)));
+            ExpenseLedgerEntries.forSignedAmount(
+                expenseAccountId,
+                liabilityAccountId,
+                expense.getAmountMinor(),
+                expense.getCurrency()));
     ledgerTransactionRepository.save(transaction);
 
     int rowsResolved =

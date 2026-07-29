@@ -75,9 +75,9 @@ public class ExtractionProposalValidator {
   }
 
   /**
-   * The books balance or the proposal does not pass. An off-by-one-minor-unit discrepancy is a
-   * failure exactly like any other: a cent that cannot be accounted for is a cent that will have to
-   * be reconciled by hand later.
+   * Itemized proposals must balance exactly. An off-by-one-minor-unit discrepancy is a failure
+   * exactly like any other: a cent that cannot be accounted for is a cent that will have to be
+   * reconciled by hand later.
    *
    * <p>A credit note or refund is a legitimate document — its total, tax and every line are
    * negative together. What is never legal is a mix: a positive total built from a negative line,
@@ -85,8 +85,8 @@ public class ExtractionProposalValidator {
    * non-negativity check.
    */
   private void checkArithmetic(ExtractionProposal proposal, List<String> violations) {
-    if (proposal.lines() == null || proposal.lines().isEmpty()) {
-      violations.add("Proposal has no line items to reconcile against the total");
+    if (proposal.lines() == null) {
+      violations.add("Proposal line items are missing");
       return;
     }
     boolean isRefund = proposal.totalMinor() < 0;
@@ -95,6 +95,15 @@ public class ExtractionProposalValidator {
     }
     if (!isRefund && proposal.taxMinor() < 0) {
       violations.add("Tax is negative but total is not: " + proposal.taxMinor());
+    }
+    if (proposal.lines().isEmpty()) {
+      // Some legitimate invoices publish only tax-inclusive service amounts and a document-level
+      // tax breakdown. Their net amounts cannot be allocated across lines without fabrication.
+      // The ledger posts the verified invoice total, never the individual lines.
+      if (Math.abs(proposal.taxMinor()) > Math.abs(proposal.totalMinor())) {
+        violations.add("Tax magnitude exceeds the total for an unitemized proposal");
+      }
+      return;
     }
     boolean lineSignMismatch =
         proposal.lines().stream()

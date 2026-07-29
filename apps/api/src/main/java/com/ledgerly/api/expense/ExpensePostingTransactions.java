@@ -10,13 +10,9 @@ import com.ledgerly.api.correlation.CorrelationIds;
 import com.ledgerly.api.document.ExtractionProposal;
 import com.ledgerly.api.document.DocumentActivityService;
 import com.ledgerly.api.document.DocumentActivityStage;
-import com.ledgerly.api.ledger.EntryDirection;
 import com.ledgerly.api.ledger.LedgerAccountRepository;
-import com.ledgerly.api.ledger.LedgerEntry;
 import com.ledgerly.api.ledger.LedgerTransaction;
 import com.ledgerly.api.ledger.LedgerTransactionRepository;
-import com.ledgerly.api.ledger.Money;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -86,17 +82,14 @@ public class ExpensePostingTransactions {
         ledgerAccountRepository.findOrCreate(
             organizationId, LIABILITY_ACCOUNT_NAME, "LIABILITY", proposal.currency());
 
-    Money amount = Money.of(proposal.totalMinor(), proposal.currency());
     Instant postedAt = Instant.now();
     LedgerTransaction transaction =
         LedgerTransaction.post(
             organizationId,
             proposal.currency(),
             postedAt,
-            List.of(
-                LedgerEntry.of(expenseAccountId, EntryDirection.DEBIT, amount, amount, BigDecimal.ONE),
-                LedgerEntry.of(
-                    liabilityAccountId, EntryDirection.CREDIT, amount, amount, BigDecimal.ONE)));
+            ExpenseLedgerEntries.forSignedAmount(
+                expenseAccountId, liabilityAccountId, proposal.totalMinor(), proposal.currency()));
     ledgerTransactionRepository.save(transaction);
 
     Expense expense =

@@ -38,7 +38,12 @@ export function UploadFlow() {
   const isBusy = flow.phase === "uploading" || flow.phase === "tracking";
   const terminalStage = activity.at(-1)?.stage;
   const failed = terminalStage === "FAILED" || terminalStage === "CATEGORIZATION_FAILED";
-  const terminal = terminalStage === "POSTED" || terminalStage === "NEEDS_REVIEW" || failed;
+  const extractionNeedsReview = terminalStage === "EXTRACTION_NEEDS_REVIEW";
+  const terminal =
+    terminalStage === "POSTED" ||
+    terminalStage === "NEEDS_REVIEW" ||
+    extractionNeedsReview ||
+    failed;
 
   return (
     <div className="mx-auto flex max-w-[640px] flex-col gap-5">
@@ -79,7 +84,16 @@ export function UploadFlow() {
               Processing failed: {failureReason ?? "No further detail available."}
             </div>
           )}
-          {terminal && !failed && (
+          {extractionNeedsReview && (
+            <div
+              role="alert"
+              className="rounded-xl border border-warning/30 bg-warning-soft p-[14px_18px] text-[13px] text-warning-foreground"
+            >
+              Extraction needs review: {failureReason ?? "No further detail available."} No
+              expense was created.
+            </div>
+          )}
+          {terminal && !failed && !extractionNeedsReview && (
             <Link
               href="/expenses"
               className="text-center text-[12.5px] font-semibold text-primary"

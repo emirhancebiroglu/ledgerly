@@ -73,6 +73,48 @@ class ExpenseReviewIT extends AbstractPostgresIT {
   }
 
   @Test
+  void approvePostsACreditNoteWithReversedLedgerDirections() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    UUID expenseId = insertNeedsReviewExpense(org, categoryId, "Globex Retail", -5_000);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "refund-approve-" + System.nanoTime()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("POSTED"))
+        .andExpect(jsonPath("$.amountMinor").value(-5_000));
+
+    String transactionId =
+        jdbcTemplate.queryForObject(
+            "SELECT ledger_transaction_id FROM expense WHERE id = ?::uuid", String.class, expenseId.toString());
+    String expenseDirection =
+        jdbcTemplate.queryForObject(
+            "SELECT entry.direction FROM ledger_entry entry JOIN account account ON account.id = entry.account_id "
+                + "WHERE entry.transaction_id = ?::uuid AND account.account_type = 'EXPENSE'",
+            String.class,
+            transactionId);
+    String liabilityDirection =
+        jdbcTemplate.queryForObject(
+            "SELECT entry.direction FROM ledger_entry entry JOIN account account ON account.id = entry.account_id "
+                + "WHERE entry.transaction_id = ?::uuid AND account.account_type = 'LIABILITY'",
+            String.class,
+            transactionId);
+    Long magnitude =
+        jdbcTemplate.queryForObject(
+            "SELECT SUM(native_amount_minor) FROM ledger_entry WHERE transaction_id = ?::uuid",
+            Long.class,
+            transactionId);
+
+    assertThat(expenseDirection).isEqualTo("CREDIT");
+    assertThat(liabilityDirection).isEqualTo("DEBIT");
+    assertThat(magnitude).isEqualTo(10_000L);
+  }
+
+  @Test
   void approveCrossing80PercentCreatesAnAuditedThresholdAlertAndUpdatesBudgetUsage()
       throws Exception {
     String token = registerAndGetAccessToken();

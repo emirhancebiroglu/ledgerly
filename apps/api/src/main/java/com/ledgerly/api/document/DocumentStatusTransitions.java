@@ -81,8 +81,8 @@ public class DocumentStatusTransitions {
     } else {
       // No ledger write happens on either branch at M4. When posting arrives at M6 it goes behind
       // this same condition, so a proposal that failed validation can never reach it.
-      document.markNeedsReview(proposalJson, validation.summary());
-      activity(document, DocumentActivityStage.NEEDS_REVIEW, validation.summary());
+      document.markExtractionNeedsReview(proposalJson, validation.summary());
+      activity(document, DocumentActivityStage.EXTRACTION_NEEDS_REVIEW, validation.summary());
       publish(document, validation.summary());
     }
     return document;

@@ -59,6 +59,14 @@ def test_every_monetary_field_is_declared_integer():
     assert schema["$defs"]["line"]["properties"]["amount_minor"]["type"] == "integer"
 
 
+def test_line_amount_semantics_exclude_tax_and_preserve_the_total_invariant():
+    description = load_schema(EXTRACTION_PROPOSAL_SCHEMA)["$defs"]["line"]["properties"][
+        "amount_minor"
+    ]["description"]
+    assert "Pre-tax/net" in description
+    assert "sum plus tax_minor to equal total_minor exactly" in description
+
+
 def test_per_field_confidence_is_required():
     schema = load_schema(EXTRACTION_PROPOSAL_SCHEMA)
     required = schema["properties"]["confidence"]["required"]

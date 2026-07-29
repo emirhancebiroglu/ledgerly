@@ -105,7 +105,7 @@
           "minimum": 0
         },
         "amount_minor": {
-          "description": "Line total in minor units. Integer, never a float.",
+          "description": "Pre-tax/net line total in minor units. Integer, never a float. When lines are present, `api` requires their sum plus tax_minor to equal total_minor exactly; tax must not be included in this field.",
           "type": "integer"
         }
       }

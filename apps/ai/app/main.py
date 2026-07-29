@@ -123,6 +123,7 @@ def get_llm_client() -> LlmClient:
             timeout_seconds=settings.llm_timeout_seconds,
             api_base=settings.llm_api_base,
             supports_native_pdf=settings.llm_supports_native_pdf,
+            thinking_enabled=settings.llm_enable_thinking,
         )
         return ResilientLlmClient(
             inner,

@@ -10,7 +10,13 @@ export interface DocumentStatusState {
 }
 
 const RECONNECT_DELAY_MS = 3000;
-const TERMINAL_STAGES: DocumentActivityStage[] = ["POSTED", "NEEDS_REVIEW", "FAILED", "CATEGORIZATION_FAILED"];
+const TERMINAL_STAGES: DocumentActivityStage[] = [
+  "POSTED",
+  "NEEDS_REVIEW",
+  "EXTRACTION_NEEDS_REVIEW",
+  "FAILED",
+  "CATEGORIZATION_FAILED",
+];
 
 /**
  * Subscribes to `GET /api/v1/documents/{id}/events` (M7a T6) through the BFF proxy —

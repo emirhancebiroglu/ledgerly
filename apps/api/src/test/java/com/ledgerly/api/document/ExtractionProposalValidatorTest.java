@@ -72,11 +72,19 @@ class ExtractionProposalValidatorTest {
   }
 
   @Test
-  void rejectsAProposalWithNoLinesToReconcileAgainst() {
+  void acceptsAnUnitemizedProposalWhenTheInvoiceLevelAmountsArePlausible() {
     ProposalValidationResult result = validator.validate(proposal().lines(List.of()).build());
 
+    assertThat(result.isValid()).isTrue();
+  }
+
+  @Test
+  void rejectsAnUnitemizedProposalWhoseTaxExceedsTheTotal() {
+    ProposalValidationResult result =
+        validator.validate(proposal().lines(List.of()).totalMinor(100).taxMinor(101).build());
+
     assertThat(result.isValid()).isFalse();
-    assertThat(result.summary()).contains("no line items");
+    assertThat(result.summary()).contains("Tax magnitude exceeds");
   }
 
   @Test

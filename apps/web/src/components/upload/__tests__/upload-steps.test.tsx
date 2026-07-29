@@ -57,6 +57,53 @@ describe("UploadSteps", () => {
     expect(screen.getByText("Failed")).toBeInTheDocument();
   });
 
+  it("shows extraction review as terminal without marking it as an expense review", () => {
+    const { container } = render(
+      <UploadSteps
+        filename="receipt.pdf"
+        sizeLabel="247 KB"
+        activity={[
+          { id: 1, stage: "UPLOADED", detail: null, createdAt: "2026-01-01T00:00:00Z" },
+          { id: 2, stage: "EXTRACTING", detail: null, createdAt: "2026-01-01T00:00:01Z" },
+          {
+            id: 3,
+            stage: "EXTRACTION_NEEDS_REVIEW",
+            detail: "Tax total is inconsistent",
+            createdAt: "2026-01-01T00:00:02Z",
+          },
+        ]}
+        connection="open"
+      />,
+    );
+
+    expect(screen.getByText("Extraction needs review")).toBeInTheDocument();
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(0);
+  });
+
+  it("does not show a future-stage spinner after categorization has failed", () => {
+    const { container } = render(
+      <UploadSteps
+        filename="receipt.pdf"
+        sizeLabel="247 KB"
+        activity={[
+          { id: 1, stage: "UPLOADED", detail: null, createdAt: "2026-01-01T00:00:00Z" },
+          { id: 2, stage: "EXTRACTING", detail: null, createdAt: "2026-01-01T00:00:01Z" },
+          { id: 3, stage: "CATEGORIZING", detail: null, createdAt: "2026-01-01T00:00:02Z" },
+          {
+            id: 4,
+            stage: "CATEGORIZATION_FAILED",
+            detail: "Categorization could not be completed",
+            createdAt: "2026-01-01T00:00:03Z",
+          },
+        ]}
+        connection="open"
+      />,
+    );
+
+    expect(screen.getByText("Failed")).toBeInTheDocument();
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(0);
+  });
+
   it("shows a stalled-connection notice when the SSE stream disconnects", () => {
     render(
       <UploadSteps

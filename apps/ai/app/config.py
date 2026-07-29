@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     llm_circuit_breaker_failure_threshold: int = 5
     llm_circuit_breaker_cooldown_seconds: float = 30.0
 
+    # Qwen3.7 Plus enables chain-of-thought by default. Invoice extraction and closed-set
+    # categorization are bounded schema tasks, so the latency/cost trade-off favors direct output.
+    # Set AI_LLM_ENABLE_THINKING=true only when a measured accuracy regression justifies it.
+    llm_enable_thinking: bool = False
+
     # OpenCode Go's Anthropic-compatible gateway. Set to None to fall back to LiteLLM's normal
     # provider-prefix routing (e.g. for gemini/... or any other native-routed model).
     llm_api_base: str | None = "https://opencode.ai/zen/go"

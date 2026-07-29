@@ -9,7 +9,12 @@ export interface LedgerEntryView {
   currency: string;
 }
 
-export type DocumentStatus = "PENDING" | "PROCESSING" | "EXTRACTED" | "NEEDS_REVIEW" | "FAILED";
+export type DocumentStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "EXTRACTED"
+  | "EXTRACTION_NEEDS_REVIEW"
+  | "FAILED";
 
 export interface DocumentMeta {
   id: string;
@@ -49,6 +54,7 @@ export type DocumentActivityStage =
   | "DRAFTING_LEDGER"
   | "POSTED"
   | "NEEDS_REVIEW"
+  | "EXTRACTION_NEEDS_REVIEW"
   | "FAILED"
   | "CATEGORIZATION_FAILED";
 

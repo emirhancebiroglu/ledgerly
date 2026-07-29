@@ -1,4 +1,9 @@
-export type DocumentStatus = "PENDING" | "PROCESSING" | "EXTRACTED" | "NEEDS_REVIEW" | "FAILED";
+export type DocumentStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "EXTRACTED"
+  | "EXTRACTION_NEEDS_REVIEW"
+  | "FAILED";
 
 export interface UploadedDocument {
   id: string;

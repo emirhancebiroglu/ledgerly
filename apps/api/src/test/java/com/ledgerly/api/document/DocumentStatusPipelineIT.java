@@ -91,8 +91,10 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   }
 
   @Test
-  void aCorruptProposalReachesNeedsReviewAndWritesNoLedgerEntry() throws Exception {
+  void aCorruptProposalReachesExtractionNeedsReviewAndCreatesNoExpenseOrLedgerEntry()
+      throws Exception {
     String token = registerAndGetAccessToken();
+    long expensesBefore = countRows("expense");
     long ledgerEntriesBefore = countRows("ledger_entry");
     long ledgerTransactionsBefore = countRows("ledger_transaction");
     // Arithmetically broken: lines 10000 + tax 2100 is 12100, not 999999.
@@ -102,11 +104,12 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     processQueue();
 
     Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
-    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.NEEDS_REVIEW);
+    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.EXTRACTION_NEEDS_REVIEW);
     assertThat(stored.getFailureReason()).contains("does not equal");
     // The proposal is kept so a human reviewer can see what was actually claimed.
     assertThat(stored.getProposal()).isNotNull();
 
+    assertThat(countRows("expense")).isEqualTo(expensesBefore);
     assertThat(countRows("ledger_entry")).isEqualTo(ledgerEntriesBefore);
     assertThat(countRows("ledger_transaction")).isEqualTo(ledgerTransactionsBefore);
   }

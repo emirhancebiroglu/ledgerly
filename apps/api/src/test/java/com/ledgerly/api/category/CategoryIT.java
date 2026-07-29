@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.hamcrest.Matchers.hasItem;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.auth.AuthResponse;
@@ -35,6 +36,17 @@ class CategoryIT extends AbstractPostgresIT {
   @Autowired private JdbcTemplate jdbcTemplate;
 
   @Test
+  void registrationProvisionsTheStarterCategoryTaxonomy() throws Exception {
+    String token = registerAndGetAccessToken();
+
+    mockMvc
+        .perform(get("/api/v1/categories").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.length()").value(12))
+        .andExpect(jsonPath("$[*].name", hasItem("Travel & Transport")));
+  }
+
+  @Test
   void aCategoryCanBeCreatedListedAndFetched() throws Exception {
     String token = registerAndGetAccessToken();
 
@@ -47,7 +59,7 @@ class CategoryIT extends AbstractPostgresIT {
     mockMvc
         .perform(get("/api/v1/categories").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$[0].name").value("Travel"));
+        .andExpect(jsonPath("$[*].name", hasItem("Travel")));
 
     mockMvc
         .perform(get("/api/v1/categories/" + id).header("Authorization", "Bearer " + token))
