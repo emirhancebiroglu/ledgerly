@@ -1,26 +1,26 @@
 import { AppShell } from "@/components/shell/app-shell";
 import { getDashboardSummary } from "@/lib/dashboard";
+import { getCurrentUser } from "@/lib/me";
 
 /**
- * The org name and user initial the sidebar/topbar want are not available from any endpoint
- * today — the access token carries only `userId`/`organizationId` (both opaque UUIDs), and
- * nothing in the API exposes a display name for either (`AuthenticatedPrincipal`,
- * `JwtService`). Placeholders until a `/api/v1/me`-shaped endpoint exists; tracked as a known
- * gap rather than guessed at from the UUID.
+ * Identity comes from the authenticated `/me` projection. Keep the neutral fallback only for an
+ * unavailable API, never derive a display identity from opaque JWT UUIDs.
  */
 const ORG_NAME_PLACEHOLDER = "Your organization";
 const ORG_INITIAL_PLACEHOLDER = "O";
 const USER_INITIAL_PLACEHOLDER = "U";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const summary = await getDashboardSummary();
+  const [summary, currentUser] = await Promise.all([getDashboardSummary(), getCurrentUser()]);
+  const orgName = currentUser?.organizationName ?? ORG_NAME_PLACEHOLDER;
+  const userInitial = currentUser?.fullName.charAt(0).toUpperCase() ?? USER_INITIAL_PLACEHOLDER;
 
   return (
     <AppShell
       reviewQueueCount={summary?.reviewQueueCount}
-      orgName={ORG_NAME_PLACEHOLDER}
-      orgInitial={ORG_INITIAL_PLACEHOLDER}
-      userInitial={USER_INITIAL_PLACEHOLDER}
+      orgName={orgName}
+      orgInitial={orgName.charAt(0).toUpperCase() || ORG_INITIAL_PLACEHOLDER}
+      userInitial={userInitial}
     >
       {children}
     </AppShell>

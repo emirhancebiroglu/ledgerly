@@ -49,9 +49,6 @@ export function LedgerEntries({ entries }: LedgerEntriesProps) {
             className="flex items-center justify-between gap-3"
           >
             <div className="min-w-0">
-              <div className="font-mono text-[12.5px] text-muted-foreground">
-                {entry.accountId.slice(0, 8)}
-              </div>
               <div className="truncate text-[13px] font-medium">{entry.accountName}</div>
             </div>
             <div className="shrink-0 text-right">

@@ -50,7 +50,7 @@ export default async function ExpenseDetailPage({ params }: ExpenseDetailPagePro
         <div className="flex flex-col gap-4">
           <ExtractedFields expense={expense} />
           <LedgerEntries entries={expense.ledgerEntries} />
-          <AgentTimeline document={expense.document} expenseStatus={expense.status} />
+          <AgentTimeline activity={expense.activity} />
         </div>
       </div>
     </div>

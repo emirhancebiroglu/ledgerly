@@ -458,6 +458,18 @@ function handleRefresh(req, res) {
   send(res, 200, TOKENS);
 }
 
+function handleMe(req, res, isAuthed) {
+  if (!isAuthed) return send(res, 401, {});
+  send(res, 200, {
+    userId: "user-1",
+    fullName: "Elif Kaya",
+    email: "owner@example.com",
+    organizationId: "org-1",
+    organizationName: "Northwind Co.",
+    baseCurrency: "EUR",
+  });
+}
+
 function handleUpload(req, res, isAuthed) {
   if (!isAuthed) return send(res, 401, {});
   const idempotencyKey = req.headers["idempotency-key"];
@@ -650,6 +662,16 @@ function handleExpenseDetail(req, res, isAuthed, expenseId) {
   const document = DOCUMENTS[expense.documentId];
   send(res, 200, {
     ...expense,
+    invoiceNumber: "INV-2026-0714",
+    documentDate: "2026-07-14",
+    taxMinor: "1200",
+    activity: [
+      { id: 1, stage: "UPLOADED", detail: "Document uploaded", createdAt: document.createdAt },
+      { id: 2, stage: "EXTRACTING", detail: "Extracting document data", createdAt: document.createdAt },
+      { id: 3, stage: "CATEGORIZING", detail: "Categorizing expense", createdAt: document.createdAt },
+      { id: 4, stage: "DRAFTING_LEDGER", detail: "Drafting ledger entries", createdAt: document.createdAt },
+      { id: 5, stage: expense.status === "POSTED" ? "POSTED" : "NEEDS_REVIEW", detail: expense.status === "POSTED" ? "Expense posted to the ledger" : "Expense needs review", createdAt: document.createdAt },
+    ],
     ledgerEntries: ledgerEntriesFor(expense),
     document: {
       id: document.id,
@@ -756,6 +778,9 @@ const server = createServer((req, res) => {
   }
   if (req.method === "POST" && url.pathname === "/api/v1/auth/refresh") {
     return handleRefresh(req, res);
+  }
+  if (req.method === "GET" && url.pathname === "/api/v1/me") {
+    return handleMe(req, res, isAuthed);
   }
   if (req.method === "POST" && url.pathname === "/api/v1/documents") {
     return handleUpload(req, res, isAuthed);
