@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatMoney } from "@/lib/money";
-import { createBudget, deleteBudget, updateBudget, type Budget, type BudgetInput } from "@/lib/budgets";
+import { createBudget, decimalToMinor, deleteBudget, minorToDecimal, updateBudget, type Budget, type BudgetInput } from "@/lib/budgets";
 import type { Category } from "@/lib/categories";
 
 interface BudgetListProps {
@@ -31,7 +32,7 @@ function toInput(budget: Budget): BudgetInput {
   return {
     categoryId: budget.categoryId,
     period: budget.period,
-    limitMinor: budget.limitMinor.toString(),
+    limitMinor: minorToDecimal(budget.limitMinor),
     currency: budget.currency,
   };
 }
@@ -41,6 +42,7 @@ export function BudgetList({ initialBudgets, categories }: BudgetListProps) {
   const [editing, setEditing] = useState<EditingBudget>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState<Budget | null>(null);
 
   async function save(input: BudgetInput) {
     setBusy(true);
@@ -59,16 +61,17 @@ export function BudgetList({ initialBudgets, categories }: BudgetListProps) {
     setEditing(null);
   }
 
-  async function remove(budget: Budget) {
+  async function remove(budget: Budget): Promise<boolean> {
     setBusy(true);
     setError(null);
     const result = await deleteBudget(budget.id);
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
-      return;
+      return false;
     }
     setBudgets((current) => current.filter((item) => item.id !== budget.id));
+    return true;
   }
 
   return (
@@ -79,21 +82,24 @@ export function BudgetList({ initialBudgets, categories }: BudgetListProps) {
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">Monthly limits use exact ledger minor units.</p>
+        <p className="text-sm text-muted-foreground">Set a monthly category limit in your currency.</p>
         <Button onClick={() => { setError(null); setEditing("new"); }}>
           <Plus data-icon="inline-start" /> New budget
         </Button>
       </div>
 
-      {editing && (
-        <BudgetForm
+      <Dialog open={editing !== null} onOpenChange={(open) => { if (!open && !busy) setEditing(null); }}>
+        {editing && <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-[560px]" showCloseButton={!busy}>
+          <DialogHeader><DialogTitle>{editing === "new" ? "New budget" : "Edit budget"}</DialogTitle><DialogDescription>Amounts accept up to two decimal places and are stored exactly in minor units.</DialogDescription></DialogHeader>
+          <BudgetForm
           budget={editing === "new" ? undefined : editing}
           categories={categories}
           busy={busy}
           onCancel={() => { if (!busy) setEditing(null); }}
           onSave={save}
-        />
-      )}
+          />
+        </DialogContent>}
+      </Dialog>
 
       {budgets.length === 0 ? (
         <Card className="items-center p-8 text-center">
@@ -130,13 +136,19 @@ export function BudgetList({ initialBudgets, categories }: BudgetListProps) {
                 </div>
                 <div className="flex justify-end gap-1 border-t border-border pt-3">
                   <Button variant="ghost" size="sm" onClick={() => { setError(null); setEditing(budget); }} disabled={busy}><Pencil /> Edit</Button>
-                  <Button variant="ghost" size="sm" className="text-danger hover:text-danger" onClick={() => remove(budget)} disabled={busy}><Trash2 /> Delete</Button>
+                  <Button variant="ghost" size="sm" className="text-danger hover:text-danger" onClick={() => setConfirmingDelete(budget)} disabled={busy}><Trash2 /> Delete</Button>
                 </div>
               </Card>
             );
           })}
         </div>
       )}
+      <Dialog open={confirmingDelete !== null} onOpenChange={(open) => { if (!open && !busy) setConfirmingDelete(null); }}>
+        {confirmingDelete && <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-sm" showCloseButton={!busy}>
+          <DialogHeader><DialogTitle>Delete budget?</DialogTitle><DialogDescription>This removes the {categoryLabel(categories, confirmingDelete.categoryId)} budget. Existing alerts and posted expenses are unchanged.</DialogDescription></DialogHeader>
+          <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={busy} onClick={() => setConfirmingDelete(null)}>Cancel</Button><Button type="button" variant="destructive" disabled={busy} onClick={async () => { if (await remove(confirmingDelete)) setConfirmingDelete(null); }}>{busy ? "Deleting…" : "Delete budget"}</Button></div>
+        </DialogContent>}
+      </Dialog>
     </div>
   );
 }
@@ -154,25 +166,23 @@ function BudgetForm({ budget, categories, busy, onCancel, onSave }: {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!values.categoryId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(values.period) || !/^\d+$/.test(values.limitMinor) || BigInt(values.limitMinor) <= BigInt(0) || BigInt(values.limitMinor) > BigInt("9223372036854775807") || !/^[A-Z]{3}$/.test(values.currency)) {
-      setValidation("Choose a category, calendar month, positive whole-number minor limit, and three-letter currency.");
+    const limitMinor = decimalToMinor(values.limitMinor);
+    if (!values.categoryId || !/^\d{4}-(0[1-9]|1[0-2])$/.test(values.period) || limitMinor === null || limitMinor <= BigInt(0) || !/^[A-Z]{3}$/.test(values.currency)) {
+      setValidation("Choose a category, calendar month, positive amount with at most two decimals, and three-letter currency.");
       return;
     }
     setValidation(null);
-    void onSave(values);
+    void onSave({ ...values, limitMinor: limitMinor.toString() });
   }
 
   return (
-    <Card className="gap-4 p-5">
-      <div><h2 className="font-heading text-base font-semibold">{budget ? "Edit budget" : "New budget"}</h2><p className="text-sm text-muted-foreground">Amounts are integer minor units, exactly as stored by the ledger.</p></div>
       <form className="grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={submit}>
         <div className="grid gap-2"><Label htmlFor="budget-category">Category</Label><select id="budget-category" value={values.categoryId} onChange={(event) => setValues({ ...values, categoryId: event.target.value })} className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm" disabled={busy}>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></div>
         <div className="grid gap-2"><Label htmlFor="budget-period">Month</Label><Input id="budget-period" type="month" value={values.period} onChange={(event) => setValues({ ...values, period: event.target.value })} disabled={busy} /></div>
-        <div className="grid gap-2"><Label htmlFor="budget-limit">Monthly limit (minor units)</Label><Input id="budget-limit" inputMode="numeric" pattern="[0-9]*" value={values.limitMinor} onChange={(event) => setValues({ ...values, limitMinor: event.target.value })} disabled={busy} /></div>
+        <div className="grid gap-2"><Label htmlFor="budget-limit">Monthly limit</Label><Input id="budget-limit" inputMode="decimal" placeholder="2,500.00" value={values.limitMinor} onChange={(event) => setValues({ ...values, limitMinor: event.target.value.replace(",", ".") })} disabled={busy} /></div>
         <div className="grid gap-2"><Label htmlFor="budget-currency">Currency</Label><Input id="budget-currency" maxLength={3} value={values.currency} onChange={(event) => setValues({ ...values, currency: event.target.value.toUpperCase() })} disabled={busy} /></div>
         {validation && <p role="alert" className="sm:col-span-2 text-sm text-danger">{validation}</p>}
         <div className="flex justify-end gap-2 sm:col-span-2"><Button type="button" variant="outline" onClick={onCancel} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy || categories.length === 0}>{busy ? "Saving…" : "Save budget"}</Button></div>
       </form>
-    </Card>
   );
 }

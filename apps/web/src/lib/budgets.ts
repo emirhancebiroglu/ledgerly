@@ -78,6 +78,18 @@ export function parseMinor(value: string | number): bigint {
   return BigInt(value);
 }
 
+/** Converts a human decimal amount to exact cents without a floating-point round trip. */
+export function decimalToMinor(value: string): bigint | null {
+  const match = value.trim().match(/^(\d+)(?:\.(\d{1,2}))?$/);
+  if (!match) return null;
+  const minor = BigInt(match[1]) * BigInt(100) + BigInt((match[2] ?? "").padEnd(2, "0") || "0");
+  return minor <= BigInt("9223372036854775807") ? minor : null;
+}
+
+export function minorToDecimal(value: bigint): string {
+  return `${value / BigInt(100)}.${(value % BigInt(100)).toString().padStart(2, "0")}`;
+}
+
 export function createBudget(input: BudgetInput): Promise<BudgetMutationResult> {
   return mutateBudget("/api/budgets", "POST", input);
 }
