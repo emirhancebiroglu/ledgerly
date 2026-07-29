@@ -43,10 +43,10 @@ describe("login action", () => {
       login(undefined, formData({ email: "user@example.com", password: "pw" })),
     ).rejects.toThrow("NEXT_REDIRECT:/dashboard");
 
-    expect(sessionMocks.setSessionCookies).toHaveBeenCalledWith({
-      accessToken: "a",
-      refreshToken: "r",
-    });
+    expect(sessionMocks.setSessionCookies).toHaveBeenCalledWith(
+      { accessToken: "a", refreshToken: "r" },
+      false,
+    );
   });
 
   it("redirects to the safe next path when provided", async () => {
@@ -65,6 +65,54 @@ describe("login action", () => {
         formData({ email: "user@example.com", password: "pw", next: "/expenses/123" }),
       ),
     ).rejects.toThrow("NEXT_REDIRECT:/expenses/123");
+  });
+
+  it("keeps the refresh session for 30 days only when remember is selected", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ accessToken: "a", refreshToken: "r" }), { status: 200 }),
+      ),
+    );
+
+    const { login } = await import("@/app/actions/auth");
+
+    await expect(
+      login(undefined, formData({ email: "user@example.com", password: "pw", remember: "on" })),
+    ).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+
+    expect(sessionMocks.setSessionCookies).toHaveBeenCalledWith(
+      { accessToken: "a", refreshToken: "r" },
+      true,
+    );
+  });
+
+  it("sends the registration identity contract unchanged", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ accessToken: "a", refreshToken: "r" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { register } = await import("@/app/actions/auth");
+
+    await expect(
+      register(
+        undefined,
+        formData({
+          fullName: "Elif Kaya",
+          company: "Northwind Co.",
+          email: "elif@example.com",
+          password: "correct-horse-battery",
+        }),
+      ),
+    ).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toEqual({
+      fullName: "Elif Kaya",
+      company: "Northwind Co.",
+      email: "elif@example.com",
+      password: "correct-horse-battery",
+    });
   });
 
   it("ignores a protocol-relative next path (open-redirect guard)", async () => {

@@ -5,8 +5,8 @@ const FIXTURES_DIR = path.join(process.cwd(), "e2e", "fixtures");
 
 async function login(page: Page): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("owner@example.com");
-  await page.getByLabel("Password").fill("password123");
+  await page.getByLabel("Work email").fill("owner@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("password123");
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }

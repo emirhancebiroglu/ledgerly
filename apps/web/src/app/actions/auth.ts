@@ -8,7 +8,10 @@ export interface AuthFormState {
   error?: string;
 }
 
-async function parseAuthResponse(response: Response): Promise<AuthFormState> {
+async function parseAuthResponse(
+  response: Response,
+  persistentSession = true,
+): Promise<AuthFormState> {
   if (!response.ok) {
     const body = await response.text();
     let message = "Something went wrong. Please try again.";
@@ -25,7 +28,7 @@ async function parseAuthResponse(response: Response): Promise<AuthFormState> {
   }
 
   const tokens = (await response.json()) as { accessToken: string; refreshToken: string };
-  await setSessionCookies(tokens);
+  await setSessionCookies(tokens, persistentSession);
   return {};
 }
 
@@ -35,6 +38,7 @@ export async function login(
 ): Promise<AuthFormState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const remember = formData.get("remember") === "on";
 
   const response = await apiFetch("/api/v1/auth/login", {
     method: "POST",
@@ -42,7 +46,7 @@ export async function login(
     body: JSON.stringify({ email, password }),
   });
 
-  const result = await parseAuthResponse(response);
+  const result = await parseAuthResponse(response, remember);
   if (result.error) {
     return result;
   }
@@ -56,14 +60,15 @@ export async function register(
   _prevState: AuthFormState | undefined,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const organizationName = String(formData.get("organizationName") ?? "");
+  const fullName = String(formData.get("fullName") ?? "");
+  const company = String(formData.get("company") ?? "");
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
 
   const response = await apiFetch("/api/v1/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ organizationName, email, password }),
+    body: JSON.stringify({ fullName, company, email, password }),
   });
 
   const result = await parseAuthResponse(response);

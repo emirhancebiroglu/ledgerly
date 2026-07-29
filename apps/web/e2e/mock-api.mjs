@@ -442,6 +442,18 @@ function handleLogin(req, res) {
   send(res, 200, TOKENS);
 }
 
+function handleRegister(req, res) {
+  readBody(req)
+    .then((body) => {
+      const { fullName, company, email, password } = JSON.parse(body.toString("utf-8"));
+      if (!fullName || !company || !email || !password || password.length < 12) {
+        return send(res, 400, { message: "Complete every field and use a 12-character password." });
+      }
+      return send(res, 201, TOKENS);
+    })
+    .catch(() => send(res, 400, { message: "Invalid request body." }));
+}
+
 function handleRefresh(req, res) {
   send(res, 200, TOKENS);
 }
@@ -738,6 +750,9 @@ const server = createServer((req, res) => {
 
   if (req.method === "POST" && url.pathname === "/api/v1/auth/login") {
     return handleLogin(req, res);
+  }
+  if (req.method === "POST" && url.pathname === "/api/v1/auth/register") {
+    return handleRegister(req, res);
   }
   if (req.method === "POST" && url.pathname === "/api/v1/auth/refresh") {
     return handleRefresh(req, res);

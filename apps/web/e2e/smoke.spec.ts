@@ -12,8 +12,8 @@ test("unauthenticated visitor is redirected from a protected route to /login", a
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard/);
 });
 
-test("login page renders the email and password fields", async ({ page }) => {
+test("login page renders the work email and password fields", async ({ page }) => {
   await page.goto("/login");
-  await expect(page.getByLabel("Email")).toBeVisible();
-  await expect(page.getByLabel("Password")).toBeVisible();
+  await expect(page.getByLabel("Work email")).toBeVisible();
+  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
 });
