@@ -80,6 +80,9 @@ services:
     ports:
       - "3000:3000"
     environment:
+      # Server Actions and server components run inside this container. They must use the
+      # Compose DNS name; localhost would point back to the web container, not the host API port.
+      API_URL: ${API_URL:-http://api:8080}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
 
 volumes:
