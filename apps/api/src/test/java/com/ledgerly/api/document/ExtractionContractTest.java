@@ -1,12 +1,12 @@
 package com.ledgerly.api.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -18,45 +18,49 @@ import org.junit.jupiter.api.Test;
 class ExtractionContractTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
+  private final ExtractionProposalContract proposalContract = new ExtractionProposalContract();
 
   @Test
-  void bothSchemasAreValidJsonSchemaAndLoadFromTheSharedDirectory() {
-    assertThat(ContractSchemas.load("extraction-proposal.schema.json")).isNotNull();
+  void bothSchemasLoadAtTheirActualOwners() {
+    assertThat(proposalContract).isNotNull();
     assertThat(ContractSchemas.load("extract-request.schema.json")).isNotNull();
   }
 
   @Test
   void theGoldenValidProposalValidatesGreen() throws Exception {
-    JsonSchema schema = ContractSchemas.load("extraction-proposal.schema.json");
-
-    assertThat(validate(schema, ContractSchemas.example("extraction-proposal.valid.json")))
-        .as("the documented valid example must satisfy the schema")
-        .isEmpty();
+    assertThatCode(
+            () ->
+                proposalContract.validate(
+                    Files.readString(ContractSchemas.example("extraction-proposal.valid.json"))))
+        .doesNotThrowAnyException();
   }
 
   @Test
   void theGoldenValidRequestValidatesGreen() throws Exception {
-    JsonSchema schema = ContractSchemas.load("extract-request.schema.json");
-
-    assertThat(validate(schema, ContractSchemas.example("extract-request.valid.json"))).isEmpty();
+    assertThat(
+            ContractSchemas.load("extract-request.schema.json")
+                .validate(
+                    MAPPER.readTree(
+                        Files.readString(ContractSchemas.example("extract-request.valid.json")))))
+        .isEmpty();
   }
 
   @Test
   void aProposalMissingTotalMinorValidatesRed() throws Exception {
-    JsonSchema schema = ContractSchemas.load("extraction-proposal.schema.json");
-
-    assertThat(validate(schema, ContractSchemas.example("extraction-proposal.missing-total.json")))
-        .as("total_minor is required")
-        .isNotEmpty();
+    assertThatThrownBy(
+            () ->
+                proposalContract.validate(
+                    Files.readString(ContractSchemas.example("extraction-proposal.missing-total.json"))))
+        .isInstanceOf(MalformedProposalException.class);
   }
 
   @Test
   void aProposalWithAFloatAmountValidatesRed() throws Exception {
-    JsonSchema schema = ContractSchemas.load("extraction-proposal.schema.json");
-
-    assertThat(validate(schema, ContractSchemas.example("extraction-proposal.float-amount.json")))
-        .as("money must be an integer of minor units, never a float")
-        .isNotEmpty();
+    assertThatThrownBy(
+            () ->
+                proposalContract.validate(
+                    Files.readString(ContractSchemas.example("extraction-proposal.float-amount.json"))))
+        .isInstanceOf(MalformedProposalException.class);
   }
 
   @Test
@@ -86,18 +90,11 @@ class ExtractionContractTest {
 
   @Test
   void anUnknownTopLevelFieldIsRejected() throws Exception {
-    JsonSchema schema = ContractSchemas.load("extraction-proposal.schema.json");
     JsonNode proposal =
         MAPPER.readTree(Files.readString(ContractSchemas.example("extraction-proposal.valid.json")));
     ((com.fasterxml.jackson.databind.node.ObjectNode) proposal).put("smuggled_field", "surprise");
 
-    assertThat(schema.validate(proposal))
-        .as("additionalProperties is false, so an unexpected field is a contract break")
-        .isNotEmpty();
-  }
-
-  private java.util.Set<com.networknt.schema.ValidationMessage> validate(
-      JsonSchema schema, Path examplePath) throws Exception {
-    return schema.validate(MAPPER.readTree(Files.readString(examplePath)));
+    assertThatThrownBy(() -> proposalContract.validate(proposal.toString()))
+        .isInstanceOf(MalformedProposalException.class);
   }
 }

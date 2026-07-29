@@ -1,9 +1,9 @@
 package com.ledgerly.api.document;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
 import java.nio.file.Files;
 import org.junit.jupiter.api.Test;
 
@@ -19,20 +19,20 @@ class ProposalContractConformanceTest {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private final ProposalMapper proposalMapper = new ProposalMapper();
+  private final ExtractionProposalContract proposalContract = new ExtractionProposalContract();
+  private final ProposalMapper proposalMapper = new ProposalMapper(proposalContract);
 
   @Test
   void aProposalSerializedByApiValidatesAgainstTheSharedSchema() throws Exception {
-    JsonSchema schema = ContractSchemas.load("extraction-proposal.schema.json");
     ExtractionProposal proposal =
         proposalMapper.parse(
             Files.readString(ContractSchemas.example("extraction-proposal.valid.json")));
 
     String serialized = proposalMapper.toJson(proposal);
 
-    assertThat(schema.validate(MAPPER.readTree(serialized)))
+    assertThatCode(() -> proposalContract.validate(serialized))
         .as("what api persists and returns must satisfy the contract both services share")
-        .isEmpty();
+        .doesNotThrowAnyException();
   }
 
   @Test

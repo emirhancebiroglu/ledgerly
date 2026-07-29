@@ -125,13 +125,11 @@
       <version>${jqwik.version}</version>
       <scope>test</scope>
     </dependency>
-    <!-- Contract tests validate against docs/contracts/ directly; the schemas are never
-         hand-copied into Java, so this stays test-scoped. -->
+    <!-- The API validates untrusted extraction output against the shared schema at runtime. -->
     <dependency>
       <groupId>com.networknt</groupId>
       <artifactId>json-schema-validator</artifactId>
       <version>${json-schema-validator.version}</version>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -149,6 +147,20 @@
 
   <build>
     <finalName>api</finalName>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- Keep docs/contracts as the single checked-in source while embedding the exact schema
+           that the production API validates. -->
+      <resource>
+        <directory>${project.basedir}/../../docs/contracts</directory>
+        <includes>
+          <include>extraction-proposal.schema.json</include>
+        </includes>
+        <targetPath>contracts</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>
