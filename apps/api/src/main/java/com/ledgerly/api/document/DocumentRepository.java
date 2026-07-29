@@ -1,11 +1,13 @@
 package com.ledgerly.api.document;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,6 +20,15 @@ public interface DocumentRepository extends JpaRepository<Document, UUID> {
    * tenant is indistinguishable from one that does not exist.
    */
   Optional<Document> findByIdAndOrganizationId(UUID id, UUID organizationId);
+
+  /**
+   * Serializes activity appends for one document. The SSE cursor is the activity id, so commits
+   * for the same stream must not become visible out of id order.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("SELECT d FROM Document d WHERE d.id = :id AND d.organizationId = :organizationId")
+  Optional<Document> lockByIdAndOrganizationId(
+      @Param("id") UUID id, @Param("organizationId") UUID organizationId);
 
   /** Paged deliberately: an organization's document list grows without bound. */
   List<Document> findByOrganizationIdOrderByCreatedAtDesc(UUID organizationId, Pageable pageable);

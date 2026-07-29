@@ -23,9 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * {@code GET /api/v1/documents/{id}/events}: M7a T6. Real status transitions through {@link
- * DocumentStatusTransitions} (the same bean the extraction pipeline uses), relayed through the
- * real Redis container via {@link DocumentEventPublisher}, delivered over a real SSE stream.
+ * {@code GET /api/v1/documents/{id}/events}: durable activity replay with Redis live delivery.
  */
 @AutoConfigureMockMvc
 class DocumentEventControllerIT extends AbstractPostgresIT {
@@ -38,7 +36,7 @@ class DocumentEventControllerIT extends AbstractPostgresIT {
   @Autowired private DocumentStatusTransitions documentStatusTransitions;
 
   @Test
-  void emitsStatusTransitionsUntilTerminalThenCloses() throws Exception {
+  void emitsActivityTransitionsUntilTerminalThenCloses() throws Exception {
     String token = registerAndGetAccessToken();
     UUID org = organizationIdOf(token);
     UUID documentId = insertPendingDocument(org, token);
@@ -62,9 +60,36 @@ class DocumentEventControllerIT extends AbstractPostgresIT {
     subscribeResult.getAsyncResult(10_000);
     String body = subscribeResult.getResponse().getContentAsString();
 
-    assertThat(body).contains("PROCESSING");
+    assertThat(body).contains("EXTRACTING");
     assertThat(body).contains("FAILED");
     assertThat(body).contains("extraction failed");
+  }
+
+  @Test
+  void replaysOnlyEventsAfterLastEventId() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID documentId = insertPendingDocument(org, token);
+    documentStatusTransitions.markProcessing(documentId, org);
+    long extractingId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM document_activity WHERE document_id = ? AND stage = 'EXTRACTING'",
+            Long.class,
+            documentId);
+    documentStatusTransitions.recordFailure(documentId, org, "extraction failed");
+
+    MvcResult replay =
+        mockMvc
+            .perform(
+                get("/api/v1/documents/" + documentId + "/events")
+                    .header("Authorization", "Bearer " + token)
+                    .header("Last-Event-ID", extractingId))
+            .andReturn();
+    replay.getAsyncResult(10_000);
+    String body = replay.getResponse().getContentAsString();
+
+    assertThat(body).contains("FAILED");
+    assertThat(body).doesNotContain("EXTRACTING");
   }
 
   @Test

@@ -31,6 +31,7 @@ public class DocumentUploadService {
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
   private final UploadRateLimiter uploadRateLimiter;
+  private final DocumentActivityService documentActivityService;
   private final long maxBytes;
 
   public DocumentUploadService(
@@ -40,6 +41,7 @@ public class DocumentUploadService {
       AuditService auditService,
       ObjectMapper objectMapper,
       UploadRateLimiter uploadRateLimiter,
+      DocumentActivityService documentActivityService,
       @Value("${ledgerly.document.max-bytes:10485760}") long maxBytes) {
     this.documentRepository = documentRepository;
     this.storageClient = storageClient;
@@ -47,6 +49,7 @@ public class DocumentUploadService {
     this.auditService = auditService;
     this.objectMapper = objectMapper;
     this.uploadRateLimiter = uploadRateLimiter;
+    this.documentActivityService = documentActivityService;
     this.maxBytes = maxBytes;
   }
 
@@ -86,6 +89,11 @@ public class DocumentUploadService {
                 storageKey,
                 ContentHasher.sha256Hex(content)));
     documentRepository.flush();
+    documentActivityService.record(
+        document.getId(),
+        principal.organizationId(),
+        DocumentActivityStage.UPLOADED,
+        "Document uploaded");
 
     auditService.record(
         principal.organizationId(),

@@ -9,7 +9,11 @@ final class DocumentEventChannels {
 
   private DocumentEventChannels() {}
 
-  static String channelFor(UUID documentId) {
+  static String statusChannelFor(UUID documentId) {
     return "document-events:" + documentId;
+  }
+
+  static String activityChannelFor(UUID documentId) {
+    return "document-activities:" + documentId;
   }
 }

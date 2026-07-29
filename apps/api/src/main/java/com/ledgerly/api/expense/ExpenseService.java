@@ -2,6 +2,8 @@ package com.ledgerly.api.expense;
 
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.document.Document;
+import com.ledgerly.api.document.DocumentActivityService;
+import com.ledgerly.api.document.DocumentActivityResponse;
 import com.ledgerly.api.document.DocumentRepository;
 import com.ledgerly.api.document.DocumentResponse;
 import com.ledgerly.api.document.ExtractionProposal;
@@ -29,16 +31,19 @@ public class ExpenseService {
   private final DocumentRepository documentRepository;
   private final LedgerTransactionRepository ledgerTransactionRepository;
   private final ProposalMapper proposalMapper;
+  private final DocumentActivityService documentActivityService;
 
   public ExpenseService(
       ExpenseRepository expenseRepository,
       DocumentRepository documentRepository,
       LedgerTransactionRepository ledgerTransactionRepository,
-      ProposalMapper proposalMapper) {
+      ProposalMapper proposalMapper,
+      DocumentActivityService documentActivityService) {
     this.expenseRepository = expenseRepository;
     this.documentRepository = documentRepository;
     this.ledgerTransactionRepository = ledgerTransactionRepository;
     this.proposalMapper = proposalMapper;
+    this.documentActivityService = documentActivityService;
   }
 
   @Transactional(readOnly = true)
@@ -73,7 +78,8 @@ public class ExpenseService {
         expense,
         ledgerEntries,
         DocumentResponse.from(document),
-        extractedFields(document));
+        extractedFields(document),
+        documentActivityService.replay(document.getId(), principal.organizationId(), 0L));
   }
 
   private ExpenseDetailResponse.ExtractedDocumentFields extractedFields(Document document) {

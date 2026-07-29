@@ -113,6 +113,8 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
 
     assertThat(ledgerEntryCountForExpense(expenseId)).isEqualTo(2);
     assertThat(netBalanceForExpense(expenseId)).isZero();
+    assertThat(activityStages(documentId))
+        .containsExactly("UPLOADED", "EXTRACTING", "CATEGORIZING", "DRAFTING_LEDGER", "POSTED");
   }
 
   @Test
@@ -502,6 +504,22 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
       try (ResultSet rs = ps.executeQuery()) {
         rs.next();
         return rs.getLong(1);
+      }
+    }
+  }
+
+  private List<String> activityStages(UUID documentId) throws Exception {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT stage FROM document_activity WHERE document_id = ? ORDER BY id")) {
+      statement.setObject(1, documentId);
+      try (ResultSet rows = statement.executeQuery()) {
+        java.util.ArrayList<String> stages = new java.util.ArrayList<>();
+        while (rows.next()) {
+          stages.add(rows.getString("stage"));
+        }
+        return stages;
       }
     }
   }

@@ -32,6 +32,7 @@ class DocumentUploadServiceTest {
   @Mock private BlobRollbackCleanup blobRollbackCleanup;
   @Mock private AuditService auditService;
   @Mock private UploadRateLimiter uploadRateLimiter;
+  @Mock private DocumentActivityService documentActivityService;
 
   private static final byte[] REAL_PDF =
       ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
@@ -47,6 +48,7 @@ class DocumentUploadServiceTest {
             auditService,
             new ObjectMapper(),
             uploadRateLimiter,
+            documentActivityService,
             10_485_760);
     AuthenticatedPrincipal principal = new AuthenticatedPrincipal(UUID.randomUUID(), UUID.randomUUID());
 

@@ -2,6 +2,7 @@ package com.ledgerly.api.expense;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.ledgerly.api.document.DocumentResponse;
+import com.ledgerly.api.document.DocumentActivityResponse;
 import com.ledgerly.api.ledger.LedgerEntryView;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -33,13 +34,15 @@ public record ExpenseDetailResponse(
     DocumentResponse document,
     String invoiceNumber,
     LocalDate documentDate,
-    String taxMinor) {
+    String taxMinor,
+    List<DocumentActivityResponse> activity) {
 
   public static ExpenseDetailResponse from(
       Expense expense,
       List<LedgerEntryView> ledgerEntries,
       DocumentResponse document,
-      ExtractedDocumentFields fields) {
+      ExtractedDocumentFields fields,
+      List<DocumentActivityResponse> activity) {
     return new ExpenseDetailResponse(
         expense.getId(),
         expense.getDocumentId(),
@@ -56,7 +59,8 @@ public record ExpenseDetailResponse(
         document,
         fields.invoiceNumber(),
         fields.documentDate(),
-        fields.taxMinor());
+        fields.taxMinor(),
+        activity);
   }
 
   /** Read-only fields from the validated extraction proposal; never a second ledger write model. */
