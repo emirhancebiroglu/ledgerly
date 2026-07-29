@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { apiFetchAuthenticated } from "@/lib/api-server";
 
 /** Headers forwarded verbatim from the browser request to `api`. */
-const FORWARDED_REQUEST_HEADERS = ["content-type", "idempotency-key"];
+const FORWARDED_REQUEST_HEADERS = ["content-type", "idempotency-key", "last-event-id"];
 
 /** Matches `spring.servlet.multipart.max-request-size` (application.yml) — rejected here rather
  * than after buffering the whole body into Node memory for nothing. */

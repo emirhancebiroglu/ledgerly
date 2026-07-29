@@ -8,8 +8,8 @@ export function AuthShell({ children }: AuthShellProps) {
   return (
     <main className="flex min-h-screen w-full bg-background text-foreground">
       <aside className="relative hidden w-[44%] max-w-[620px] shrink-0 flex-col justify-between overflow-hidden bg-[oklch(0.28_0.07_265)] px-12 py-11 text-[oklch(0.97_0.005_265)] min-[900px]:flex">
-        <div className="absolute -right-35 -top-35 size-[420px] rounded-full bg-[oklch(0.42_0.13_265_/_0.55)]" />
-        <div className="absolute -bottom-45 -left-30 size-[380px] rounded-full bg-[oklch(0.5_0.12_265_/_0.3)]" />
+        <div className="absolute -right-35 -top-35 size-[420px] rounded-full bg-[oklch(0.42_0.13_265_/_0.55)] blur-3xl" />
+        <div className="absolute -bottom-45 -left-30 size-[380px] rounded-full bg-[oklch(0.5_0.12_265_/_0.3)] blur-3xl" />
         <BrandMark inverse />
 
         <div className="relative max-w-[420px]">
