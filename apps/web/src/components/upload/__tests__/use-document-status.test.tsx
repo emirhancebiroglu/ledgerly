@@ -52,21 +52,16 @@ describe("useDocumentStatus", () => {
     expect(MockEventSource.instances[0].url).toBe("/api/documents/doc-1/events");
   });
 
-  it("updates status on a status event and closes the connection on a terminal status", async () => {
+  it("replays activity and closes the connection on a terminal outcome", async () => {
     vi.stubGlobal("EventSource", MockEventSource);
     const { result } = renderHook(() => useDocumentStatus("doc-1"));
     const source = MockEventSource.instances[0];
 
     act(() => {
-      source.emit("status", {
-        documentId: "doc-1",
-        organizationId: "org-1",
-        status: "EXTRACTED",
-        detail: null,
-      });
+      source.emit("activity", { id: 5, stage: "POSTED", detail: "Expense posted", createdAt: "2026-01-01T00:00:00Z" });
     });
 
-    await waitFor(() => expect(result.current.status).toBe("EXTRACTED"));
+    await waitFor(() => expect(result.current.activity[0]?.stage).toBe("POSTED"));
     expect(source.closed).toBe(true);
   });
 
@@ -96,12 +91,7 @@ describe("useDocumentStatus", () => {
     const source = MockEventSource.instances[0];
 
     act(() => {
-      source.emit("status", {
-        documentId: "doc-1",
-        organizationId: "org-1",
-        status: "FAILED",
-        detail: "bad scan",
-      });
+      source.emit("activity", { id: 2, stage: "FAILED", detail: "bad scan", createdAt: "2026-01-01T00:00:00Z" });
     });
     act(() => {
       source.onerror?.();

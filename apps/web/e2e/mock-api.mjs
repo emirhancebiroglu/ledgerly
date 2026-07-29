@@ -426,9 +426,9 @@ function publishStatus(documentId, status, detail) {
     doc.status = status;
     doc.failureReason = detail ?? null;
   }
-  const payload = { documentId, organizationId: "org-1", status, detail: detail ?? null };
-  for (const res of eventSubscribers.get(documentId) ?? []) {
-    res.write(`event: status\ndata: ${JSON.stringify(payload)}\n\n`);
+  const stages = status === "PROCESSING" ? [[2, "EXTRACTING", "Extracting document data"]] : status === "EXTRACTED" ? [[3, "CATEGORIZING", "Categorizing expense"], [4, "DRAFTING_LEDGER", "Drafting ledger entries"], [5, "POSTED", "Expense posted to the ledger"]] : [[3, "FAILED", detail ?? "Processing failed"]];
+  for (const [id, stage, activityDetail] of stages) for (const res of eventSubscribers.get(documentId) ?? []) {
+    res.write(`id: ${id}\nevent: activity\ndata: ${JSON.stringify({ id, stage, detail: activityDetail, createdAt: new Date().toISOString() })}\n\n`);
   }
   if (["EXTRACTED", "NEEDS_REVIEW", "FAILED"].includes(status)) {
     for (const res of eventSubscribers.get(documentId) ?? []) {
@@ -529,17 +529,12 @@ function handleDocumentEvents(req, res, isAuthed, documentId) {
     "cache-control": "no-cache",
     connection: "keep-alive",
   });
+  res.write(`id: 1\nevent: activity\ndata: ${JSON.stringify({ id: 1, stage: "UPLOADED", detail: "Document uploaded", createdAt: doc.createdAt })}\n\n`);
 
   const terminal = ["EXTRACTED", "NEEDS_REVIEW", "FAILED"].includes(doc.status);
   if (terminal) {
-    res.write(
-      `event: status\ndata: ${JSON.stringify({
-        documentId,
-        organizationId: "org-1",
-        status: doc.status,
-        detail: doc.failureReason,
-      })}\n\n`,
-    );
+    const stage = doc.status === "EXTRACTED" ? "POSTED" : "FAILED";
+    res.write(`id: 5\nevent: activity\ndata: ${JSON.stringify({ id: 5, stage, detail: doc.failureReason, createdAt: doc.createdAt })}\n\n`);
     res.end();
     return;
   }
