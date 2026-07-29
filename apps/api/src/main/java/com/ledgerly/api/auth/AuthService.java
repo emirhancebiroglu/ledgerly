@@ -1,5 +1,6 @@
 package com.ledgerly.api.auth;
 
+import com.ledgerly.api.category.OrganizationCategoryProvisioner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +19,7 @@ public class AuthService {
   private final JwtService jwtService;
   private final RefreshTokenService refreshTokenService;
   private final AuthRateLimiter authRateLimiter;
+  private final OrganizationCategoryProvisioner organizationCategoryProvisioner;
 
   public AuthService(
       AppUserRepository appUserRepository,
@@ -25,13 +27,15 @@ public class AuthService {
       PasswordEncoder passwordEncoder,
       JwtService jwtService,
       RefreshTokenService refreshTokenService,
-      AuthRateLimiter authRateLimiter) {
+      AuthRateLimiter authRateLimiter,
+      OrganizationCategoryProvisioner organizationCategoryProvisioner) {
     this.appUserRepository = appUserRepository;
     this.organizationRepository = organizationRepository;
     this.passwordEncoder = passwordEncoder;
     this.jwtService = jwtService;
     this.refreshTokenService = refreshTokenService;
     this.authRateLimiter = authRateLimiter;
+    this.organizationCategoryProvisioner = organizationCategoryProvisioner;
   }
 
   @Transactional
@@ -39,6 +43,7 @@ public class AuthService {
     authRateLimiter.checkRegistration(request.email());
     Organization organization = organizationRepository.save(
         new Organization(request.company(), "EUR"));
+    organizationCategoryProvisioner.provision(organization.getId());
     AppUser user = appUserRepository.save(
         new AppUser(
             organization.getId(), request.fullName(), request.email(), passwordEncoder.encode(request.password())));

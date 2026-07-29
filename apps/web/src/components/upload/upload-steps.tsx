@@ -16,12 +16,45 @@ interface Step {
  * is no event for "OCR done" vs "matching done" to drive intermediate steps honestly. Collapsed
  * to the 3 states the api actually reports rather than fabricating progress within PROCESSING.
  */
-const STAGES: Array<[DocumentActivityStage, string]> = [["UPLOADED", "Uploading"], ["EXTRACTING", "Extracting document data"], ["CATEGORIZING", "Categorizing expense"], ["DRAFTING_LEDGER", "Drafting ledger entries"]];
+const STAGES: Array<[DocumentActivityStage, string]> = [
+  ["UPLOADED", "Uploading"],
+  ["EXTRACTING", "Extracting document data"],
+  ["CATEGORIZING", "Categorizing expense"],
+  ["DRAFTING_LEDGER", "Drafting ledger entries"],
+];
+
 function buildSteps(activity: DocumentActivity[]): Step[] {
   const observed = new Set(activity.map((item) => item.stage));
-  const terminal = activity.find((item) => ["POSTED", "NEEDS_REVIEW", "FAILED", "CATEGORIZATION_FAILED"].includes(item.stage));
+  const terminal = activity.find((item) =>
+    ["POSTED", "NEEDS_REVIEW", "FAILED", "CATEGORIZATION_FAILED"].includes(item.stage),
+  );
   const firstPending = STAGES.findIndex(([stage]) => !observed.has(stage));
-  return [...STAGES.map(([stage, label], index) => ({ label, state: observed.has(stage) ? "done" as StepState : index === firstPending ? "active" as StepState : "pending" as StepState })), { label: terminal?.stage === "POSTED" ? "Posted to ledger" : terminal?.stage === "NEEDS_REVIEW" ? "Needs review" : terminal ? "Failed" : "Outcome", state: terminal ? (terminal.stage === "POSTED" || terminal.stage === "NEEDS_REVIEW" ? "done" : "failed") : firstPending === -1 ? "active" : "pending" }];
+  const workflowSteps: Step[] = STAGES.map(([stage, label], index) => ({
+    label,
+    state: observed.has(stage)
+      ? "done"
+      : !terminal && index === firstPending
+        ? "active"
+        : "pending",
+  }));
+  const outcome: Step = {
+    label:
+      terminal?.stage === "POSTED"
+        ? "Posted to ledger"
+        : terminal?.stage === "NEEDS_REVIEW"
+          ? "Needs review"
+          : terminal
+            ? "Failed"
+            : "Outcome",
+    state: terminal
+      ? terminal.stage === "POSTED" || terminal.stage === "NEEDS_REVIEW"
+        ? "done"
+        : "failed"
+      : firstPending === -1
+        ? "active"
+        : "pending",
+  };
+  return [...workflowSteps, outcome];
 }
 
 function StepIndicator({ state }: { state: StepState }) {
