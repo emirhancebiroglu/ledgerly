@@ -275,6 +275,20 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   }
 
   @Test
+  void anEmptyAiResponseLeavesTheDocumentFailed() throws Exception {
+    String token = registerAndGetAccessToken();
+    stubExtractionClient.respondWith(id -> null);
+
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
+
+    Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
+    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.FAILED);
+    assertThat(stored.getFailureReason()).isEqualTo("Extraction returned a malformed proposal");
+    assertThat(stored.getProposal()).isNull();
+  }
+
+  @Test
   void aFloatAmountFromAiLeavesTheDocumentFailedRatherThanBeingTruncated() throws Exception {
     String token = registerAndGetAccessToken();
     stubExtractionClient.respondWith(
@@ -285,6 +299,28 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
     assertThat(documentRepository.findById(documentIdOf(result)).orElseThrow().getFailureReason())
         .isEqualTo("Extraction returned a malformed proposal");
+  }
+
+  @Test
+  void aMissingRequiredPrimitiveCannotReachPostingThroughJacksonsDefaultValue() throws Exception {
+    String token = registerAndGetAccessToken();
+    long expensesBefore = countRows("expense");
+    long ledgerEntriesBefore = countRows("ledger_entry");
+    long ledgerTransactionsBefore = countRows("ledger_transaction");
+    // Without schema validation, Jackson binds the omitted primitive total_minor to zero. The zero
+    // line and tax then make the handwritten arithmetic validator accept the proposal.
+    stubExtractionClient.respondWith(DocumentStatusPipelineIT::proposalMissingTotalMinor);
+
+    MvcResult result = upload(token).andExpect(jsonPath("$.status").value("PENDING")).andReturn();
+    processQueue();
+
+    Document stored = documentRepository.findById(documentIdOf(result)).orElseThrow();
+    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.FAILED);
+    assertThat(stored.getFailureReason()).isEqualTo("Extraction returned a malformed proposal");
+    assertThat(stored.getProposal()).isNull();
+    assertThat(countRows("expense")).isEqualTo(expensesBefore);
+    assertThat(countRows("ledger_entry")).isEqualTo(ledgerEntriesBefore);
+    assertThat(countRows("ledger_transaction")).isEqualTo(ledgerTransactionsBefore);
   }
 
   @Test
@@ -424,6 +460,16 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
   private static String validProposal(UUID documentId) {
     return proposalWithTotal(documentId, 12_100L);
+  }
+
+  private static String proposalMissingTotalMinor(UUID documentId) {
+    return """
+        {"document_id":"%s","vendor":"Contoso","currency":"EUR","tax_minor":0,
+         "document_date":"%s","lines":[{"description":"zero-value item","quantity":0,"amount_minor":0}],
+         "confidence":{"vendor":0.9,"currency":0.99,"total_minor":0.95,"tax_minor":0.9,
+                       "document_date":0.93},"model":"fake-llm-v1","warnings":[]}
+        """
+        .formatted(documentId, LocalDate.now().minusDays(3));
   }
 
   /** Lines total 10000 and tax is 2100, so only a total of 12100 is internally consistent. */

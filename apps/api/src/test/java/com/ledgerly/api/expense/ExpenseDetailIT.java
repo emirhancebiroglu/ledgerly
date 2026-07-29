@@ -197,7 +197,8 @@ class ExpenseDetailIT extends AbstractPostgresIT {
         {"document_id":"%s","vendor":"Acme Corp","invoice_number":"CRN-42","currency":"EUR",
         "total_minor":-1200,"tax_minor":-120,"document_date":"2026-07-22",
         "lines":[{"description":"credit","quantity":1000,"amount_minor":-1080}],
-        "confidence":{"currency":0.99},"model":"fake-llm-v1","warnings":[]}
+        "confidence":{"currency":0.99,"total_minor":0.95,"tax_minor":0.94,
+        "document_date":0.97},"model":"fake-llm-v1","warnings":[]}
         """.formatted(documentId);
     jdbcTemplate.update("UPDATE document SET proposal = CAST(? AS jsonb) WHERE id = ?", proposal, documentId);
   }

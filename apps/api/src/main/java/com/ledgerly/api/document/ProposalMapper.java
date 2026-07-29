@@ -30,9 +30,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProposalMapper {
 
+  private final ExtractionProposalContract contract;
   private final ObjectMapper objectMapper;
 
-  public ProposalMapper() {
+  public ProposalMapper(ExtractionProposalContract contract) {
+    this.contract = contract;
     this.objectMapper =
         JsonMapper.builder()
             .addModule(new JavaTimeModule())
@@ -59,6 +61,7 @@ public class ProposalMapper {
    * @throws MalformedProposalException if the JSON does not bind to a well-formed proposal
    */
   public ExtractionProposal parse(String json) {
+    contract.validate(json);
     try {
       return objectMapper.readValue(json, ExtractionProposal.class);
     } catch (JsonProcessingException e) {

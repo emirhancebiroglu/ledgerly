@@ -2,13 +2,15 @@
 
 The interface between `api` and `ai`, as JSON Schema. **This directory is the single source of
 truth.** Neither service hand-copies a field list from the other — `api` loads these files from the
-repository root at test time, and `ai` loads the same files. A change here that breaks either side
-fails that side's contract test.
+repository root at test time, and `ai` loads the same files. `api` also embeds
+`extraction-proposal.schema.json` from this directory into its executable artifact and validates
+every raw extraction response against it at runtime before typed binding or ledger posting. A change
+here that breaks either side fails that side's contract test.
 
 | File | Meaning |
 |---|---|
 | `extract-request.schema.json` | The `metadata` part of `POST /extract` on `ai`. Bytes travel as the multipart `file` part. |
-| `extraction-proposal.schema.json` | What `ai` returns. Advisory only — `api` validates it before anything is posted. |
+| `extraction-proposal.schema.json` | What `ai` returns. Advisory only — `api` validates raw JSON against this exact embedded schema, then applies deterministic posting rules. |
 | `embed-policy-request.schema.json` | The `metadata` part of `POST /embed-policy` on `ai`. Bytes travel as the multipart `file` part. |
 | `embed-policy-response.schema.json` | What `ai` returns — a policy document split into chunks with embeddings. `api` persists these as `policy_chunk` rows. |
 | `embed-query-request.schema.json` | The full body of `POST /embed-query` on `ai` — plain JSON, text only. |
@@ -44,7 +46,10 @@ score, which is not money.
 
 ## Schema-valid is not the same as trustworthy
 
-Passing these schemas means the shape is right, nothing more. The arithmetic
+Passing this schema means the shape is right, nothing more. For extraction proposals, `api` applies
+the schema to raw agent JSON before it constructs an `ExtractionProposal`; a missing required field,
+unknown field, invalid format, or out-of-bounds value is a malformed response and reaches no posting
+path. The arithmetic
 (`total == sum(lines) + tax`), the currency allow-list, the date range and the organization's amount
 ceiling are checked in `api` by `ExtractionProposalValidator` — the trust boundary described in
 `docs/architecture.md`. A schema-valid proposal that fails those rules routes to `NEEDS_REVIEW` and
