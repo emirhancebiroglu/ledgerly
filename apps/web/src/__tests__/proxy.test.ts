@@ -19,6 +19,8 @@ const PROTECTED_PATHS = [
   "/upload",
   "/review",
   "/budgets",
+  // Operational, not public: service topology and liveness stay behind the session guard.
+  "/health",
 ];
 
 describe("proxy", () => {

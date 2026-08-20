@@ -31,7 +31,8 @@ test("registration sends the full identity contract and remains usable on mobile
 });
 
 test("the root path is an entry point, never a screen of its own", async ({ page }) => {
-  // Signed out: `/` resolves to login rather than serving the old service-health screen.
+  // Signed out: `/` resolves to login rather than serving a screen of its own. The service-health
+  // view it used to host now lives at `/health`.
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByText(/service health/i)).toHaveCount(0);
@@ -47,10 +48,26 @@ test("the root path is an entry point, never a screen of its own", async ({ page
 });
 
 test("no product route renders without a session", async ({ page }) => {
-  for (const path of ["/dashboard", "/expenses", "/upload", "/review", "/budgets"]) {
+  // `/health` is operational rather than product, but it is guarded the same way: an anonymous
+  // visitor has no business learning which services exist or whether they are up.
+  for (const path of ["/dashboard", "/expenses", "/upload", "/review", "/budgets", "/health"]) {
     await page.goto(path);
     await expect(page).toHaveURL(`/login?next=${encodeURIComponent(path)}`);
   }
+});
+
+test("the service-health view is reachable at /health once signed in", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Work email").fill("elif@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("Correct-Horse-Battery9");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  await page.goto("/health");
+  await expect(page).toHaveURL(/\/health$/);
+  await expect(page.getByText("Ledgerly service health")).toBeVisible();
+  await expect(page.getByText("Api")).toBeVisible();
+  await expect(page.getByText("Ai")).toBeVisible();
 });
 
 test("autofilled credentials keep the designed field styling inside the wrapper", async ({ page }) => {
