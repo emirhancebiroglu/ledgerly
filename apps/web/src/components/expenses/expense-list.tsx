@@ -1,5 +1,5 @@
 import { Card } from "@/components/ui/card";
-import { ExpenseRow } from "@/components/expenses/expense-row";
+import { EXPENSE_GRID_TEMPLATE, ExpenseRow } from "@/components/expenses/expense-row";
 import type { Expense } from "@/lib/expenses";
 
 const COLUMN_HEADERS = ["Vendor", "Category", "Date", "Amount", "Status"];
@@ -29,9 +29,14 @@ export function ExpenseList({ expenses, categoryName, errorMessage }: ExpenseLis
 
   return (
     <Card className="gap-0 overflow-hidden py-0">
-      <div className="hidden border-b border-border px-5 py-2.5 text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase shell:grid shell:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] shell:gap-4">
+      <div
+        className={`hidden border-b border-border px-5 py-2.5 text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase shell:grid ${EXPENSE_GRID_TEMPLATE}`}
+      >
         {COLUMN_HEADERS.map((header) => (
-          <div key={header}>{header}</div>
+          // "Amount" sits over right-aligned figures, so the label follows them to that edge.
+          <div key={header} className={header === "Amount" ? "text-right" : undefined}>
+            {header}
+          </div>
         ))}
       </div>
       {expenses.map((expense) => (

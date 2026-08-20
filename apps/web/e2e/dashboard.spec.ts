@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectAlignedAmountAndStatusColumns } from "./alignment";
 
 async function login(page: Page): Promise<void> {
   await page.goto("/login");
@@ -77,17 +78,29 @@ test.describe("dashboard", () => {
     await expect(page).toHaveURL(/\/expenses$/);
   });
 
-  test("recent threshold and anomaly alerts show persisted figures and link to the expense", async ({ page }) => {
+  // The mock API still serves alert records; the dashboard deliberately no longer renders them.
+  // Alerts get their own route rather than a card on a screen that is not about them.
+  test("carries no alerts card", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
-    const alerts = page.getByTestId("recent-alerts");
-    await expect(alerts.getByText("80% budget threshold")).toBeVisible();
-    await expect(alerts.getByText("€8,400.00 of €10,000.00").first()).toBeVisible();
-    await expect(alerts.getByText("Unusual expense")).toBeVisible();
+    await expect(page.getByText("Recent expenses")).toBeVisible();
+    await expect(page.getByTestId("recent-alerts")).toHaveCount(0);
+    await expect(page.getByText("Recent alerts")).toHaveCount(0);
+    await expect(page.getByText("No budget or anomaly alerts yet.")).toHaveCount(0);
+    await expect(page.getByText("80% budget threshold")).toHaveCount(0);
+  });
 
-    await alerts.getByRole("link", { name: /80% budget threshold/ }).click();
-    await expect(page).toHaveURL(/\/expenses\/exp-1$/);
+  // The reported defect: with `auto` tracks the amount column followed its own row's content, so
+  // a row carrying the wider "Needs review" chip pushed its amount left out of the column.
+  // Columns only exist at or above the shell breakpoint; the mobile project stacks these rows.
+  test("recent-expenses amounts and status chips hold one column across mixed statuses", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page);
+
+    await expectAlignedAmountAndStatusColumns(page);
   });
 
   test("no horizontal scroll and single-column layout below the shell breakpoint (768px)", async ({
