@@ -130,6 +130,18 @@ class DocumentUploadIT extends AbstractPostgresIT {
   }
 
   @Test
+  void aPdfWithTrailingMultipartDataIsRejectedWith415BeforeItIsStored() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    byte[] multipartEnvelope = concat(REAL_PDF, "--multipart-boundary".getBytes(StandardCharsets.UTF_8));
+
+    upload(token, "envelope.pdf", multipartEnvelope, "key-" + System.nanoTime())
+        .andExpect(status().isUnsupportedMediaType());
+
+    assertThat(documentRepository.countByOrganizationId(organizationId)).isZero();
+  }
+
+  @Test
   void aDeclaredPdfContentTypeOnNonPdfBytesIsStillRejected() throws Exception {
     String token = registerAndGetAccessToken();
     MockMultipartFile file =
