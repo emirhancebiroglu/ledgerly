@@ -12,8 +12,8 @@ final class PdfDocumentValidator {
   private PdfDocumentValidator() {}
 
   static void validate(byte[] content) {
-    if (!hasOnlyWhitespaceAfterFinalEof(content)) {
-      throw new UnsupportedDocumentTypeException("Uploaded PDF contains trailing non-PDF data");
+    if (hasMultipartBoundaryAfterFinalEof(content)) {
+      throw new UnsupportedDocumentTypeException("Uploaded PDF contains trailing multipart data");
     }
     try (PDDocument document = Loader.loadPDF(content)) {
       // Opening and closing the document is the structural validation. The extraction service owns
@@ -26,7 +26,7 @@ final class PdfDocumentValidator {
     }
   }
 
-  private static boolean hasOnlyWhitespaceAfterFinalEof(byte[] content) {
+  private static boolean hasMultipartBoundaryAfterFinalEof(byte[] content) {
     int markerStart = -1;
     for (int index = 0; index <= content.length - EOF_MARKER.length; index++) {
       boolean markerMatches = true;
@@ -43,11 +43,13 @@ final class PdfDocumentValidator {
     if (markerStart < 0) {
       return false;
     }
-    for (int index = markerStart + EOF_MARKER.length; index < content.length; index++) {
-      if (!Character.isWhitespace((char) content[index])) {
-        return false;
+    for (int index = markerStart + EOF_MARKER.length; index < content.length - 2; index++) {
+      if ((index == markerStart + EOF_MARKER.length || content[index - 1] == '\n')
+          && content[index] == '-'
+          && content[index + 1] == '-') {
+        return true;
       }
     }
-    return true;
+    return false;
   }
 }

@@ -142,6 +142,15 @@ class DocumentUploadIT extends AbstractPostgresIT {
   }
 
   @Test
+  void aParseablePdfWithNonMultipartTrailingBytesIsAccepted() throws Exception {
+    String token = registerAndGetAccessToken();
+    byte[] postProcessedPdf = concat(REAL_PDF, "\npost-processing metadata".getBytes(StandardCharsets.UTF_8));
+
+    upload(token, "post-processed.pdf", postProcessedPdf, "key-" + System.nanoTime())
+        .andExpect(status().isCreated());
+  }
+
+  @Test
   void aDeclaredPdfContentTypeOnNonPdfBytesIsStillRejected() throws Exception {
     String token = registerAndGetAccessToken();
     MockMultipartFile file =
