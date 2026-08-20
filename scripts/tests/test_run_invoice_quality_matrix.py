@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from http.client import IncompleteRead
 from pathlib import Path
 
 import pytest
 
 from scripts.run_invoice_quality_matrix import (
+    document_activity_stages,
     expense_field_values,
     mismatched_fields,
     load_manifest,
@@ -147,3 +149,24 @@ def test_expense_field_mismatch_reports_only_the_field_names() -> None:
         observed,
         {"vendor": "Acme GmbH", "invoice_number": "INV-42"},
     ) == ["invoice_number"]
+
+
+def test_activity_stream_parser_collects_only_activity_stages(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = b": keepalive\n\nevent: activity\ndata: {\"stage\":\"EXTRACTING\"}\n\ndata: {\"stage\":\"NO_POSTING_REQUIRED\"}\n"
+
+    class Response:
+        def read(self) -> bytes:
+            raise IncompleteRead(payload)
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr("scripts.run_invoice_quality_matrix.urlopen", lambda *_args, **_kwargs: Response())
+
+    assert document_activity_stages("http://api", "document-id", {}, 1) == {
+        "EXTRACTING",
+        "NO_POSTING_REQUIRED",
+    }

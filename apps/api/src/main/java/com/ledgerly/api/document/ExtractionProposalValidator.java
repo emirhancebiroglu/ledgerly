@@ -90,11 +90,15 @@ public class ExtractionProposalValidator {
       return;
     }
     boolean isRefund = proposal.totalMinor() < 0;
+    boolean isZeroTotal = proposal.totalMinor() == 0;
     if (isRefund && proposal.taxMinor() > 0) {
       violations.add("Total is negative but tax is positive: " + proposal.taxMinor());
     }
     if (!isRefund && proposal.taxMinor() < 0) {
       violations.add("Tax is negative but total is not: " + proposal.taxMinor());
+    }
+    if (isZeroTotal && proposal.taxMinor() != 0) {
+      violations.add("Tax must be zero when the total is zero: " + proposal.taxMinor());
     }
     if (proposal.lines().isEmpty()) {
       // Some legitimate invoices publish only tax-inclusive service amounts and a document-level
@@ -107,7 +111,9 @@ public class ExtractionProposalValidator {
     }
     boolean lineSignMismatch =
         proposal.lines().stream()
-            .anyMatch(line -> isRefund ? line.amountMinor() > 0 : line.amountMinor() < 0);
+            .anyMatch(
+                line ->
+                    !isZeroTotal && (isRefund ? line.amountMinor() > 0 : line.amountMinor() < 0));
     if (lineSignMismatch) {
       violations.add("A line amount's sign is inconsistent with the total");
     }

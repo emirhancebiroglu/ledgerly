@@ -83,6 +83,24 @@ describe("useDocumentStatus", () => {
     expect(source.closed).toBe(true);
   });
 
+  it("closes the connection when a zero-total document needs no posting", async () => {
+    vi.stubGlobal("EventSource", MockEventSource);
+    const { result } = renderHook(() => useDocumentStatus("doc-1"));
+    const source = MockEventSource.instances[0];
+
+    act(() => {
+      source.emit("activity", {
+        id: 5,
+        stage: "NO_POSTING_REQUIRED",
+        detail: "No ledger posting required for a zero-total document",
+        createdAt: "2026-01-01T00:00:00Z",
+      });
+    });
+
+    await waitFor(() => expect(result.current.activity[0]?.stage).toBe("NO_POSTING_REQUIRED"));
+    expect(source.closed).toBe(true);
+  });
+
   it("marks the connection stalled and schedules a reconnect on a non-terminal disconnect", async () => {
     vi.useFakeTimers();
     vi.stubGlobal("EventSource", MockEventSource);

@@ -129,6 +129,34 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
   }
 
   @Test
+  void aValidZeroTotalDocumentCompletesWithoutExpenseLedgerOrCategorizationActivity()
+      throws Exception {
+    String token = registerAndGetAccessToken();
+    long expensesBefore = countRows("expense");
+    long ledgerEntriesBefore = countRows("ledger_entry");
+    long ledgerTransactionsBefore = countRows("ledger_transaction");
+    stubExtractionClient.respondWith(DocumentStatusPipelineIT::zeroTotalProposal);
+
+    UUID documentId = documentIdOf(upload(token).andExpect(status().isCreated()).andReturn());
+    processQueue();
+
+    Document stored = documentRepository.findById(documentId).orElseThrow();
+    assertThat(stored.getStatus()).isEqualTo(DocumentStatus.EXTRACTED);
+    assertThat(stored.getProposal()).isNotNull();
+    assertThat(countRows("expense")).isEqualTo(expensesBefore);
+    assertThat(countRows("ledger_entry")).isEqualTo(ledgerEntriesBefore);
+    assertThat(countRows("ledger_transaction")).isEqualTo(ledgerTransactionsBefore);
+    assertThat(activityStages(documentId))
+        .contains(DocumentActivityStage.NO_POSTING_REQUIRED)
+        .doesNotContain(
+            DocumentActivityStage.CATEGORIZING,
+            DocumentActivityStage.DRAFTING_LEDGER,
+            DocumentActivityStage.POSTED,
+            DocumentActivityStage.NEEDS_REVIEW,
+            DocumentActivityStage.CATEGORIZATION_FAILED);
+  }
+
+  @Test
   void anUnknownCurrencyRoutesToNeedsReview() throws Exception {
     String token = registerAndGetAccessToken();
     stubExtractionClient.respondWith(
@@ -395,6 +423,22 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
     }
   }
 
+  private java.util.List<DocumentActivityStage> activityStages(UUID documentId) throws Exception {
+    try (Connection connection = dataSource.getConnection();
+        java.sql.PreparedStatement statement =
+            connection.prepareStatement(
+                "SELECT stage FROM document_activity WHERE document_id = ? ORDER BY id")) {
+      statement.setObject(1, documentId);
+      try (ResultSet rows = statement.executeQuery()) {
+        java.util.List<DocumentActivityStage> stages = new java.util.ArrayList<>();
+        while (rows.next()) {
+          stages.add(DocumentActivityStage.valueOf(rows.getString("stage")));
+        }
+        return stages;
+      }
+    }
+  }
+
   private UUID documentIdOf(MvcResult result) throws Exception {
     return UUID.fromString(
         objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText());
@@ -463,6 +507,19 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
   private static String validProposal(UUID documentId) {
     return proposalWithTotal(documentId, 12_100L);
+  }
+
+  private static String zeroTotalProposal(UUID documentId) {
+    return """
+        {"document_id":"%s","vendor":"Contoso","currency":"EUR","total_minor":0,
+         "tax_minor":0,"document_date":"%s",
+         "lines":[{"description":"trial credit","quantity":1000,"amount_minor":1000},
+                  {"description":"trial discount","quantity":1000,"amount_minor":-1000}],
+         "confidence":{"vendor":0.9,"currency":0.99,"total_minor":0.95,"tax_minor":0.9,
+                       "document_date":0.93},
+         "model":"fake-llm-v1","warnings":[]}
+        """
+        .formatted(documentId, LocalDate.now().minusDays(3));
   }
 
   private static String proposalMissingTotalMinor(UUID documentId) {

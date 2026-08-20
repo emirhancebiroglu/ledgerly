@@ -12,6 +12,7 @@ export interface DocumentStatusState {
 const RECONNECT_DELAY_MS = 3000;
 const TERMINAL_STAGES: DocumentActivityStage[] = [
   "POSTED",
+  "NO_POSTING_REQUIRED",
   "NEEDS_REVIEW",
   "EXTRACTION_NEEDS_REVIEW",
   "FAILED",

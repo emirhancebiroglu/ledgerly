@@ -112,7 +112,15 @@ public class DocumentExtractionWorker {
             documentId, organizationId, proposalMapper.toJson(proposal), validation);
 
     if (outcome.getStatus() == DocumentStatus.EXTRACTED) {
-      categorizeAndPost(documentId, organizationId, document.getUploadedBy(), proposal);
+      if (proposal.totalMinor() == 0L) {
+        documentActivityService.record(
+            documentId,
+            organizationId,
+            DocumentActivityStage.NO_POSTING_REQUIRED,
+            "No ledger posting required for a zero-total document");
+      } else {
+        categorizeAndPost(documentId, organizationId, document.getUploadedBy(), proposal);
+      }
     }
     return outcome;
   }
