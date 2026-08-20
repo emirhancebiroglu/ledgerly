@@ -1,30 +1,38 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const redirect = vi.fn();
+const getAccessToken = vi.fn();
+
+vi.mock("next/navigation", () => ({ redirect: (path: string) => redirect(path) }));
+vi.mock("@/lib/session", () => ({ getAccessToken: () => getAccessToken() }));
+
 import Home from "@/app/page";
 
 describe("Home", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+  beforeEach(() => {
+    redirect.mockReset();
+    getAccessToken.mockReset();
   });
 
-  it("renders both service indicators independently when ai is unreachable", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockImplementation((url: string) => {
-        if (url.includes("8000")) {
-          return Promise.reject(new TypeError("Failed to fetch"));
-        }
-        return Promise.resolve({ ok: true } as Response);
-      }),
-    );
+  it("sends a signed-in visitor to the dashboard", async () => {
+    getAccessToken.mockResolvedValue("valid-token");
 
-    render(<Home />);
+    await Home();
 
-    expect(screen.getByText("Api")).toBeInTheDocument();
-    expect(screen.getByText("Ai")).toBeInTheDocument();
+    expect(redirect).toHaveBeenCalledExactlyOnceWith("/dashboard");
+  });
 
-    await waitFor(() => expect(screen.getByText("Healthy")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText("Unreachable")).toBeInTheDocument());
+  it("sends a signed-out visitor to login", async () => {
+    getAccessToken.mockResolvedValue(undefined);
+
+    await Home();
+
+    expect(redirect).toHaveBeenCalledExactlyOnceWith("/login");
+  });
+
+  it("renders no content of its own on either path", async () => {
+    getAccessToken.mockResolvedValue("valid-token");
+
+    await expect(Home()).resolves.toBeUndefined();
   });
 });
