@@ -24,4 +24,32 @@ describe("formatMoney", () => {
     // does further math on the float instead of the original integer.
     expect(formatMoney(8455, "USD")).toBe("$84.55");
   });
+
+  // `currencyDisplay: "symbol"` leaves TRY as the literal code ("TRY 1,234.56") under the pinned
+  // `en-US` locale, which read as an inconsistency next to "$101,237.50" in the same list.
+  // Only "narrowSymbol" resolves every supported currency to an actual symbol.
+  it("renders every supported currency as a symbol rather than a code", () => {
+    expect(formatMoney(123456, "TRY")).toBe("₺1,234.56");
+    expect(formatMoney(123456, "GBP")).toBe("£1,234.56");
+  });
+
+  it("keeps the bigint path's symbol and separators identical to the number path", () => {
+    expect(formatMoney(BigInt(123456), "TRY")).toBe("₺1,234.56");
+    expect(formatMoney(BigInt(123456), "USD")).toBe("$1,234.56");
+  });
+
+  it("formats an amount beyond Number.MAX_SAFE_INTEGER without precision loss", () => {
+    // 9007199254740993 is MAX_SAFE_INTEGER + 2 — unrepresentable as a `number`, so this can only
+    // pass on the integer-preserving bigint path.
+    expect(formatMoney(BigInt("9007199254740993"), "TRY")).toBe("₺90,071,992,547,409.93");
+  });
+
+  it("renders a credit note's negative amount with a leading sign and no double negative", () => {
+    expect(formatMoney(-123456, "TRY")).toBe("-₺1,234.56");
+    expect(formatMoney(BigInt(-123456), "TRY")).toBe("-₺1,234.56");
+  });
+
+  it("renders a zero bigint amount without a stray -0", () => {
+    expect(formatMoney(BigInt(0), "TRY")).toBe("₺0.00");
+  });
 });
