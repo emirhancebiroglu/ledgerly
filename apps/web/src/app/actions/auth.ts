@@ -51,9 +51,38 @@ export async function login(
     return result;
   }
 
-  const next = String(formData.get("next") ?? "");
-  const isSafeRelativePath = next.startsWith("/") && !next.startsWith("//");
-  redirect(isSafeRelativePath ? next : "/dashboard");
+  redirect(safeRedirectTarget(String(formData.get("next") ?? "")));
+}
+
+/**
+ * `next` arrives from a query parameter an attacker can hand a victim, so it decides where a
+ * freshly authenticated session lands. Resolve it and require the result to stay on this origin
+ * rather than testing string prefixes: `/\evil.com` starts with a single `/` yet resolves
+ * off-origin, because a backslash is equivalent to a slash in a special scheme. Anything that
+ * leaves the origin — or fails to parse at all — falls back to the dashboard.
+ */
+function safeRedirectTarget(next: string): string {
+  const FALLBACK = "/dashboard";
+  if (!next) {
+    return FALLBACK;
+  }
+
+  // A fixed opaque base: only paths that stay on it are in-app destinations.
+  const base = "http://ledgerly.invalid";
+  let resolved: URL;
+  try {
+    resolved = new URL(next, base);
+  } catch {
+    return FALLBACK;
+  }
+
+  if (resolved.origin !== base) {
+    return FALLBACK;
+  }
+
+  // Return the resolved path so a traversal or encoded form cannot smuggle anything past the
+  // origin check that a raw echo of `next` would preserve.
+  return `${resolved.pathname}${resolved.search}${resolved.hash}`;
 }
 
 export async function register(
