@@ -13,6 +13,7 @@ import logging
 from jsonschema import Draft202012Validator
 
 from app.contracts import EXTRACTION_PROPOSAL_SCHEMA, load_schema
+from app.embedded_invoice import extract_embedded_invoice_fields
 from app.llm.client import LlmClient
 from app.llm.extraction_graph import ExtractionFailedError as GraphExtractionFailedError
 from app.llm.extraction_graph import run_extraction_graph
@@ -140,7 +141,9 @@ class ExtractionService:
         except GraphExtractionFailedError as error:
             raise ExtractionFailedError(str(error)) from error
 
-        extracted = _normalize_unreconciled_lines(result["extracted"])
+        extracted = _normalize_unreconciled_lines(
+            self._with_embedded_invoice_fields(result["extracted"], content, content_type)
+        )
         if result["self_checked_fields"]:
             logger.info(
                 "Self-check ran for document %s on fields: %s",
@@ -175,6 +178,34 @@ class ExtractionService:
             # actually derived from, and the model has no business choosing it.
             "document_id": document_id,
             "model": self._llm_client.model_name,
+        }
+
+    def _with_embedded_invoice_fields(self, extracted: dict, content: bytes, content_type: str) -> dict:
+        embedded = extract_embedded_invoice_fields(content, content_type)
+        if embedded is None:
+            return extracted
+
+        confidence = extracted.get("confidence")
+        trusted_confidence = (
+            {
+                **confidence,
+                "currency": 1.0,
+                "total_minor": 1.0,
+                "tax_minor": 1.0,
+                "document_date": 1.0,
+            }
+            if isinstance(confidence, dict)
+            else confidence
+        )
+        logger.info("Used a complete embedded UBL invoice header")
+        return {
+            **extracted,
+            "invoice_number": embedded.invoice_number,
+            "currency": embedded.currency,
+            "total_minor": embedded.total_minor,
+            "tax_minor": embedded.tax_minor,
+            "document_date": embedded.document_date,
+            "confidence": trusted_confidence,
         }
 
     def _validation_errors(self, proposal: dict) -> list:

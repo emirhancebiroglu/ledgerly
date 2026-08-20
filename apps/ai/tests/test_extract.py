@@ -10,6 +10,8 @@ from jsonschema import Draft202012Validator
 
 from app.config import settings
 from app.contracts import EXTRACT_REQUEST_SCHEMA, EXTRACTION_PROPOSAL_SCHEMA, contracts_directory, load_schema
+from app.embedded_invoice import EmbeddedInvoiceFields
+import app.extraction as extraction_module
 from app.extraction import (
     EXTRACTION_INSTRUCTION,
     _UNRECONCILED_LINE_WARNING,
@@ -215,6 +217,59 @@ def test_a_model_returning_non_json_surfaces_as_extraction_failure_not_a_crash()
 
     with pytest.raises(ExtractionFailedError):
         service.extract(str(uuid.uuid4()), PDF_BYTES, "application/pdf")
+
+
+def test_a_complete_embedded_ubl_header_overrides_model_header_facts(monkeypatch):
+    model_extracted = {
+        "vendor": "Issuer from the page",
+        "invoice_number": "model-number",
+        "currency": "EUR",
+        "total_minor": 121,
+        "tax_minor": 21,
+        "document_date": "2026-07-14",
+        "lines": [],
+        "confidence": {
+            "vendor": 0.8,
+            "currency": 0.4,
+            "total_minor": 0.4,
+            "tax_minor": 0.4,
+            "document_date": 0.4,
+        },
+    }
+    monkeypatch.setattr(
+        extraction_module,
+        "run_extraction_graph",
+        lambda *_: {
+            "extracted": model_extracted,
+            "original_extracted": model_extracted,
+            "self_checked_fields": [],
+        },
+    )
+    monkeypatch.setattr(
+        extraction_module,
+        "extract_embedded_invoice_fields",
+        lambda *_: EmbeddedInvoiceFields("ubl-number", "TRY", 1250, 250, "2026-08-01"),
+    )
+
+    proposal = ExtractionService(FakeLlmClient()).extract(
+        str(uuid.uuid4()), PDF_BYTES, "application/pdf"
+    )
+
+    assert proposal["vendor"] == "Issuer from the page"
+    assert proposal["invoice_number"] == "ubl-number"
+    assert {
+        key: proposal[key]
+        for key in ("currency", "total_minor", "tax_minor", "document_date")
+    } == {
+        "currency": "TRY",
+        "total_minor": 1250,
+        "tax_minor": 250,
+        "document_date": "2026-08-01",
+    }
+    assert all(
+        proposal["confidence"][key] == 1.0
+        for key in ("currency", "total_minor", "tax_minor", "document_date")
+    )
 
 
 def test_a_model_returning_a_schema_invalid_proposal_is_refused():
