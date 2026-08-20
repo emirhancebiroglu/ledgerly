@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from http.client import IncompleteRead
+from http.client import IncompleteRead, RemoteDisconnected
 from pathlib import Path
 
 import pytest
@@ -10,6 +10,7 @@ import pytest
 from scripts.run_invoice_quality_matrix import (
     document_activity_stages,
     expense_field_values,
+    json_request,
     mismatched_fields,
     load_manifest,
     wait_for_api,
@@ -131,6 +132,30 @@ def test_api_readiness_timeout_is_an_error(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(RuntimeError, match="did not become healthy"):
         wait_for_api("http://localhost:8080", timeout_seconds=-1)
+
+
+def test_json_request_converts_a_restart_disconnect_to_a_retryable_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def disconnect(*_args: object, **_kwargs: object) -> None:
+        raise RemoteDisconnected("container restarted")
+
+    monkeypatch.setattr("scripts.run_invoice_quality_matrix.urlopen", disconnect)
+
+    with pytest.raises(RuntimeError, match="disconnected before a response"):
+        json_request("GET", "http://localhost:8080/actuator/health")
+
+
+def test_json_request_converts_an_aborted_restart_connection_to_a_retryable_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def abort(*_args: object, **_kwargs: object) -> None:
+        raise ConnectionAbortedError("container restarted")
+
+    monkeypatch.setattr("scripts.run_invoice_quality_matrix.urlopen", abort)
+
+    with pytest.raises(RuntimeError, match="disconnected before a response"):
+        json_request("GET", "http://localhost:8080/actuator/health")
 
 
 def test_expense_field_mismatch_reports_only_the_field_names() -> None:

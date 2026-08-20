@@ -29,6 +29,7 @@
     <jackson-bom.version>2.21.4</jackson-bom.version>
     <netty.version>4.1.136.Final</netty.version>
     <tomcat.version>10.1.55</tomcat.version>
+    <pdfbox.version>3.0.8</pdfbox.version>
   </properties>
 
   <dependencies>
@@ -130,6 +131,11 @@
       <groupId>com.networknt</groupId>
       <artifactId>json-schema-validator</artifactId>
       <version>${json-schema-validator.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>${pdfbox.version}</version>
     </dependency>
   </dependencies>
 

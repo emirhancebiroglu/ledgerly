@@ -55,8 +55,7 @@ import org.springframework.test.web.servlet.ResultActions;
     })
 class DocumentStatusPipelineIT extends AbstractPostgresIT {
 
-  private static final byte[] REAL_PDF =
-      ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
+  private static final byte[] REAL_PDF = TestPdfFactory.validPdf();
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;

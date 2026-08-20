@@ -13,6 +13,8 @@ from app.llm.client import LlmClient, LlmError, VisionPrompt
 from app.llm.extraction_graph import (
     CONFIDENCE_THRESHOLD,
     ExtractionFailedError,
+    SELF_CHECK_INSTRUCTION_TEMPLATE,
+    VENDOR_SELF_CHECK_INSTRUCTION_TEMPLATE,
     run_extraction_graph,
 )
 
@@ -66,13 +68,13 @@ def run(client, instruction="extract"):
     return run_extraction_graph(client, instruction, PDF_BYTES, "application/pdf")
 
 
-def test_high_confidence_extraction_does_not_trigger_a_self_check():
-    client = ScriptedLlmClient([proposal()])
+def test_a_populated_vendor_triggers_one_identity_self_check_even_when_confident():
+    client = ScriptedLlmClient([proposal(), proposal()])
 
     result = run(client)
 
-    assert client.call_count == 1
-    assert result["self_checked_fields"] == []
+    assert client.call_count == 2
+    assert result["self_checked_fields"] == ["vendor"]
     assert result["extracted"]["total_minor"] == 1210
 
 
@@ -89,7 +91,7 @@ def test_a_field_below_threshold_triggers_exactly_one_self_check_pass():
     result = run(client)
 
     assert client.call_count == 2  # extract + exactly one self-check, never more
-    assert result["self_checked_fields"] == ["total_minor"]
+    assert result["self_checked_fields"] == ["vendor", "total_minor"]
 
 
 def test_the_self_check_can_correct_a_wrong_value_and_records_that_it_did():
@@ -115,7 +117,53 @@ def test_the_self_check_can_correct_a_wrong_value_and_records_that_it_did():
     result = run(client)
 
     assert result["extracted"]["total_minor"] == 1210
-    assert "total_minor" in result["self_checked_fields"]
+    assert result["self_checked_fields"] == ["vendor", "total_minor"]
+
+
+def test_a_vendor_self_check_cannot_overwrite_unchecked_monetary_fields():
+    original = proposal(vendor="Wrong vendor", total_minor=1210)
+    corrected = proposal(vendor="Correct vendor", total_minor=9999)
+    client = ScriptedLlmClient([original, corrected])
+
+    result = run(client)
+
+    assert result["extracted"]["vendor"] == "Correct vendor"
+    assert result["extracted"]["total_minor"] == 1210
+
+
+def test_a_text_pdf_uses_text_completion_for_the_focused_self_check(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class TextOnlyClient(ScriptedLlmClient):
+        def __init__(self) -> None:
+            super().__init__([proposal(), proposal(vendor="Verified vendor")])
+            self.vision_calls = 0
+            self.text_calls = 0
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            self.vision_calls += 1
+            return self._next()
+
+        def complete(self, prompt: str) -> str:
+            self.text_calls += 1
+            return self._next()
+
+    monkeypatch.setattr("app.llm.extraction_graph.extract_pdf_text", lambda _content: "invoice text")
+    client = TextOnlyClient()
+
+    result = run(client)
+
+    assert client.vision_calls == 1
+    assert client.text_calls == 1
+    assert result["extracted"]["vendor"] == "Verified vendor"
+
+
+def test_vendor_self_check_explicitly_separates_the_seller_and_buyer_roles():
+    assert "BOTH the seller" in SELF_CHECK_INSTRUCTION_TEMPLATE
+    assert "buyer/customer" in SELF_CHECK_INSTRUCTION_TEMPLATE
+    assert "one key: vendor" in VENDOR_SELF_CHECK_INSTRUCTION_TEMPLATE
+
+
 
 
 def test_a_second_low_confidence_answer_after_self_check_does_not_trigger_another_pass():
@@ -133,7 +181,7 @@ def test_a_second_low_confidence_answer_after_self_check_does_not_trigger_anothe
     result = run(client)
 
     assert client.call_count == 2  # not 3, not unbounded
-    assert result["self_checked_fields"] == ["total_minor"]
+    assert result["self_checked_fields"] == ["vendor", "total_minor"]
 
 
 def test_multiple_gated_fields_below_threshold_still_trigger_only_one_self_check_call():
@@ -149,7 +197,7 @@ def test_multiple_gated_fields_below_threshold_still_trigger_only_one_self_check
     result = run(client)
 
     assert client.call_count == 2
-    assert set(result["self_checked_fields"]) == {"currency", "total_minor", "document_date"}
+    assert set(result["self_checked_fields"]) == {"vendor", "currency", "total_minor", "document_date"}
 
 
 def test_unparseable_json_from_the_first_call_raises_extraction_failed():
@@ -179,7 +227,7 @@ def test_unparseable_json_from_the_self_check_keeps_the_original_extraction():
     result = run(client)
 
     assert result["extracted"]["total_minor"] == 1210  # original value preserved
-    assert result["self_checked_fields"] == ["total_minor"]
+    assert result["self_checked_fields"] == ["vendor", "total_minor"]
 
 
 def test_a_model_error_on_the_self_check_keeps_the_original_extraction():
@@ -195,7 +243,7 @@ def test_a_model_error_on_the_self_check_keeps_the_original_extraction():
     result = run(client)
 
     assert result["extracted"]["total_minor"] == 1210
-    assert result["self_checked_fields"] == ["total_minor"]
+    assert result["self_checked_fields"] == ["vendor", "total_minor"]
 
 
 def test_confidence_threshold_is_a_module_constant_not_a_magic_number():
@@ -204,7 +252,7 @@ def test_confidence_threshold_is_a_module_constant_not_a_magic_number():
 
 def test_a_markdown_json_fence_around_the_response_is_stripped():
     fenced = "```json\n" + proposal() + "\n```"
-    client = ScriptedLlmClient([fenced])
+    client = ScriptedLlmClient([fenced, proposal()])
 
     result = run(client)
 
@@ -213,7 +261,7 @@ def test_a_markdown_json_fence_around_the_response_is_stripped():
 
 def test_a_markdown_fence_without_the_json_language_tag_is_also_stripped():
     fenced = "```\n" + proposal() + "\n```"
-    client = ScriptedLlmClient([fenced])
+    client = ScriptedLlmClient([fenced, proposal()])
 
     result = run(client)
 

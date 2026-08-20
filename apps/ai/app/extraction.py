@@ -24,13 +24,19 @@ Read this document and return ONLY a single JSON object — no markdown code fen
 commentary before or after — matching exactly this shape:
 
 {
-  "vendor": "<name as printed, or null if unreadable>",
-  "invoice_number": "<invoice or receipt number as printed, or null if unreadable or absent>",
+  "vendor": "<the complete legal seller/issuer name as printed on the invoice, or null if unreadable. \
+First identify the party that issued the invoice by its seller/supplier/issuer label, legal address \
+or tax-registration details. Never use the buyer, recipient, marketplace, payment provider or a \
+shortened brand name; preserve the issuer's spelling, punctuation and diacritics exactly as printed>",
+  "invoice_number": "<the invoice/receipt number explicitly labelled as such, or null if unreadable \
+or absent. Never substitute an order, shipment, payment, customer, transaction, UUID or tax id>",
   "currency": "<ISO 4217 alphabetic code, e.g. TRY, USD, EUR, GBP, MYR — never a symbol like $ or a \
 local abbreviation like TL>",
   "total_minor": <integer, the final payable amount in minor units (cents/kuruş), e.g. 12.10 -> \
 1210. Never a float.>,
-  "tax_minor": <integer, the tax portion already included in total_minor, in minor units. Never a \
+  "tax_minor": <integer, the sum of every printed VAT/sales-tax amount already included in \
+total_minor, in minor units. Never return a tax rate, subtotal or one tax rate when several are \
+printed; do not infer tax from a percentage when an invoice tax breakdown is available. Never a \
 float. 0 if the document is genuinely tax-exempt, never omitted.>,
   "document_date": "<YYYY-MM-DD — the date the document was ISSUED or CUT, e.g. \\"Fatura Tarihi\\" \
 or \\"Invoice Date\\". NEVER the due date, order date, dispatch date or upload date, even if a \
@@ -142,7 +148,28 @@ class ExtractionService:
                 ", ".join(result["self_checked_fields"]),
             )
 
-        proposal = {
+        proposal = self._with_trusted_fields(extracted, document_id)
+        errors = self._validation_errors(proposal)
+        if errors and result["original_extracted"] != result["extracted"]:
+            # A re-check is advisory. It must never turn an otherwise valid first pass into a
+            # failed upload merely by returning incomplete or malformed JSON.
+            original_proposal = self._with_trusted_fields(
+                _normalize_unreconciled_lines(result["original_extracted"]), document_id
+            )
+            original_errors = self._validation_errors(original_proposal)
+            if not original_errors:
+                logger.info("Self-check proposal was schema-invalid; keeping the original extraction")
+                proposal = original_proposal
+                errors = []
+        if errors:
+            # The proposal itself is not logged — a document's contents are the customer's.
+            logger.warning("Extraction produced a schema-invalid proposal")
+            raise ExtractionFailedError("Extraction did not satisfy the proposal schema")
+
+        return proposal
+
+    def _with_trusted_fields(self, extracted: dict, document_id: str) -> dict:
+        return {
             **extracted,
             # Set here, not by the model: a proposal must carry the id of the document it was
             # actually derived from, and the model has no business choosing it.
@@ -150,10 +177,5 @@ class ExtractionService:
             "model": self._llm_client.model_name,
         }
 
-        errors = sorted(self._validator.iter_errors(proposal), key=lambda e: e.path)
-        if errors:
-            # The proposal itself is not logged — a document's contents are the customer's.
-            logger.warning("Extraction produced a schema-invalid proposal")
-            raise ExtractionFailedError("Extraction did not satisfy the proposal schema")
-
-        return proposal
+    def _validation_errors(self, proposal: dict) -> list:
+        return sorted(self._validator.iter_errors(proposal), key=lambda error: error.path)

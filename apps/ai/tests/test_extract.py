@@ -86,6 +86,9 @@ def test_extraction_instruction_defines_net_line_amounts_and_the_total_invariant
     assert "pre-tax/net line total" in EXTRACTION_INSTRUCTION
     assert "sum plus tax_minor MUST equal total_minor exactly" in EXTRACTION_INSTRUCTION
     assert "calculate that equality" in EXTRACTION_INSTRUCTION
+    assert "complete legal seller/issuer name" in EXTRACTION_INSTRUCTION
+    assert "Never substitute an order" in EXTRACTION_INSTRUCTION
+    assert "sum of every printed VAT/sales-tax amount" in EXTRACTION_INSTRUCTION
 
 
 def test_identical_bytes_produce_an_identical_proposal():
@@ -235,6 +238,36 @@ def test_a_model_returning_a_schema_invalid_proposal_is_refused():
 
     with pytest.raises(ExtractionFailedError):
         service.extract(str(uuid.uuid4()), PDF_BYTES, "application/pdf")
+
+
+def test_a_schema_invalid_self_check_keeps_a_schema_valid_first_proposal():
+    class InvalidSelfCheckLlmClient(LlmClient):
+        def __init__(self) -> None:
+            self.calls = 0
+
+        @property
+        def model_name(self) -> str:
+            return "self-check-v1"
+
+        def complete(self, prompt: str) -> str:
+            raise AssertionError("The extraction path uses vision completion")
+
+        def complete_vision(self, prompt: VisionPrompt) -> str:
+            self.calls += 1
+            if self.calls == 1:
+                return (
+                    '{"vendor":"Acme","currency":"EUR","total_minor":121,'
+                    '"tax_minor":21,"document_date":"2026-07-14","lines":[],'
+                    '"confidence":{"vendor":1,"currency":1,"total_minor":1,'
+                    '"tax_minor":1,"document_date":1}}'
+                )
+            return '{"vendor":"Acme"}'
+
+    proposal = ExtractionService(InvalidSelfCheckLlmClient()).extract(
+        str(uuid.uuid4()), PDF_BYTES, "application/pdf"
+    )
+
+    assert proposal["total_minor"] == 121
 
 
 def test_a_failing_model_surfaces_as_extraction_failure():

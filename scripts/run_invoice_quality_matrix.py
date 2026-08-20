@@ -21,7 +21,7 @@ import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from http.client import IncompleteRead
+from http.client import IncompleteRead, RemoteDisconnected
 from pathlib import Path
 from statistics import median
 from typing import Any
@@ -171,6 +171,10 @@ def json_request(
         raise RuntimeError(f"{method} request failed with HTTP {error.code}: {detail}") from error
     except URLError as error:
         raise RuntimeError(f"{method} request could not connect: {error.reason}") from error
+    except (RemoteDisconnected, ConnectionError) as error:
+        # Compose may have accepted the TCP connection just as the API container was replaced.
+        # Readiness polling should retry that transient startup boundary instead of crashing.
+        raise RuntimeError(f"{method} request disconnected before a response") from error
     return json.loads(payload) if payload else None
 
 

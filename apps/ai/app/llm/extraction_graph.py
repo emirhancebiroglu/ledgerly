@@ -20,21 +20,34 @@ from typing import TypedDict
 from langgraph.graph import END, StateGraph
 
 from app.llm.client import LlmClient, LlmError, VisionPrompt
+from app.policy.text_extraction import UnreadablePdfError, extract_pdf_text
 
 logger = logging.getLogger(__name__)
 
-# Fields the M5 gate measures (total, date, currency) plus tax, which the schema also requires a
-# confidence for. Below this, the model gets one chance to look again.
-GATED_FIELDS = ("currency", "total_minor", "tax_minor", "document_date")
+# The corpus's primary miss cluster is vendor identity. It is re-read once even when the model is
+# confident: issuer-vs-recipient confusion is frequently overconfident. The remaining fields are
+# selected by confidence and all re-checks still share the graph's one-pass bound.
+GATED_FIELDS = ("vendor", "currency", "total_minor", "tax_minor", "document_date")
 CONFIDENCE_THRESHOLD = 0.7
 
 SELF_CHECK_INSTRUCTION_TEMPLATE = (
-    "You previously extracted the following from this document, but your own confidence on "
-    "{fields} was below {threshold}:\n{previous}\n\n"
-    "Look at the document again and return a corrected JSON object in the same schema. If your "
-    "original answer was already correct, return it unchanged, but raise the confidence for the "
-    "field(s) you re-checked."
+    "Read this invoice and identify BOTH the seller who issued it and the buyer/customer internally. "
+    "Return ONLY one JSON object containing exactly these field(s): {fields}. Do not return any "
+    "other fields or an explanation. A field may be null only when unreadable or absent. For vendor, "
+    "return the complete legal seller/issuer exactly as printed; never return the buyer, recipient, "
+    "bill-to party, marketplace, or payment provider. Do not rely on a prior extraction. Use the "
+    "source text below as an additional reading aid when present; it is not a substitute for checking "
+    "the rendered document.\n\nINVOICE TEXT:\n{text_hint}"
 )
+
+VENDOR_SELF_CHECK_INSTRUCTION_TEMPLATE = (
+    "Read the invoice text below. Identify BOTH the seller who issued the invoice and the "
+    "buyer/customer internally. Return ONLY JSON with one key: vendor. vendor must be the complete "
+    "legal seller/issuer exactly as printed; it must never be the buyer, recipient, bill-to party, "
+    "marketplace, or payment provider.\n\nINVOICE TEXT:\n{text_hint}"
+)
+
+_TEXT_HINT_LIMIT = 12_000
 
 
 class ExtractionFailedError(RuntimeError):
@@ -46,6 +59,7 @@ class GraphState(TypedDict):
     content_type: str
     instruction: str
     extracted: dict | None
+    original_extracted: dict | None
     self_check_ran: bool
     self_checked_fields: list[str]
 
@@ -69,6 +83,46 @@ def _low_confidence_fields(extracted: dict) -> list[str]:
     ]
 
 
+def _fields_to_self_check(extracted: dict) -> list[str]:
+    """Returns the bounded re-check set, prioritizing the common issuer-identity error."""
+    fields = _low_confidence_fields(extracted)
+    vendor = extracted.get("vendor")
+    if isinstance(vendor, str) and vendor.strip() and "vendor" not in fields:
+        return ["vendor", *fields]
+    return fields
+
+
+def _merge_checked_fields(original: dict, corrected: dict, fields_to_check: list[str]) -> dict:
+    """Accept only the fields explicitly re-checked; unrelated facts stay from the first pass."""
+    merged = dict(original)
+    for field in fields_to_check:
+        if field in corrected:
+            merged[field] = corrected[field]
+
+    original_confidence = original.get("confidence")
+    corrected_confidence = corrected.get("confidence")
+    if isinstance(original_confidence, dict) and isinstance(corrected_confidence, dict):
+        merged_confidence = dict(original_confidence)
+        for field in fields_to_check:
+            if field in corrected_confidence:
+                merged_confidence[field] = corrected_confidence[field]
+        merged["confidence"] = merged_confidence
+    return merged
+
+
+def _text_hint(content: bytes, content_type: str) -> str | None:
+    if content_type != "application/pdf":
+        return None
+    try:
+        text = extract_pdf_text(content)
+    except UnreadablePdfError:
+        return None
+    normalized = text.strip()
+    if not normalized:
+        return None
+    return normalized[:_TEXT_HINT_LIMIT]
+
+
 def build_extraction_graph(llm_client: LlmClient):
     def extract(state: GraphState) -> GraphState:
         try:
@@ -87,24 +141,35 @@ def build_extraction_graph(llm_client: LlmClient):
         except json.JSONDecodeError as error:
             raise ExtractionFailedError("Model returned output that is not valid JSON") from error
 
-        return {**state, "extracted": extracted}
+        return {**state, "extracted": extracted, "original_extracted": extracted}
 
     def self_check(state: GraphState) -> GraphState:
         extracted = state["extracted"]
-        low_confidence = _low_confidence_fields(extracted)
+        fields_to_check = _fields_to_self_check(extracted)
 
-        instruction = SELF_CHECK_INSTRUCTION_TEMPLATE.format(
-            fields=", ".join(low_confidence),
-            threshold=CONFIDENCE_THRESHOLD,
-            previous=json.dumps(extracted),
+        text_hint = _text_hint(state["content"], state["content_type"])
+        prompt_text = text_hint or "(No embedded text is available; inspect the rendered document.)"
+        instruction = (
+            VENDOR_SELF_CHECK_INSTRUCTION_TEMPLATE.format(text_hint=prompt_text)
+            if fields_to_check == ["vendor"]
+            else SELF_CHECK_INSTRUCTION_TEMPLATE.format(
+                fields=", ".join(fields_to_check), text_hint=prompt_text
+            )
         )
 
         try:
-            raw = llm_client.complete_vision(
-                VisionPrompt(
-                    instruction=instruction,
-                    content=state["content"],
-                    content_type=state["content_type"],
+            # Text PDFs retain labels and reading order that vision models can blur across dense
+            # invoice layouts. Use that precise representation for the focused re-check; scans
+            # and images still take the existing rendered-vision path.
+            raw = (
+                llm_client.complete(instruction)
+                if text_hint is not None
+                else llm_client.complete_vision(
+                    VisionPrompt(
+                        instruction=instruction,
+                        content=state["content"],
+                        content_type=state["content_type"],
+                    )
                 )
             )
         except LlmError as error:
@@ -114,19 +179,19 @@ def build_extraction_graph(llm_client: LlmClient):
                 "Self-check call failed, keeping the original extraction exceptionType=%s",
                 type(error).__name__,
             )
-            return {**state, "self_check_ran": True, "self_checked_fields": low_confidence}
+            return {**state, "self_check_ran": True, "self_checked_fields": fields_to_check}
 
         try:
             corrected = json.loads(_strip_markdown_fence(raw))
         except json.JSONDecodeError:
             logger.info("Self-check returned non-JSON, keeping the original extraction")
-            return {**state, "self_check_ran": True, "self_checked_fields": low_confidence}
+            return {**state, "self_check_ran": True, "self_checked_fields": fields_to_check}
 
         return {
             **state,
-            "extracted": corrected,
+            "extracted": _merge_checked_fields(extracted, corrected, fields_to_check),
             "self_check_ran": True,
-            "self_checked_fields": low_confidence,
+            "self_checked_fields": fields_to_check,
         }
 
     def route_after_extract(state: GraphState) -> str:
@@ -134,7 +199,7 @@ def build_extraction_graph(llm_client: LlmClient):
         # nothing routes back into extract or self_check afterwards.
         if state["self_check_ran"]:
             return END
-        if _low_confidence_fields(state["extracted"]):
+        if _fields_to_self_check(state["extracted"]):
             return "self_check"
         return END
 
@@ -150,6 +215,7 @@ def build_extraction_graph(llm_client: LlmClient):
 
 class ExtractionResult(TypedDict):
     extracted: dict
+    original_extracted: dict
     self_checked_fields: list[str]
 
 
@@ -170,11 +236,13 @@ def run_extraction_graph(
         "content_type": content_type,
         "instruction": instruction,
         "extracted": None,
+        "original_extracted": None,
         "self_check_ran": False,
         "self_checked_fields": [],
     }
     final_state = graph.invoke(initial_state)
     return {
         "extracted": final_state["extracted"],
+        "original_extracted": final_state["original_extracted"],
         "self_checked_fields": final_state["self_checked_fields"],
     }

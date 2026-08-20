@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ledgerly.api.auth.AuthResponse;
 import com.ledgerly.api.auth.RegisterRequest;
+import com.ledgerly.api.document.TestPdfFactory;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -39,8 +40,7 @@ import org.springframework.test.web.servlet.MvcResult;
 class UploadRateLimitIT extends AbstractPostgresIT {
 
   private static final String TEST_JWT_SECRET = "test-only-secret-not-for-production-use-0123456789";
-  private static final byte[] PDF =
-      ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
+  private static final byte[] PDF = TestPdfFactory.validPdf();
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;

@@ -34,8 +34,7 @@ class DocumentUploadServiceTest {
   @Mock private UploadRateLimiter uploadRateLimiter;
   @Mock private DocumentActivityService documentActivityService;
 
-  private static final byte[] REAL_PDF =
-      ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+  private static final byte[] REAL_PDF = TestPdfFactory.validPdf();
 
   @Test
   void aStorageFailureBeforeTheRowIsWrittenLeavesNoRowAndPropagates() {

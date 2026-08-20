@@ -14,6 +14,7 @@ import com.ledgerly.api.category.CategoryRequest;
 import com.ledgerly.api.document.DocumentQueuePoller;
 import com.ledgerly.api.document.DocumentExtractionWorker;
 import com.ledgerly.api.document.DocumentStatus;
+import com.ledgerly.api.document.TestPdfFactory;
 import com.ledgerly.api.document.DocumentStatusTransitions;
 import com.ledgerly.api.document.ExtractionClient;
 import com.ledgerly.api.document.ExtractionProposal;
@@ -75,8 +76,7 @@ import org.springframework.test.web.servlet.ResultActions;
     })
 class ExpensePostingPipelineIT extends AbstractPostgresIT {
 
-  private static final byte[] REAL_PDF =
-      ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
+  private static final byte[] REAL_PDF = TestPdfFactory.validPdf();
 
   private static final String TEST_JWT_SECRET = "test-only-secret-not-for-production-use-0123456789";
 
