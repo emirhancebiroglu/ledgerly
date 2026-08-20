@@ -16,6 +16,7 @@ import com.ledgerly.api.document.DocumentExtractionWorker;
 import com.ledgerly.api.document.DocumentStatus;
 import com.ledgerly.api.document.DocumentStatusTransitions;
 import com.ledgerly.api.document.ExtractionClient;
+import com.ledgerly.api.document.ExtractionProposal;
 import com.ledgerly.api.ledger.AbstractPostgresIT;
 import com.ledgerly.api.support.SqlStatementCounter;
 import io.jsonwebtoken.Jwts;
@@ -31,6 +32,10 @@ import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import javax.crypto.SecretKey;
 import javax.sql.DataSource;
@@ -82,6 +87,7 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
   @Autowired private DocumentQueuePoller queuePoller;
   @Autowired private DocumentExtractionWorker documentExtractionWorker;
   @Autowired private DocumentStatusTransitions documentStatusTransitions;
+  @Autowired private ExpensePostingService expensePostingService;
   @Autowired private DataSource dataSource;
 
   @BeforeEach
@@ -218,14 +224,118 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
   }
 
   @Test
-  void categorizationFailureLeavesTheDocumentExtractedWithNoExpense() throws Exception {
+  void categorizationServiceFailureCreatesAnUnclassifiedReviewItem() throws Exception {
     String token = registerAndGetAccessToken();
     createCategory(token, "Travel");
     stubCategorizationClient.failWith(() -> new RuntimeException("ai unavailable"));
+    long ledgerEntriesBefore = countRows("ledger_entry");
 
     MvcResult uploaded = uploadAndProcess(token);
+    UUID documentId = documentIdOf(uploaded);
+    UUID expenseId = expenseIdForDocument(documentId);
 
-    assertThat(expenseCountForDocument(documentIdOf(uploaded))).isZero();
+    assertUnclassifiedReview(token, documentId, expenseId, ledgerEntriesBefore);
+  }
+
+  @Test
+  void malformedCategorizationResponseCreatesAnUnclassifiedReviewItem() throws Exception {
+    String token = registerAndGetAccessToken();
+    createCategory(token, "Travel");
+    stubCategorizationClient.respondWith(documentId -> "not-json");
+    long ledgerEntriesBefore = countRows("ledger_entry");
+
+    MvcResult uploaded = uploadAndProcess(token);
+    UUID documentId = documentIdOf(uploaded);
+
+    assertUnclassifiedReview(token, documentId, expenseIdForDocument(documentId), ledgerEntriesBefore);
+  }
+
+  @Test
+  void unknownCategorizationCategoryCreatesAnUnclassifiedReviewItem() throws Exception {
+    String token = registerAndGetAccessToken();
+    createCategory(token, "Travel");
+    stubCategorizationClient.respondWith(
+        documentId -> categorizeResponse(documentId, "Invented category", 0.99, null));
+    long ledgerEntriesBefore = countRows("ledger_entry");
+
+    MvcResult uploaded = uploadAndProcess(token);
+    UUID documentId = documentIdOf(uploaded);
+
+    assertUnclassifiedReview(token, documentId, expenseIdForDocument(documentId), ledgerEntriesBefore);
+  }
+
+  @Test
+  void missingCategoryTaxonomyCreatesAnUnclassifiedReviewItem() throws Exception {
+    String token = registerAndGetAccessToken();
+    long ledgerEntriesBefore = countRows("ledger_entry");
+
+    MvcResult uploaded = uploadAndProcess(token);
+    UUID documentId = documentIdOf(uploaded);
+
+    assertUnclassifiedReview(token, documentId, expenseIdForDocument(documentId), ledgerEntriesBefore);
+  }
+
+  @Test
+  void concurrentDuplicateUnclassifiedFallbackCreatesOnlyOneReviewItem() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    UUID documentId = documentIdOf(upload(token).andExpect(status().isCreated()).andReturn());
+    UUID actor = userIdFor(organizationId);
+    long ledgerTransactionsBefore = countRows("ledger_transaction");
+    ExtractionProposal proposal =
+        new ExtractionProposal(
+            documentId.toString(),
+            "Contoso",
+            "EUR",
+            12_100,
+            2_100,
+            LocalDate.now().minusDays(3),
+            List.of(
+                new ExtractionProposal.Line("item a", 1_000L, 4_000),
+                new ExtractionProposal.Line("item b", 1_000L, 6_000)),
+            java.util.Map.of("vendor", 0.9),
+            "fake-llm-v1",
+            List.of(),
+            null);
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      List<Future<Expense>> futures =
+          executor.invokeAll(
+              List.of(
+                  () ->
+                      expensePostingService.recordUnclassifiedNeedsReview(
+                          organizationId, documentId, actor, proposal),
+                  () ->
+                      expensePostingService.recordUnclassifiedNeedsReview(
+                          organizationId, documentId, actor, proposal)));
+      for (Future<Expense> future : futures) {
+        assertThat(future.get(10, TimeUnit.SECONDS).getId()).isNotNull();
+      }
+    } finally {
+      executor.shutdown();
+      executor.awaitTermination(10, TimeUnit.SECONDS);
+    }
+
+    assertThat(expenseCountForDocument(documentId)).isEqualTo(1);
+    assertThat(countRows("ledger_transaction")).isEqualTo(ledgerTransactionsBefore);
+    assertThat(activityStages(documentId)).containsExactly("UPLOADED", "NEEDS_REVIEW");
+  }
+
+  private void assertUnclassifiedReview(
+      String token, UUID documentId, UUID expenseId, long ledgerEntriesBefore) throws Exception {
+    mockMvc
+        .perform(get("/api/v1/expenses/" + expenseId).header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("NEEDS_REVIEW"))
+        .andExpect(jsonPath("$.categoryId").doesNotExist())
+        .andExpect(jsonPath("$.ledgerTransactionId").doesNotExist())
+        .andExpect(jsonPath("$.amountMinor").value(12_100))
+        .andExpect(jsonPath("$.currency").value("EUR"));
+
+    assertThat(countRows("ledger_entry")).isEqualTo(ledgerEntriesBefore);
+    assertThat(activityStages(documentId))
+        .containsExactly("UPLOADED", "EXTRACTING", "CATEGORIZING", "NEEDS_REVIEW");
   }
 
   @Test
@@ -373,6 +483,12 @@ class ExpensePostingPipelineIT extends AbstractPostgresIT {
         rows.next();
         return (UUID) rows.getObject("id");
       }
+    }
+  }
+
+  private UUID userIdFor(UUID organizationId) throws Exception {
+    try (Connection connection = dataSource.getConnection()) {
+      return userIdFor(connection, organizationId);
     }
   }
 

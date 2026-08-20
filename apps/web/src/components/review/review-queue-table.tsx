@@ -155,6 +155,9 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
         </div>
         {expenses.map((expense) => {
           const error = errors.find((e) => e.id === expense.id);
+          // Legacy/nullable JSON fields are omitted on the wire, so an unclassified category can
+          // arrive as either null or undefined despite the application-level type.
+          const requiresCategorySelection = expense.categoryId == null;
           return (
             <div key={expense.id} className="border-b border-border/60 last:border-b-0">
               <div className="grid grid-cols-1 items-start gap-1.5 px-5 py-3.5 shell:grid-cols-[auto_1.5fr_1fr_1.5fr_auto] shell:items-center shell:gap-2.5">
@@ -164,7 +167,7 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
                     checked={selected.has(expense.id)}
                     onChange={() => toggle(expense.id)}
                     aria-label={`Select ${expense.vendor ?? "expense"} for bulk approval`}
-                    disabled={pending.has(expense.id)}
+                    disabled={pending.has(expense.id) || requiresCategorySelection}
                     className="size-4"
                   />
                 </div>
@@ -173,18 +176,22 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
                   {formatMoney(expense.amountMinor, expense.currency)}
                 </div>
                 <div className="text-[12px] text-muted-foreground">
-                  {expense.citation ??
+                  {requiresCategorySelection
+                    ? "Needs review — choose a category before posting"
+                    : expense.citation ??
                     `Confidence below threshold (${Math.round(expense.categorizationConfidence * 100)}%)`}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => approveOne(expense.id)}
-                    disabled={pending.has(expense.id)}
-                    className="rounded-md bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success-foreground transition-all hover:-translate-y-px disabled:opacity-50"
-                  >
-                    Approve
-                  </button>
+                  {!requiresCategorySelection && (
+                    <button
+                      type="button"
+                      onClick={() => approveOne(expense.id)}
+                      disabled={pending.has(expense.id)}
+                      className="rounded-md bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success-foreground transition-all hover:-translate-y-px disabled:opacity-50"
+                    >
+                      Approve
+                    </button>
+                  )}
                   <label className="sr-only" htmlFor={`correct-${expense.id}`}>
                     Correct category for {expense.vendor ?? "expense"}
                   </label>

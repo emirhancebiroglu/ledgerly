@@ -1,6 +1,7 @@
 package com.ledgerly.api.document;
 
 import com.ledgerly.api.correlation.CorrelationIdHolder;
+import com.ledgerly.api.expense.CategorizationOutcomeException;
 import com.ledgerly.api.expense.ExpensePostingService;
 import com.ledgerly.api.storage.StorageClient;
 import java.util.UUID;
@@ -125,23 +126,36 @@ public class DocumentExtractionWorker {
     return outcome;
   }
 
-  /**
-   * Categorization/posting failures are logged, not fatal to the pipeline run: the document has
-   * already reached its correct terminal status ({@code EXTRACTED}) regardless of whether an
-   * expense could be categorized from it. A future re-processing pass — not built at M6 — would be
-   * the way to retry categorization for a document stuck without an expense.
-   */
+  /** Expected categorization uncertainty becomes a human-correctable review item; unexpected
+   * failures remain visible as technical pipeline failures. */
   private void categorizeAndPost(
       UUID documentId, UUID organizationId, UUID actor, ExtractionProposal proposal) {
     try {
       expensePostingService.categorizeAndPost(organizationId, documentId, actor, proposal);
-    } catch (RuntimeException e) {
-      log.warn("Categorization failed documentId={} exceptionType={}", documentId, e.getClass().getSimpleName());
-      documentActivityService.record(
+    } catch (CategorizationOutcomeException e) {
+      log.warn(
+          "Categorization needs review documentId={} exceptionType={}",
           documentId,
-          organizationId,
-          DocumentActivityStage.CATEGORIZATION_FAILED,
-          "Categorization could not be completed");
+          e.getClass().getSimpleName());
+      try {
+        expensePostingService.recordUnclassifiedNeedsReview(organizationId, documentId, actor, proposal);
+      } catch (RuntimeException fallbackFailure) {
+        recordCategorizationFailure(documentId, organizationId, fallbackFailure);
+      }
+    } catch (RuntimeException e) {
+      recordCategorizationFailure(documentId, organizationId, e);
     }
+  }
+
+  private void recordCategorizationFailure(UUID documentId, UUID organizationId, RuntimeException failure) {
+    log.warn(
+        "Categorization failed documentId={} exceptionType={}",
+        documentId,
+        failure.getClass().getSimpleName());
+    documentActivityService.record(
+        documentId,
+        organizationId,
+        DocumentActivityStage.CATEGORIZATION_FAILED,
+        "Categorization could not be completed");
   }
 }

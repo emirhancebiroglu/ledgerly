@@ -165,6 +165,47 @@ public class ExpensePostingTransactions {
     return expense;
   }
 
+  /**
+   * Persists a correctable, unclassified review item after an expected categorization outcome.
+   * The native insert is intentionally conflict-tolerant so a duplicate worker delivery cannot
+   * create a second review item or turn into a technical pipeline failure.
+   */
+  @Transactional
+  public Expense recordUnclassifiedNeedsReview(
+      UUID organizationId, UUID documentId, UUID actor, ExtractionProposal proposal) {
+    boolean inserted =
+        expenseRepository.insertUnclassifiedNeedsReview(
+                UUID.randomUUID(),
+                organizationId,
+                documentId,
+                proposal.vendor(),
+                proposal.totalMinor(),
+                proposal.currency())
+            == 1;
+    Expense expense =
+        expenseRepository
+            .findByDocumentIdAndOrganizationId(documentId, organizationId)
+            .orElseThrow(() -> new IllegalStateException("Review expense was not persisted"));
+
+    if (inserted) {
+      auditService.record(
+          organizationId,
+          actor,
+          "NEEDS_REVIEW",
+          "expense",
+          expense.getId(),
+          null,
+          auditPayload(expense),
+          CorrelationIds.current());
+      documentActivityService.record(
+          documentId,
+          organizationId,
+          DocumentActivityStage.NEEDS_REVIEW,
+          "Categorization needs review");
+    }
+    return expense;
+  }
+
   private String auditPayload(Expense expense) {
     Map<String, Object> payload = new HashMap<>();
     payload.put("documentId", expense.getDocumentId());
