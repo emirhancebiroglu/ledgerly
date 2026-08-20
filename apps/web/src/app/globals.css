@@ -123,6 +123,29 @@
   html {
     @apply font-sans;
   }
+
+  /*
+   * Browser autofill repaints an input with its own background and text colour, which broke the
+   * auth fields: the handoff (docs/design/m7/README.md) draws the border, background and 42px
+   * height on the *wrapper* and keeps the inner input transparent, so Chrome's fill painted an
+   * opaque block inside — and over — that wrapper's rounded edge.
+   *
+   * `background-color` cannot be overridden on an autofilled control; a large inset shadow in the
+   * field's own colour is the supported way to repaint it. `-webkit-text-fill-color` is likewise
+   * the only thing that wins over the UA's autofill text colour.
+   */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-background-clip: text;
+    background-clip: text;
+    box-shadow: 0 0 0 1000px transparent inset;
+    -webkit-text-fill-color: var(--foreground);
+    /* The UA applies its own fade-in on autofill; keep the field from flashing the default fill. */
+    transition: background-color 5000000s ease-in-out 0s;
+    caret-color: var(--foreground);
+  }
 }
 
 /*
