@@ -9,6 +9,8 @@ function summary(overrides: Partial<DashboardSummary>): DashboardSummary {
     monthlySeries: [],
     reviewQueueCount: 0,
     documentsProcessedToday: 0,
+    alertCount: 0,
+    recentAlerts: [],
     ...overrides,
   };
 }

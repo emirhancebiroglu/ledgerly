@@ -42,6 +42,12 @@ export interface DashboardSummary {
   monthlySeries: MonthlySpend[];
   reviewQueueCount: number;
   documentsProcessedToday: number;
+  /**
+   * Still returned by `api` and still parsed here, but nothing renders it: the dashboard's alerts
+   * card was removed because alert records belong on their own screen rather than on a screen that
+   * is not about them. Kept so the deferred Alerts route has its data path intact; delete both
+   * fields instead of adding a second reader if that route is dropped for good.
+   */
   alertCount: number;
   recentAlerts: AlertSummary[];
 }
