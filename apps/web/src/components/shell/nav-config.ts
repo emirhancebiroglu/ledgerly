@@ -22,8 +22,8 @@ export interface DisabledNavItem {
   icon: LucideIcon;
 }
 
-/** Active routes available in the browser. Alerts remains intentionally deferred: M8 exposes
- * recent alerts on the dashboard, but does not add an alert-management screen. */
+/** Active routes available in the browser. Alerts remains intentionally deferred — see
+ * `DISABLED_NAV_ITEMS`. */
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
   { label: "Expenses", href: "/expenses", icon: Receipt },
@@ -32,7 +32,9 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Budgets", href: "/budgets", icon: Wallet },
 ];
 
-/** Alert records are visible on Dashboard in M8. A dedicated management route is deferred. */
+/** Rendered as present-but-disabled so the shell stays honest about what is not built yet.
+ * Alerts owns its own route when it ships; M9.4 removed the dashboard's alerts card rather than
+ * leaving alert records on a screen that is not about them, so nothing surfaces them today. */
 export const DISABLED_NAV_ITEMS: DisabledNavItem[] = [
   { label: "Alerts", icon: Bell },
   { label: "Policies", icon: FileText },

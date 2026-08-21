@@ -115,6 +115,64 @@ describe("login action", () => {
     });
   });
 
+  // Every one of these passes a naive `startsWith("/") && !startsWith("//")` check but resolves
+  // off-origin, because backslash is equivalent to slash in a special scheme.
+  it.each([
+    "//evil.com",
+    String.raw`/\evil.com`,
+    String.raw`/\\evil.com`,
+    String.raw`/\/evil.com`,
+    "https://evil.com",
+    "javascript:alert(1)",
+  ])("refuses to redirect off-origin for next=%j", async (next) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ accessToken: "a", refreshToken: "r" }), { status: 200 }),
+      ),
+    );
+
+    const { login } = await import("@/app/actions/auth");
+
+    await expect(
+      login(undefined, formData({ email: "user@example.com", password: "pw", next })),
+    ).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+  });
+
+  it("normalises a same-scheme relative reference to its in-app path", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ accessToken: "a", refreshToken: "r" }), { status: 200 }),
+      ),
+    );
+
+    const { login } = await import("@/app/actions/auth");
+
+    // `http:/evil.com` shares this origin's scheme, so it resolves here rather than off-site.
+    await expect(
+      login(undefined, formData({ email: "user@example.com", password: "pw", next: "http:/evil.com" })),
+    ).rejects.toThrow("NEXT_REDIRECT:/evil.com");
+  });
+
+  it.each(["/dashboard", "/expenses?status=NEEDS_REVIEW", "/expenses/abc-123"])(
+    "honours the in-app destination next=%j",
+    async (next) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ accessToken: "a", refreshToken: "r" }), { status: 200 }),
+        ),
+      );
+
+      const { login } = await import("@/app/actions/auth");
+
+      await expect(
+        login(undefined, formData({ email: "user@example.com", password: "pw", next })),
+      ).rejects.toThrow(`NEXT_REDIRECT:${next}`);
+    },
+  );
+
   it("ignores a protocol-relative next path (open-redirect guard)", async () => {
     vi.stubGlobal(
       "fetch",

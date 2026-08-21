@@ -9,6 +9,11 @@
 // letting `Intl` pick up whatever locale the deploying machine happens to have would silently
 // change that format per-environment rather than per-user preference (which nothing here reads).
 const DISPLAY_LOCALE = "en-US";
+// `narrowSymbol`, not `symbol`: under the pinned `en-US` locale `symbol` resolves TRY to the
+// literal code ("TRY 1,234.56") while USD/EUR/GBP get real symbols, so a mixed-currency list read
+// as inconsistent. `narrowSymbol` yields an actual symbol for every currency Ledgerly supports and
+// leaves the already-correct ones unchanged.
+const CURRENCY_DISPLAY = "narrowSymbol" as const;
 const ZERO = BigInt(0);
 const HUNDRED = BigInt(100);
 
@@ -21,7 +26,7 @@ export function formatMoney(amountMinor: number | bigint, currency: string): str
     const formatter = new Intl.NumberFormat(DISPLAY_LOCALE, {
       style: "currency",
       currency,
-      currencyDisplay: "symbol",
+      currencyDisplay: CURRENCY_DISPLAY,
     });
     const majorDisplay = new Intl.NumberFormat(DISPLAY_LOCALE).format(major);
     const display = formatter
@@ -37,6 +42,6 @@ export function formatMoney(amountMinor: number | bigint, currency: string): str
   return new Intl.NumberFormat(DISPLAY_LOCALE, {
     style: "currency",
     currency,
-    currencyDisplay: "symbol",
+    currencyDisplay: CURRENCY_DISPLAY,
   }).format(amountMinor / 100);
 }

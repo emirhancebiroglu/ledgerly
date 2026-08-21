@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { expectAlignedAmountAndStatusColumns } from "./alignment";
 
 async function login(page: Page): Promise<void> {
   await page.goto("/login");
@@ -9,6 +10,17 @@ async function login(page: Page): Promise<void> {
 }
 
 test.describe("expenses list", () => {
+  // Same alignment contract as the dashboard's recent-expenses card — the two lists must not
+  // drift apart, since they render the same facts.
+  // Columns only exist at or above the shell breakpoint; the mobile project stacks these rows.
+  test("amounts and status chips hold one column across mixed statuses", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page);
+    await page.goto("/expenses");
+
+    await expectAlignedAmountAndStatusColumns(page);
+  });
+
   test("renders every seeded expense with vendor, category, date, amount, status", async ({
     page,
   }) => {

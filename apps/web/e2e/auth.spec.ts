@@ -29,3 +29,123 @@ test("registration sends the full identity contract and remains usable on mobile
 
   await expect(page).toHaveURL(/\/dashboard/);
 });
+
+test("the root path is an entry point, never a screen of its own", async ({ page }) => {
+  // Signed out: `/` resolves to login rather than serving a screen of its own. The service-health
+  // view it used to host now lives at `/health`.
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByText(/service health/i)).toHaveCount(0);
+
+  // Signed in: the same URL resolves to the dashboard.
+  await page.getByLabel("Work email").fill("elif@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("Correct-Horse-Battery9");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/dashboard/);
+});
+
+test("no product route renders without a session", async ({ page }) => {
+  // `/health` is operational rather than product, but it is guarded the same way: an anonymous
+  // visitor has no business learning which services exist or whether they are up.
+  for (const path of ["/dashboard", "/expenses", "/upload", "/review", "/budgets", "/health"]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(`/login?next=${encodeURIComponent(path)}`);
+  }
+});
+
+test("the service-health view is reachable at /health once signed in", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByLabel("Work email").fill("elif@example.com");
+  await page.getByLabel("Password", { exact: true }).fill("Correct-Horse-Battery9");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  await page.goto("/health");
+  await expect(page).toHaveURL(/\/health$/);
+  await expect(page.getByText("Ledgerly service health")).toBeVisible();
+  await expect(page.getByText("Api")).toBeVisible();
+  await expect(page.getByText("Ai")).toBeVisible();
+});
+
+test("autofilled credentials keep the designed field styling inside the wrapper", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/login");
+
+  const email = page.getByLabel("Work email");
+  const password = page.getByLabel("Password", { exact: true });
+
+  // Chrome only applies `:-webkit-autofill` to a genuine autofill, which Playwright cannot
+  // trigger. Assert the rule that governs it is actually served and would repaint the field,
+  // rather than asserting a state the harness can't produce.
+  const autofillRule = await page.evaluate(() => {
+    // The rule lives inside `@layer base`, whose contents are nested rules rather than entries in
+    // the sheet's top-level `cssRules`, so the search has to recurse into grouping rules.
+    function find(rules: CSSRuleList): CSSStyleRule | null {
+      for (const rule of Array.from(rules)) {
+        if (rule instanceof CSSStyleRule && rule.selectorText?.includes("-webkit-autofill")) {
+          return rule;
+        }
+        const nested = (rule as CSSGroupingRule).cssRules;
+        if (nested) {
+          const hit = find(nested);
+          if (hit) return hit;
+        }
+      }
+      return null;
+    }
+
+    for (const sheet of Array.from(document.styleSheets)) {
+      let rule: CSSStyleRule | null;
+      try {
+        rule = find(sheet.cssRules);
+      } catch {
+        continue; // cross-origin sheet
+      }
+      if (rule) {
+        return {
+          textFillColor: rule.style.getPropertyValue("-webkit-text-fill-color"),
+          boxShadow: rule.style.getPropertyValue("box-shadow"),
+          backgroundClip:
+            rule.style.getPropertyValue("background-clip") ||
+            rule.style.getPropertyValue("-webkit-background-clip"),
+        };
+      }
+    }
+    return null;
+  });
+
+  expect(autofillRule).not.toBeNull();
+  expect(autofillRule!.textFillColor).not.toBe("");
+  expect(autofillRule!.boxShadow).toContain("inset");
+  expect(autofillRule!.backgroundClip).toBe("text");
+
+  // A filled field must stay inside its wrapper's rounded border at every viewport.
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await email.fill("a-fairly-long-address@example.com");
+    await password.fill("a-long-enough-password");
+
+    for (const field of [email, password]) {
+      const fieldBox = (await field.boundingBox())!;
+      const wrapperBox = (await field.locator("xpath=..").boundingBox())!;
+
+      expect(fieldBox.x).toBeGreaterThanOrEqual(wrapperBox.x - 1);
+      expect(fieldBox.x + fieldBox.width).toBeLessThanOrEqual(wrapperBox.x + wrapperBox.width + 1);
+      expect(fieldBox.y).toBeGreaterThanOrEqual(wrapperBox.y - 1);
+      expect(fieldBox.y + fieldBox.height).toBeLessThanOrEqual(wrapperBox.y + wrapperBox.height + 1);
+    }
+  }
+
+  // Focus still lifts the wrapper's border and ring, not the bare input.
+  const wrapper = email.locator("xpath=..");
+  await email.focus();
+  const focusStyles = await wrapper.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { borderColor: style.borderColor, boxShadow: style.boxShadow };
+  });
+  expect(focusStyles.borderColor).not.toBe("");
+  expect(focusStyles.boxShadow).not.toBe("none");
+});

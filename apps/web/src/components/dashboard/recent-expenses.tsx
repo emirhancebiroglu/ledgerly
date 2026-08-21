@@ -4,6 +4,18 @@ import { StatusChip } from "@/components/status-chip";
 import { formatMoney } from "@/lib/money";
 import type { Expense } from "@/lib/expenses";
 
+/**
+ * Every column is a fixed track — the amount and status ones were `auto`, so each sized to its own
+ * row's content and a wide "Needs review" chip pushed that row's amount left. The figures stopped
+ * sharing an edge and the columns stopped being columns.
+ *
+ * At shell width the amount ends on a common right edge (tabular-nums figures read down as one
+ * block) and each chip starts on a common left edge. Below the breakpoint the row falls back to
+ * the handoff's stacked two-column reading order, where those alignments do not apply.
+ */
+const ROW_CLASS =
+  "grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border/60 px-5 py-3 transition-colors hover:bg-muted/60 shell:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_7.5rem_7.5rem] shell:items-center shell:gap-3 shell:px-6";
+
 interface RecentExpensesProps {
   expenses: Expense[];
   categoryName: (categoryId: string | null) => string;
@@ -25,16 +37,16 @@ export function RecentExpenses({ expenses, categoryName }: RecentExpensesProps) 
           <Link
             key={expense.id}
             href={`/expenses/${expense.id}`}
-            className="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border/60 px-5 py-3 transition-colors hover:bg-muted/60 shell:grid-cols-[1.5fr_1fr_auto_auto] shell:items-center shell:gap-3 shell:px-6"
+            className={ROW_CLASS}
           >
             <div className="truncate text-[13px] font-medium">{expense.vendor ?? "Unknown vendor"}</div>
-            <div className="truncate text-right text-[12.5px] text-muted-foreground shell:text-left">
+            <div data-testid="expense-category" className="truncate text-right text-[12.5px] text-muted-foreground shell:text-left">
               {categoryName(expense.categoryId)}
             </div>
-            <div className="font-mono text-[13px] tabular-nums shell:col-auto">
+            <div data-testid="expense-amount" className="font-mono text-[13px] tabular-nums shell:text-right">
               {formatMoney(expense.amountMinor, expense.currency)}
             </div>
-            <div className="justify-self-end shell:justify-self-auto"><StatusChip status={expense.status} /></div>
+            <div data-testid="expense-status" className="justify-self-end shell:justify-self-start"><StatusChip status={expense.status} /></div>
           </Link>
         ))
       )}
