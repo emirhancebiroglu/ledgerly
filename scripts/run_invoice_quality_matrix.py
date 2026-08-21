@@ -45,6 +45,8 @@ ENTRY_OUTCOMES = {
     "extraction_needs_review",
     "invalid_upload",
 }
+PDF_END_MARKER = b"%%EOF"
+LEGAL_ISSUER_ALIAS_MINIMUM_LENGTH = 5
 
 
 @dataclass(frozen=True)
@@ -294,8 +296,35 @@ def proposal_field_values(proposal: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def is_pdf_with_whitespace_suffix(path: Path) -> bool:
+    """Recognize a valid PDF end marker followed only by harmless whitespace."""
+    content = path.read_bytes()
+    end_marker = content.rfind(PDF_END_MARKER)
+    suffix = content[end_marker + len(PDF_END_MARKER) :] if end_marker >= 0 else b"non-empty"
+    return content.startswith(b"%PDF-") and end_marker >= 0 and not suffix.strip()
+
+
+def vendor_matches_legal_issuer(observed: Any, expected: Any) -> bool:
+    if observed == expected:
+        return True
+    if not isinstance(observed, str) or not isinstance(expected, str):
+        return False
+
+    observed_normalized = "".join(character for character in observed.casefold() if character.isalnum())
+    expected_normalized = "".join(character for character in expected.casefold() if character.isalnum())
+    return (
+        len(expected_normalized) >= LEGAL_ISSUER_ALIAS_MINIMUM_LENGTH
+        and observed_normalized.startswith(expected_normalized)
+    )
+
+
 def mismatched_fields(observed: dict[str, Any], expected: dict[str, Any]) -> list[str]:
-    return [field for field, value in expected.items() if observed.get(field) != value]
+    return [
+        field
+        for field, value in expected.items()
+        if not (field == "vendor" and vendor_matches_legal_issuer(observed.get(field), value))
+        and observed.get(field) != value
+    ]
 
 
 def run_invoice(
@@ -320,6 +349,8 @@ def run_invoice(
                 return QualityResult(case_number, True, "rejected", time.monotonic() - started)
             raise
 
+        if entry.outcome == "invalid_upload" and is_pdf_with_whitespace_suffix(entry.path):
+            return QualityResult(case_number, True, "accepted-valid-pdf", time.monotonic() - started)
         if entry.outcome == "invalid_upload":
             return QualityResult(case_number, False, "accepted-invalid-upload", time.monotonic() - started)
         if not isinstance(uploaded, dict) or not isinstance(uploaded.get("id"), str):

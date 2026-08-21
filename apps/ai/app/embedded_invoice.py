@@ -25,6 +25,7 @@ class EmbeddedInvoiceFields:
     total_minor: int
     tax_minor: int
     document_date: str
+    vendor: str | None = None
 
 
 def extract_embedded_invoice_fields(content: bytes, content_type: str) -> EmbeddedInvoiceFields | None:
@@ -86,6 +87,7 @@ def _parse_ubl_invoice(content: bytes) -> EmbeddedInvoiceFields | None:
         total_minor=total_minor,
         tax_minor=tax_minor,
         document_date=document_date,
+        vendor=_supplier_name(root),
     )
 
 
@@ -127,6 +129,34 @@ def _tax_minor(root: element_tree.Element, multiplier: int) -> int | None:
             return None
         tax_amounts.append(_to_minor(amount))
     return sum(tax_amounts) * multiplier if tax_amounts else None
+
+
+def _supplier_name(root: element_tree.Element) -> str | None:
+    """Read the UBL supplier role only; buyer and delivery-party names are never candidates."""
+    supplier_party = next(
+        (child for child in root if _local_name(child.tag) == "AccountingSupplierParty"), None
+    )
+    if supplier_party is None:
+        return None
+    party = next((child for child in supplier_party if _local_name(child.tag) == "Party"), None)
+    if party is None:
+        return None
+    for parent_name, child_name in (
+        ("PartyName", "Name"),
+        ("PartyLegalEntity", "RegistrationName"),
+    ):
+        names = {
+            child.text.strip()
+            for parent in party
+            if _local_name(parent.tag) == parent_name
+            for child in parent
+            if _local_name(child.tag) == child_name and child.text and child.text.strip()
+        }
+        if len(names) == 1:
+            return names.pop()
+        if len(names) > 1:
+            return None
+    return None
 
 
 def _to_minor(value: str) -> int:

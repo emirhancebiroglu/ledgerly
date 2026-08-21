@@ -14,7 +14,7 @@ from app.llm.extraction_graph import (
     CONFIDENCE_THRESHOLD,
     ExtractionFailedError,
     SELF_CHECK_INSTRUCTION_TEMPLATE,
-    VENDOR_SELF_CHECK_INSTRUCTION_TEMPLATE,
+    VENDOR_HEADER_CHECK_INSTRUCTION,
     run_extraction_graph,
 )
 
@@ -78,6 +78,45 @@ def test_a_populated_vendor_triggers_one_identity_self_check_even_when_confident
     assert result["extracted"]["total_minor"] == 1210
 
 
+def test_a_pdf_vendor_self_check_uses_a_first_page_header_crop(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("app.llm.extraction_graph.render_first_page_header_to_png", lambda _content: b"header")
+    client = ScriptedLlmClient([proposal(), proposal(vendor="Verified issuer")])
+
+    result = run(client)
+
+    assert result["extracted"]["vendor"] == "Verified issuer"
+
+
+def test_a_header_vendor_check_preserves_full_document_checks_for_other_low_fields(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr("app.llm.extraction_graph.render_first_page_header_to_png", lambda _content: b"header")
+    low = proposal(confidence={
+        "vendor": 0.9,
+        "currency": 0.95,
+        "total_minor": 0.2,
+        "tax_minor": 0.95,
+        "document_date": 0.95,
+    })
+    client = ScriptedLlmClient([
+        low,
+        '{"vendor":"Verified issuer"}',
+        '{"total_minor":1210}',
+    ])
+
+    result = run(client)
+
+    assert client.call_count == 3
+    assert result["extracted"]["vendor"] == "Verified issuer"
+    assert result["extracted"]["total_minor"] == 1210
+    assert result["self_checked_fields"] == ["vendor", "total_minor"]
+
+
+def test_vendor_header_instruction_separates_issuer_from_buyer_roles():
+    assert "seller/issuer" in VENDOR_HEADER_CHECK_INSTRUCTION
+    assert "buyer" in VENDOR_HEADER_CHECK_INSTRUCTION
+
+
 def test_a_field_below_threshold_triggers_exactly_one_self_check_pass():
     low_confidence = proposal(confidence={
         "vendor": 0.9,
@@ -136,7 +175,7 @@ def test_a_text_pdf_uses_text_completion_for_the_focused_self_check(
 ):
     class TextOnlyClient(ScriptedLlmClient):
         def __init__(self) -> None:
-            super().__init__([proposal(), proposal(vendor="Verified vendor")])
+            super().__init__([proposal(), '{"tax_minor":210}', proposal(vendor="Verified vendor")])
             self.vision_calls = 0
             self.text_calls = 0
 
@@ -154,14 +193,26 @@ def test_a_text_pdf_uses_text_completion_for_the_focused_self_check(
     result = run(client)
 
     assert client.vision_calls == 1
-    assert client.text_calls == 1
+    assert client.text_calls == 2
     assert result["extracted"]["vendor"] == "Verified vendor"
+    assert result["extracted"]["tax_minor"] == 210
+    assert result["self_checked_fields"] == ["vendor", "tax_minor"]
+
+
+def test_a_text_tax_check_cannot_overwrite_with_a_non_integer_value(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr("app.llm.extraction_graph.extract_pdf_text", lambda _content: "invoice text")
+    client = ScriptedLlmClient([proposal(), '{"tax_minor":"210"}', proposal(vendor="Verified vendor")])
+
+    result = run(client)
+
+    assert result["extracted"]["tax_minor"] == 210
+    assert result["self_checked_fields"] == ["vendor"]
 
 
 def test_vendor_self_check_explicitly_separates_the_seller_and_buyer_roles():
     assert "BOTH the seller" in SELF_CHECK_INSTRUCTION_TEMPLATE
     assert "buyer/customer" in SELF_CHECK_INSTRUCTION_TEMPLATE
-    assert "one key: vendor" in VENDOR_SELF_CHECK_INSTRUCTION_TEMPLATE
+    assert "untrusted data" in SELF_CHECK_INSTRUCTION_TEMPLATE
 
 
 
@@ -201,10 +252,19 @@ def test_multiple_gated_fields_below_threshold_still_trigger_only_one_self_check
 
 
 def test_unparseable_json_from_the_first_call_raises_extraction_failed():
-    client = ScriptedLlmClient(["not json at all"])
+    client = ScriptedLlmClient(["not json at all", "still not json"])
 
     with pytest.raises(ExtractionFailedError):
         run(client)
+
+
+def test_invalid_json_gets_one_bounded_format_retry():
+    client = ScriptedLlmClient(["not json at all", proposal(), proposal()])
+
+    result = run(client)
+
+    assert client.call_count == 3  # format retry plus the one bounded vendor self-check
+    assert result["extracted"]["vendor"] == "Acme"
 
 
 def test_a_model_error_on_the_first_call_raises_extraction_failed():

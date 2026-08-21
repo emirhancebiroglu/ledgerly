@@ -62,6 +62,8 @@ class Settings(BaseSettings):
     # PDF providers render PDF pages to PNG first — see app.llm.pdf_to_images.
     llm_supports_native_pdf: bool = False
 
+    vendor_verification_model: str = "anthropic/qwen3.8-max"
+
     # Which EmbeddingClient adapter to use. "litellm" is the real M6 adapter; "fake" keeps a
     # deterministic stub available for tests and offline runs, same split as llm_provider above.
     embedding_provider: str = "litellm"

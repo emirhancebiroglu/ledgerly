@@ -10,6 +10,7 @@ import pytest
 from scripts.run_invoice_quality_matrix import (
     document_activity_stages,
     expense_field_values,
+    is_pdf_with_whitespace_suffix,
     json_request,
     mismatched_fields,
     load_manifest,
@@ -174,6 +175,34 @@ def test_expense_field_mismatch_reports_only_the_field_names() -> None:
         observed,
         {"vendor": "Acme GmbH", "invoice_number": "INV-42"},
     ) == ["invoice_number"]
+
+
+def test_legal_issuer_matches_a_short_brand_alias() -> None:
+    assert mismatched_fields(
+        {"vendor": "North Holdings A.S."},
+        {"vendor": "North"},
+    ) == []
+
+
+def test_short_brand_does_not_match_expected_legal_issuer() -> None:
+    assert mismatched_fields(
+        {"vendor": "North"},
+        {"vendor": "North Holdings A.S."},
+    ) == ["vendor"]
+
+
+def test_pdf_with_only_whitespace_after_end_marker_is_accepted(tmp_path: Path) -> None:
+    path = tmp_path / "trailing-whitespace.pdf"
+    path.write_bytes(b"%PDF-1.7\n%%EOF\n \t")
+
+    assert is_pdf_with_whitespace_suffix(path)
+
+
+def test_pdf_with_non_whitespace_after_end_marker_is_not_accepted(tmp_path: Path) -> None:
+    path = tmp_path / "trailing-bytes.pdf"
+    path.write_bytes(b"%PDF-1.7\n%%EOF\ninvalid")
+
+    assert not is_pdf_with_whitespace_suffix(path)
 
 
 def test_activity_stream_parser_collects_only_activity_stages(monkeypatch: pytest.MonkeyPatch) -> None:
