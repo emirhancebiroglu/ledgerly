@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { ExtractedFields } from "@/components/expense-detail/extracted-fields";
+import type { ExpenseDetail } from "@/lib/expense-detail";
 
 const baseExpense = {
   id: "1",
@@ -45,5 +46,25 @@ describe("ExtractedFields", () => {
     render(<ExtractedFields expense={{ ...baseExpense, vendor: null }} />);
 
     expect(screen.getByText("Unknown vendor")).toBeInTheDocument();
+  });
+
+  it("renders zero tax and reserves the placeholder for a truly unavailable value", () => {
+    const { rerender } = render(<ExtractedFields expense={{ ...baseExpense, taxMinor: "0" }} />);
+
+    expect(screen.getByText("$0.00")).toBeInTheDocument();
+
+    rerender(<ExtractedFields expense={{ ...baseExpense, taxMinor: null }} />);
+
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
+  it("handles a legacy response that omits taxMinor entirely", () => {
+    render(
+      <ExtractedFields
+        expense={{ ...baseExpense, taxMinor: undefined } as unknown as ExpenseDetail}
+      />,
+    );
+
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 });

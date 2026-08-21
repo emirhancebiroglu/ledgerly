@@ -28,6 +28,7 @@ function buildSteps(activity: DocumentActivity[]): Step[] {
   const terminal = activity.find((item) =>
     [
       "POSTED",
+      "NO_POSTING_REQUIRED",
       "NEEDS_REVIEW",
       "EXTRACTION_NEEDS_REVIEW",
       "FAILED",
@@ -47,6 +48,8 @@ function buildSteps(activity: DocumentActivity[]): Step[] {
     label:
       terminal?.stage === "POSTED"
         ? "Posted to ledger"
+        : terminal?.stage === "NO_POSTING_REQUIRED"
+          ? "No ledger posting required"
         : terminal?.stage === "NEEDS_REVIEW"
           ? "Needs review"
           : terminal?.stage === "EXTRACTION_NEEDS_REVIEW"
@@ -55,7 +58,9 @@ function buildSteps(activity: DocumentActivity[]): Step[] {
             ? "Failed"
             : "Outcome",
     state: terminal
-      ? terminal.stage === "POSTED" || terminal.stage === "NEEDS_REVIEW"
+      ? terminal.stage === "POSTED" ||
+        terminal.stage === "NO_POSTING_REQUIRED" ||
+        terminal.stage === "NEEDS_REVIEW"
         ? "done"
         : terminal.stage === "EXTRACTION_NEEDS_REVIEW"
           ? "review"

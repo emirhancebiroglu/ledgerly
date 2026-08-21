@@ -3,8 +3,11 @@ package com.ledgerly.api.document;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -61,5 +64,59 @@ class ProposalContractConformanceTest {
     serialized
         .get("lines")
         .forEach(line -> assertThat(line.get("amount_minor").isIntegralNumber()).isTrue());
+  }
+
+  @Test
+  void everyOptionalFieldCanBeAbsentIndependentlyAndStillRoundTripsThroughPersistence()
+      throws Exception {
+    for (String optionalField : List.of("vendor", "invoice_number", "warnings", "quantity")) {
+      ObjectNode proposal = validProposal();
+      removeOptionalField(proposal, optionalField);
+
+      assertAbsentFieldRoundTrips(proposal, optionalField);
+    }
+  }
+
+  @Test
+  void allOptionalFieldsCanBeAbsentTogetherAndStillRoundTripThroughPersistence()
+      throws Exception {
+    ObjectNode proposal = validProposal();
+    for (String optionalField : List.of("vendor", "invoice_number", "warnings", "quantity")) {
+      removeOptionalField(proposal, optionalField);
+    }
+
+    for (String optionalField : List.of("vendor", "invoice_number", "warnings", "quantity")) {
+      assertAbsentFieldRoundTrips(proposal, optionalField);
+    }
+  }
+
+  private void assertAbsentFieldRoundTrips(ObjectNode rawProposal, String absentField) throws Exception {
+    ExtractionProposal parsed = proposalMapper.parse(rawProposal.toString());
+    String persisted = proposalMapper.toJson(parsed);
+
+    assertThatCode(() -> proposalContract.validate(persisted)).doesNotThrowAnyException();
+    JsonNode stored = MAPPER.readTree(persisted);
+    assertThat(optionalFieldNode(stored, absentField)).isNull();
+    assertThatCode(() -> proposalMapper.parse(persisted)).doesNotThrowAnyException();
+  }
+
+  private ObjectNode validProposal() throws Exception {
+    return (ObjectNode)
+        MAPPER.readTree(Files.readString(ContractSchemas.example("extraction-proposal.valid.json")));
+  }
+
+  private void removeOptionalField(ObjectNode proposal, String optionalField) {
+    if (optionalField.equals("quantity")) {
+      ((ObjectNode) proposal.withArray("lines").get(0)).remove(optionalField);
+      return;
+    }
+    proposal.remove(optionalField);
+  }
+
+  private JsonNode optionalFieldNode(JsonNode proposal, String optionalField) {
+    if (optionalField.equals("quantity")) {
+      return proposal.path("lines").get(0).get(optionalField);
+    }
+    return proposal.get(optionalField);
   }
 }

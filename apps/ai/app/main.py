@@ -134,8 +134,28 @@ def get_llm_client() -> LlmClient:
     raise RuntimeError(f"Unknown LLM provider: {settings.llm_provider}")
 
 
+def get_vendor_verification_client() -> LlmClient:
+    if settings.llm_provider == "fake":
+        return FakeLlmClient()
+    if settings.llm_provider == "litellm":
+        return ResilientLlmClient(
+            LiteLlmClient(
+                model=settings.vendor_verification_model,
+                api_key=settings.llm_api_key,
+                timeout_seconds=settings.llm_timeout_seconds,
+                api_base=settings.llm_api_base,
+                supports_native_pdf=settings.llm_supports_native_pdf,
+                thinking_enabled=False,
+            ),
+            max_retries=settings.llm_max_retries,
+            failure_threshold=settings.llm_circuit_breaker_failure_threshold,
+            cooldown_seconds=settings.llm_circuit_breaker_cooldown_seconds,
+        )
+    raise RuntimeError(f"Unknown LLM provider: {settings.llm_provider}")
+
+
 def get_extraction_service() -> ExtractionService:
-    return ExtractionService(get_llm_client())
+    return ExtractionService(get_llm_client(), get_vendor_verification_client())
 
 
 def get_embedding_client() -> EmbeddingClient:

@@ -29,7 +29,14 @@ export function ExtractedFields({ expense }: ExtractedFieldsProps) {
         <Field label="Invoice number" value={expense.invoiceNumber ?? "—"} />
         <Field label="Date" value={expense.documentDate ? formatDate(expense.documentDate) : "—"} />
         <Field label="Amount" value={formatMoney(expense.amountMinor, expense.currency)} />
-        <Field label="Tax" value={expense.taxMinor ? formatMoney(BigInt(expense.taxMinor), expense.currency) : "—"} />
+        <Field
+          label="Tax"
+          value={
+            expense.taxMinor == null
+              ? "—"
+              : formatMoney(BigInt(expense.taxMinor), expense.currency)
+          }
+        />
         <Field
           label="Confidence"
           value={`${Math.round(expense.categorizationConfidence * 100)}%`}

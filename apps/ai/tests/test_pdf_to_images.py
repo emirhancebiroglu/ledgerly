@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
-from app.llm.pdf_to_images import render_pdf_pages_to_png
+from PIL import Image
+
+from app.llm.pdf_to_images import render_first_page_header_to_png, render_pdf_pages_to_png
 
 FIXTURES_DIR = Path(__file__).resolve().parents[1] / "evals" / "fixtures" / "synthetic"
 
@@ -32,3 +35,13 @@ def test_rendered_pages_are_non_trivially_sized():
     pages = render_pdf_pages_to_png(pdf_bytes)
 
     assert len(pages[0]) > 1000
+
+
+def test_renders_a_smaller_first_page_header_png():
+    full_page = render_pdf_pages_to_png((FIXTURES_DIR / "02_no_itemisation.pdf").read_bytes())[0]
+    header = render_first_page_header_to_png((FIXTURES_DIR / "02_no_itemisation.pdf").read_bytes())
+
+    with Image.open(io.BytesIO(full_page)) as page_image, Image.open(io.BytesIO(header)) as header_image:
+        assert header.startswith(b"\x89PNG\r\n\x1a\n")
+        assert header_image.width == page_image.width
+        assert 0 < header_image.height < page_image.height

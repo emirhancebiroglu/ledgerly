@@ -79,8 +79,8 @@ public class ExpenseController {
   /**
    * Approve a review-queue item using the category the AI already chose — posts the balanced
    * ledger transaction that categorization withheld. 409 if the expense is not currently {@code
-   * NEEDS_REVIEW} (already approved/corrected, including via a replayed request outside the
-   * {@code Idempotency-Key} window).
+   * NEEDS_REVIEW} or has no AI category (including via a replayed request outside the
+   * {@code Idempotency-Key} window). Unclassified items must use {@code correct}.
    */
   @PostMapping("/api/v1/expenses/{id}/approve")
   public ExpenseResponse approve(

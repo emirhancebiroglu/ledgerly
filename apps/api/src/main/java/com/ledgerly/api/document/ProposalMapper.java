@@ -1,6 +1,7 @@
 package com.ledgerly.api.document;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -42,6 +43,10 @@ public class ProposalMapper {
             // contract says an ISO-8601 string. Without this, what api persists and returns fails
             // the very schema both services are supposed to agree on.
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            // Optional extraction fields are absent in the canonical contract. Persisting a Java
+            // null as JSON null can violate that contract (notably warnings), turning an otherwise
+            // valid document into an unreadable detail view on its next parse.
+            .serializationInclusion(JsonInclude.Include.NON_NULL)
             .disable(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL)
             .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .withCoercionConfig(

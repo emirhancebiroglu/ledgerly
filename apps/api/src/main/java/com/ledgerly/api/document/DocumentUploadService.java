@@ -72,6 +72,10 @@ public class DocumentUploadService {
                     new UnsupportedDocumentTypeException(
                     "Unsupported document type; expected PDF, JPEG or PNG"));
 
+    if (detected == DetectedContentType.PDF) {
+      PdfDocumentValidator.validate(content);
+    }
+
     // Validation deliberately precedes this check: malformed input must not spend quota.
     uploadRateLimiter.checkDocumentUpload(principal.organizationId());
 

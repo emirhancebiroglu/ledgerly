@@ -44,7 +44,7 @@ public class Expense {
    * ExpenseRepository#resolveIfNeedsReview}, a bulk {@code UPDATE} that bypasses the persistence
    * context entirely, same as every other field this class otherwise never lets Java mutate.
    */
-  @Column(name = "category_id", nullable = false, updatable = false)
+  @Column(name = "category_id", updatable = false)
   private UUID categoryId;
 
   @Column(name = "ledger_transaction_id")
