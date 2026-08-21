@@ -39,8 +39,10 @@ export function UploadFlow() {
   const terminalStage = activity.at(-1)?.stage;
   const failed = terminalStage === "FAILED" || terminalStage === "CATEGORIZATION_FAILED";
   const extractionNeedsReview = terminalStage === "EXTRACTION_NEEDS_REVIEW";
+  const noPostingRequired = terminalStage === "NO_POSTING_REQUIRED";
   const terminal =
     terminalStage === "POSTED" ||
+    noPostingRequired ||
     terminalStage === "NEEDS_REVIEW" ||
     extractionNeedsReview ||
     failed;
@@ -93,7 +95,12 @@ export function UploadFlow() {
               expense was created.
             </div>
           )}
-          {terminal && !failed && !extractionNeedsReview && (
+          {noPostingRequired && (
+            <p className="text-center text-[12.5px] text-success-foreground" role="status">
+              Processed successfully. No ledger posting was needed because the document total is zero.
+            </p>
+          )}
+          {terminal && !failed && !extractionNeedsReview && !noPostingRequired && (
             <Link
               href="/expenses"
               className="text-center text-[12.5px] font-semibold text-primary"

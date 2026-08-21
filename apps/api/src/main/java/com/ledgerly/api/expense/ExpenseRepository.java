@@ -46,6 +46,29 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
   Optional<Expense> findByDocumentIdAndOrganizationId(UUID documentId, UUID organizationId);
 
+  /**
+   * Inserts the durable fallback for a categorization outcome exactly once. PostgreSQL's existing
+   * unique {@code document_id} constraint, rather than a read-then-write race, owns duplicate
+   * delivery safety.
+   */
+  @Modifying
+  @Query(
+      value =
+          "INSERT INTO expense (id, organization_id, document_id, vendor, category_id, "
+              + "ledger_transaction_id, amount_minor, currency, categorization_confidence, "
+              + "citation, status, created_at) "
+              + "VALUES (:id, :organizationId, :documentId, :vendor, NULL, NULL, :amountMinor, "
+              + ":currency, 0, NULL, 'NEEDS_REVIEW', CURRENT_TIMESTAMP) "
+              + "ON CONFLICT (document_id) DO NOTHING",
+      nativeQuery = true)
+  int insertUnclassifiedNeedsReview(
+      @Param("id") UUID id,
+      @Param("organizationId") UUID organizationId,
+      @Param("documentId") UUID documentId,
+      @Param("vendor") String vendor,
+      @Param("amountMinor") long amountMinor,
+      @Param("currency") String currency);
+
   List<Expense> findByOrganizationId(UUID organizationId, Pageable pageable);
 
   List<Expense> findByOrganizationIdAndStatus(

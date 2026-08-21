@@ -43,8 +43,7 @@ class DocumentUploadRollbackIT extends AbstractPostgresIT {
 
   private static final String TEST_JWT_SECRET = "test-only-secret-not-for-production-use-0123456789";
 
-  private static final byte[] REAL_PDF =
-      ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
+  private static final byte[] REAL_PDF = TestPdfFactory.validPdf();
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;

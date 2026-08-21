@@ -7,6 +7,7 @@ public enum DocumentActivityStage {
   CATEGORIZING,
   DRAFTING_LEDGER,
   POSTED,
+  NO_POSTING_REQUIRED,
   NEEDS_REVIEW,
   EXTRACTION_NEEDS_REVIEW,
   FAILED,
@@ -14,6 +15,7 @@ public enum DocumentActivityStage {
 
   public boolean isTerminal() {
     return this == POSTED
+        || this == NO_POSTING_REQUIRED
         || this == NEEDS_REVIEW
         || this == EXTRACTION_NEEDS_REVIEW
         || this == FAILED

@@ -94,6 +94,22 @@ class ExtractionProposalValidatorTest {
   }
 
   @Test
+  void acceptsAZeroTotalDocumentWithOffsettingLinesAndNoTax() {
+    ProposalValidationResult result =
+        validator.validate(
+            proposal()
+                .lines(
+                    List.of(
+                        new ExtractionProposal.Line("service", 1000L, 2_000L),
+                        new ExtractionProposal.Line("full discount", 1000L, -2_000L)))
+                .taxMinor(0)
+                .totalMinor(0)
+                .build());
+
+    assertThat(result.isValid()).isTrue();
+  }
+
+  @Test
   void rejectsALineWhoseSignDisagreesWithTheTotal() {
     assertThat(
             validator

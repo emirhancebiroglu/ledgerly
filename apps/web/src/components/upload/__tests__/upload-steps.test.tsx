@@ -44,6 +44,29 @@ describe("UploadSteps", () => {
     expect(container.querySelectorAll('[role="status"]')).toHaveLength(0);
   });
 
+  it("shows zero-total no-posting as a successful terminal outcome", () => {
+    const { container } = render(
+      <UploadSteps
+        filename="receipt.pdf"
+        sizeLabel="247 KB"
+        activity={[
+          { id: 1, stage: "UPLOADED", detail: null, createdAt: "2026-01-01T00:00:00Z" },
+          { id: 2, stage: "EXTRACTING", detail: null, createdAt: "2026-01-01T00:00:01Z" },
+          {
+            id: 3,
+            stage: "NO_POSTING_REQUIRED",
+            detail: "No ledger posting required for a zero-total document",
+            createdAt: "2026-01-01T00:00:02Z",
+          },
+        ]}
+        connection="open"
+      />,
+    );
+
+    expect(screen.getByText("No ledger posting required")).toBeInTheDocument();
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(0);
+  });
+
   it("shows a failed indicator instead of a spinner or checkmark when processing fails", () => {
     render(
       <UploadSteps

@@ -9,6 +9,7 @@ const labels: Record<DocumentActivityStage, string> = {
   CATEGORIZING: "Categorizing expense",
   DRAFTING_LEDGER: "Drafting ledger entries",
   POSTED: "Posted to ledger",
+  NO_POSTING_REQUIRED: "No ledger posting required",
   NEEDS_REVIEW: "Needs review",
   EXTRACTION_NEEDS_REVIEW: "Extraction needs review",
   FAILED: "Processing failed",

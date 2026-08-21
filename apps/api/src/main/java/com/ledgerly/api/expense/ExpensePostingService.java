@@ -9,6 +9,7 @@ import com.ledgerly.api.policy.PolicyChunk;
 import com.ledgerly.api.policy.PolicyChunkRepository;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,9 +71,8 @@ public class ExpensePostingService {
    *     authenticated principal, so the caller passes the document's uploader instead.
    * @throws CategorizationOutcomeException if categorization could not be completed at all (`ai`
    *     unavailable, malformed response, no category taxonomy exists yet for the organization, or
-   *     `ai` chose a category outside the given list). The document stays {@code EXTRACTED}; no
-   *     expense or ledger row is written. Retrying is a future re-processing concern, not this
-   *     call's job.
+   *     `ai` chose a category outside the given list). The caller persists a correctable,
+   *     unclassified review item; no ledger row is written.
    */
   public Expense categorizeAndPost(
       UUID organizationId, UUID documentId, UUID actor, ExtractionProposal proposal) {
@@ -100,12 +100,30 @@ public class ExpensePostingService {
 
     CategorizeResponse trustedResponse = withTrustedCitation(response, relevantChunks);
 
-    if (trustedResponse.confidence() < confidenceThreshold) {
-      return transactions.recordNeedsReview(
+    try {
+      if (trustedResponse.confidence() < confidenceThreshold) {
+        return transactions.recordNeedsReview(
+            organizationId, documentId, actor, chosenCategory, proposal, trustedResponse);
+      }
+      return transactions.recordPosted(
           organizationId, documentId, actor, chosenCategory, proposal, trustedResponse);
+    } catch (DataIntegrityViolationException e) {
+      // A category can be deleted after the AI response has been checked but before this
+      // transaction writes its foreign key. That is an expected classification race, not a
+      // technical posting failure; every other integrity failure remains observable.
+      if (categoryRepository
+          .findByIdAndOrganizationId(chosenCategory.getId(), organizationId)
+          .isEmpty()) {
+        throw new CategorizationOutcomeException("Categorization category was deleted before posting");
+      }
+      throw e;
     }
-    return transactions.recordPosted(
-        organizationId, documentId, actor, chosenCategory, proposal, trustedResponse);
+  }
+
+  /** Records the no-category review fallback for an expected categorization outcome. */
+  public Expense recordUnclassifiedNeedsReview(
+      UUID organizationId, UUID documentId, UUID actor, ExtractionProposal proposal) {
+    return transactions.recordUnclassifiedNeedsReview(organizationId, documentId, actor, proposal);
   }
 
   /**

@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from http.client import IncompleteRead, RemoteDisconnected
 from pathlib import Path
 
 import pytest
 
 from scripts.run_invoice_quality_matrix import (
+    document_activity_stages,
     expense_field_values,
+    is_pdf_with_whitespace_suffix,
+    json_request,
     mismatched_fields,
     load_manifest,
     wait_for_api,
@@ -131,6 +135,30 @@ def test_api_readiness_timeout_is_an_error(monkeypatch: pytest.MonkeyPatch) -> N
         wait_for_api("http://localhost:8080", timeout_seconds=-1)
 
 
+def test_json_request_converts_a_restart_disconnect_to_a_retryable_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def disconnect(*_args: object, **_kwargs: object) -> None:
+        raise RemoteDisconnected("container restarted")
+
+    monkeypatch.setattr("scripts.run_invoice_quality_matrix.urlopen", disconnect)
+
+    with pytest.raises(RuntimeError, match="disconnected before a response"):
+        json_request("GET", "http://localhost:8080/actuator/health")
+
+
+def test_json_request_converts_an_aborted_restart_connection_to_a_retryable_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def abort(*_args: object, **_kwargs: object) -> None:
+        raise ConnectionAbortedError("container restarted")
+
+    monkeypatch.setattr("scripts.run_invoice_quality_matrix.urlopen", abort)
+
+    with pytest.raises(RuntimeError, match="disconnected before a response"):
+        json_request("GET", "http://localhost:8080/actuator/health")
+
+
 def test_expense_field_mismatch_reports_only_the_field_names() -> None:
     observed = expense_field_values(
         {
@@ -147,3 +175,52 @@ def test_expense_field_mismatch_reports_only_the_field_names() -> None:
         observed,
         {"vendor": "Acme GmbH", "invoice_number": "INV-42"},
     ) == ["invoice_number"]
+
+
+def test_legal_issuer_matches_a_short_brand_alias() -> None:
+    assert mismatched_fields(
+        {"vendor": "North Holdings A.S."},
+        {"vendor": "North"},
+    ) == []
+
+
+def test_short_brand_does_not_match_expected_legal_issuer() -> None:
+    assert mismatched_fields(
+        {"vendor": "North"},
+        {"vendor": "North Holdings A.S."},
+    ) == ["vendor"]
+
+
+def test_pdf_with_only_whitespace_after_end_marker_is_accepted(tmp_path: Path) -> None:
+    path = tmp_path / "trailing-whitespace.pdf"
+    path.write_bytes(b"%PDF-1.7\n%%EOF\n \t")
+
+    assert is_pdf_with_whitespace_suffix(path)
+
+
+def test_pdf_with_non_whitespace_after_end_marker_is_not_accepted(tmp_path: Path) -> None:
+    path = tmp_path / "trailing-bytes.pdf"
+    path.write_bytes(b"%PDF-1.7\n%%EOF\ninvalid")
+
+    assert not is_pdf_with_whitespace_suffix(path)
+
+
+def test_activity_stream_parser_collects_only_activity_stages(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = b": keepalive\n\nevent: activity\ndata: {\"stage\":\"EXTRACTING\"}\n\ndata: {\"stage\":\"NO_POSTING_REQUIRED\"}\n"
+
+    class Response:
+        def read(self) -> bytes:
+            raise IncompleteRead(payload)
+
+        def __enter__(self) -> "Response":
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr("scripts.run_invoice_quality_matrix.urlopen", lambda *_args, **_kwargs: Response())
+
+    assert document_activity_stages("http://api", "document-id", {}, 1) == {
+        "EXTRACTING",
+        "NO_POSTING_REQUIRED",
+    }

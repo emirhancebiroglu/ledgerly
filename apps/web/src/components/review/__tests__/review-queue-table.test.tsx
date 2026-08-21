@@ -190,6 +190,20 @@ describe("ReviewQueueTable", () => {
     });
   });
 
+  it("requires correction instead of allowing approval for an unclassified review item", () => {
+    render(
+      <ReviewQueueTable
+        initialExpenses={[expense({ categoryId: undefined as unknown as null })]}
+        categories={categories}
+      />,
+    );
+
+    expect(screen.getByText("Needs review — choose a category before posting")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox")).toBeDisabled();
+    expect(screen.getByLabelText(/Correct category for Office Depot/)).toBeEnabled();
+  });
+
   it("checkboxes are real inputs operable via keyboard/change events", () => {
     render(<ReviewQueueTable initialExpenses={[expense()]} categories={categories} />);
 

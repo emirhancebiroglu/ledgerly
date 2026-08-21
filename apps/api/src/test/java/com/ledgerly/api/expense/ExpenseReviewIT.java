@@ -219,6 +219,38 @@ class ExpenseReviewIT extends AbstractPostgresIT {
   }
 
   @Test
+  void unclassifiedReviewRequiresCorrectionBeforeItCanPost() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    UUID correctedCategory = createCategory(organizationId);
+    UUID expenseId = insertNeedsReviewExpense(organizationId, null, "Acme Corp", 5_000);
+
+    mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/approve")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "unclassified-approve-" + System.nanoTime()))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.detail").value("Choose a category before approving this expense"));
+
+    assertThat(transactionCount(organizationId)).isZero();
+
+    mockMvc
+        .perform(
+            post("/api/v1/expenses/" + expenseId + "/correct")
+                .header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", "unclassified-correct-" + System.nanoTime())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    objectMapper.writeValueAsString(new CorrectExpenseRequest(correctedCategory))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("POSTED"))
+        .andExpect(jsonPath("$.categoryId").value(correctedCategory.toString()));
+
+    assertThat(transactionCount(organizationId)).isEqualTo(1);
+  }
+
+  @Test
   void correctRePointsTheDebitAccountAndStillBalances() throws Exception {
     String token = registerAndGetAccessToken();
     UUID org = organizationIdOf(token);
@@ -477,6 +509,11 @@ class ExpenseReviewIT extends AbstractPostgresIT {
         categoryId,
         amountMinor);
     return expenseId;
+  }
+
+  private Integer transactionCount(UUID organizationId) {
+    return jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM ledger_transaction WHERE organization_id = ?", Integer.class, organizationId);
   }
 
   private UUID insertBudget(UUID organizationId, UUID categoryId, String period, long limitMinor) {

@@ -44,9 +44,7 @@ class DocumentUploadIT extends AbstractPostgresIT {
 
   private static final String TEST_JWT_SECRET = "test-only-secret-not-for-production-use-0123456789";
 
-  /** A byte sequence that really does start with the PDF magic number. */
-  private static final byte[] REAL_PDF =
-      ("%PDF-1.7\n" + "0".repeat(512) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
+  private static final byte[] REAL_PDF = TestPdfFactory.validPdf();
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
@@ -106,6 +104,50 @@ class DocumentUploadIT extends AbstractPostgresIT {
 
     upload(token, "invoice.pdf", notAPdf, "key-" + System.nanoTime())
         .andExpect(status().isUnsupportedMediaType());
+  }
+
+  @Test
+  void aPdfHeaderWithMalformedPdfBytesIsRejectedWith415BeforeItIsStored() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    byte[] malformedPdf = "%PDF-1.7\nnot a PDF body\n%%EOF\n".getBytes(StandardCharsets.UTF_8);
+
+    upload(token, "malformed.pdf", malformedPdf, "key-" + System.nanoTime())
+        .andExpect(status().isUnsupportedMediaType());
+
+    assertThat(documentRepository.countByOrganizationId(organizationId)).isZero();
+  }
+
+  @Test
+  void aStructurallyValidPdfWithoutPagesIsRejectedWith415BeforeItIsStored() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+
+    upload(token, "empty.pdf", TestPdfFactory.emptyPdf(), "key-" + System.nanoTime())
+        .andExpect(status().isUnsupportedMediaType());
+
+    assertThat(documentRepository.countByOrganizationId(organizationId)).isZero();
+  }
+
+  @Test
+  void aPdfWithTrailingMultipartDataIsRejectedWith415BeforeItIsStored() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID organizationId = organizationIdOf(token);
+    byte[] multipartEnvelope = concat(REAL_PDF, "--multipart-boundary".getBytes(StandardCharsets.UTF_8));
+
+    upload(token, "envelope.pdf", multipartEnvelope, "key-" + System.nanoTime())
+        .andExpect(status().isUnsupportedMediaType());
+
+    assertThat(documentRepository.countByOrganizationId(organizationId)).isZero();
+  }
+
+  @Test
+  void aParseablePdfWithNonMultipartTrailingBytesIsAccepted() throws Exception {
+    String token = registerAndGetAccessToken();
+    byte[] postProcessedPdf = concat(REAL_PDF, "\npost-processing metadata".getBytes(StandardCharsets.UTF_8));
+
+    upload(token, "post-processed.pdf", postProcessedPdf, "key-" + System.nanoTime())
+        .andExpect(status().isCreated());
   }
 
   @Test
@@ -192,8 +234,7 @@ class DocumentUploadIT extends AbstractPostgresIT {
     String token = registerAndGetAccessToken();
     UUID orgId = organizationIdOf(token);
     String key = "key-" + System.nanoTime();
-    byte[] otherPdf =
-        ("%PDF-1.7\n" + "7".repeat(600) + "\n%%EOF\n").getBytes(StandardCharsets.UTF_8);
+    byte[] otherPdf = concat(REAL_PDF, "\n".getBytes(StandardCharsets.UTF_8));
 
     upload(token, "first.pdf", REAL_PDF, key).andExpect(status().isCreated());
 

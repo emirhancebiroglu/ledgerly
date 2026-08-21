@@ -32,6 +32,9 @@ public class ExpenseReviewService {
   public Expense approve(UUID expenseId, AuthenticatedPrincipal principal) {
     UUID organizationId = principal.organizationId();
     Expense expense = findForOrganization(expenseId, organizationId);
+    if (expense.getCategoryId() == null) {
+      throw new ExpenseCategoryRequiredException();
+    }
     Category category = findCategory(expense.getCategoryId(), organizationId);
     return transactions.resolve(
         organizationId, expenseId, principal.userId(), category, "APPROVE");

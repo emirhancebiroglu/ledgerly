@@ -53,6 +53,7 @@ export type DocumentActivityStage =
   | "CATEGORIZING"
   | "DRAFTING_LEDGER"
   | "POSTED"
+  | "NO_POSTING_REQUIRED"
   | "NEEDS_REVIEW"
   | "EXTRACTION_NEEDS_REVIEW"
   | "FAILED"

@@ -29,6 +29,7 @@ public class ExtractionProposalValidator {
    * organization that has never traded in it is far more likely a misread than a real invoice.
    */
   private static final Set<String> ALLOWED_CURRENCIES = Set.of("EUR", "USD", "GBP", "TRY");
+  private static final String SAMPLE_DOCUMENT_WARNING = "DOCUMENT_IS_SAMPLE_OR_ILLUSTRATION";
 
   private final Clock clock;
   private final long amountCeilingMinor;
@@ -57,6 +58,7 @@ public class ExtractionProposalValidator {
     checkArithmetic(proposal, violations);
     checkDate(proposal, violations);
     checkCeiling(proposal, violations);
+    checkDocumentWarnings(proposal, violations);
 
     return new ProposalValidationResult(violations);
   }
@@ -90,11 +92,15 @@ public class ExtractionProposalValidator {
       return;
     }
     boolean isRefund = proposal.totalMinor() < 0;
+    boolean isZeroTotal = proposal.totalMinor() == 0;
     if (isRefund && proposal.taxMinor() > 0) {
       violations.add("Total is negative but tax is positive: " + proposal.taxMinor());
     }
     if (!isRefund && proposal.taxMinor() < 0) {
       violations.add("Tax is negative but total is not: " + proposal.taxMinor());
+    }
+    if (isZeroTotal && proposal.taxMinor() != 0) {
+      violations.add("Tax must be zero when the total is zero: " + proposal.taxMinor());
     }
     if (proposal.lines().isEmpty()) {
       // Some legitimate invoices publish only tax-inclusive service amounts and a document-level
@@ -107,7 +113,9 @@ public class ExtractionProposalValidator {
     }
     boolean lineSignMismatch =
         proposal.lines().stream()
-            .anyMatch(line -> isRefund ? line.amountMinor() > 0 : line.amountMinor() < 0);
+            .anyMatch(
+                line ->
+                    !isZeroTotal && (isRefund ? line.amountMinor() > 0 : line.amountMinor() < 0));
     if (lineSignMismatch) {
       violations.add("A line amount's sign is inconsistent with the total");
     }
@@ -161,6 +169,12 @@ public class ExtractionProposalValidator {
       violations.add(
           "Total %d exceeds the organization ceiling of %d minor units"
               .formatted(proposal.totalMinor(), amountCeilingMinor));
+    }
+  }
+
+  private void checkDocumentWarnings(ExtractionProposal proposal, List<String> violations) {
+    if (proposal.warnings() != null && proposal.warnings().contains(SAMPLE_DOCUMENT_WARNING)) {
+      violations.add("Document explicitly identifies itself as sample or illustration material");
     }
   }
 
