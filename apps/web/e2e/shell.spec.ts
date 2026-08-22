@@ -115,22 +115,21 @@ test.describe("app shell", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  test("Budgets is a live nav item while Alerts and Policies remain disabled", async ({
+  test("Budgets and Alerts are live nav items while Policies remains disabled", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
     await expect(page.getByRole("link", { name: "Budgets" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Alerts" })).toBeVisible();
 
-    for (const label of ["Alerts", "Policies"]) {
-      const item = page.getByText(label, { exact: true });
-      await expect(item).toBeVisible();
-      const isInsideAnchor = await item.evaluate((el) => el.closest("a") !== null);
-      expect(isInsideAnchor).toBe(false);
-      const disabledAncestor = item.locator("xpath=ancestor-or-self::*[@aria-disabled='true']");
-      await expect(disabledAncestor).toHaveCount(1);
-    }
+    const item = page.getByText("Policies", { exact: true });
+    await expect(item).toBeVisible();
+    const isInsideAnchor = await item.evaluate((el) => el.closest("a") !== null);
+    expect(isInsideAnchor).toBe(false);
+    const disabledAncestor = item.locator("xpath=ancestor-or-self::*[@aria-disabled='true']");
+    await expect(disabledAncestor).toHaveCount(1);
   });
 
   test("mobile drawer traps focus while open and restores it to the hamburger on close", async ({
@@ -172,5 +171,17 @@ test.describe("app shell", () => {
     await login(page);
 
     await expect(page.getByRole("navigation", { name: "Main" }).getByText("3")).toBeVisible();
+  });
+
+  test("Alerts nav item shows the unread count from the seeded alerts", async ({ page }) => {
+    const apiPort = process.env.E2E_API_PORT ?? "8081";
+    const response = await page.request.post(`http://localhost:${apiPort}/api/v1/test/reset-alerts`);
+    expect(response.ok()).toBe(true);
+
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await login(page);
+
+    const alertsLink = page.getByRole("link", { name: "Alerts" });
+    await expect(alertsLink.getByText("2", { exact: true })).toBeVisible();
   });
 });

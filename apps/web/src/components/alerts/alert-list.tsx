@@ -6,7 +6,7 @@ import { BellOff, CircleCheck, TriangleAlert, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/date";
-import { dismissAlert, markAlertRead, type Alert, type AlertType } from "@/lib/alerts";
+import { dismissAlert, markAlertRead, markAllAlertsRead, type Alert, type AlertType } from "@/lib/alerts";
 import { alertBody, categoryNameLookup } from "@/components/alerts/alert-body";
 import type { Category } from "@/lib/categories";
 
@@ -84,6 +84,17 @@ export function AlertList({ initialAlerts, categories }: AlertListProps) {
     }
   }
 
+  async function handleMarkAllRead() {
+    setError(null);
+    const previous = alerts;
+    setAlerts((current) => current.map((a) => ({ ...a, read: true })));
+    const result = await markAllAlertsRead();
+    if (!result.ok) {
+      setAlerts(previous);
+      setError(result.message);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {error && (
@@ -91,21 +102,28 @@ export function AlertList({ initialAlerts, categories }: AlertListProps) {
           {error}
         </div>
       )}
-      <div className="flex flex-wrap gap-2">
-        {FILTER_TABS.map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setFilter(tab.key)}
-            className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
-              filter === tab.key
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-border bg-card text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setFilter(tab.key)}
+              className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                filter === tab.key
+                  ? "border-primary/30 bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+        {alerts.some((a) => !a.read) && (
+          <Button variant="ghost" size="sm" onClick={() => void handleMarkAllRead()}>
+            Mark all as read
+          </Button>
+        )}
       </div>
 
       {visible.length === 0 ? (

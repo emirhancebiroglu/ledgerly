@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 
 interface SidebarProps {
   reviewQueueCount?: number;
+  unreadAlertCount?: number;
   orgName: string;
   orgInitial: string;
   className?: string;
@@ -18,6 +19,7 @@ interface SidebarProps {
 
 export function Sidebar({
   reviewQueueCount,
+  unreadAlertCount,
   orgName,
   orgInitial,
   className,
@@ -41,7 +43,12 @@ export function Sidebar({
       <div className="flex flex-col gap-0.5">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname.startsWith(item.href);
-          const count = item.countKey === "reviewQueue" ? reviewQueueCount : undefined;
+          const count =
+            item.countKey === "reviewQueue"
+              ? reviewQueueCount
+              : item.countKey === "unreadAlerts"
+                ? unreadAlertCount
+                : undefined;
           return (
             <Link
               key={item.href}

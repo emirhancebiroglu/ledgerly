@@ -13,8 +13,8 @@ export interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
-  /** Review queue's count badge — supplied by the caller, not baked into the config. */
-  countKey?: "reviewQueue";
+  /** Count badge — supplied by the caller, not baked into the config. */
+  countKey?: "reviewQueue" | "unreadAlerts";
 }
 
 export interface DisabledNavItem {
@@ -22,7 +22,7 @@ export interface DisabledNavItem {
   icon: LucideIcon;
 }
 
-/** Active routes available in the browser. Alerts remains intentionally deferred — see
+/** Active routes available in the browser. M9.5 gave Alerts its own route and promoted it out of
  * `DISABLED_NAV_ITEMS`. */
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
@@ -30,13 +30,11 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Upload", href: "/upload", icon: Upload },
   { label: "Review", href: "/review", icon: CheckCircle2, countKey: "reviewQueue" },
   { label: "Budgets", href: "/budgets", icon: Wallet },
+  { label: "Alerts", href: "/alerts", icon: Bell, countKey: "unreadAlerts" },
 ];
 
-/** Rendered as present-but-disabled so the shell stays honest about what is not built yet.
- * Alerts owns its own route when it ships; M9.4 removed the dashboard's alerts card rather than
- * leaving alert records on a screen that is not about them, so nothing surfaces them today. */
+/** Rendered as present-but-disabled so the shell stays honest about what is not built yet. */
 export const DISABLED_NAV_ITEMS: DisabledNavItem[] = [
-  { label: "Alerts", icon: Bell },
   { label: "Policies", icon: FileText },
 ];
 
@@ -51,4 +49,5 @@ export const QUICK_JUMP_ITEMS: QuickJumpItem[] = [
   { label: "Go to Review queue", href: "/review" },
   { label: "Go to Expenses", href: "/expenses" },
   { label: "Go to Budgets", href: "/budgets" },
+  { label: "Go to Alerts", href: "/alerts" },
 ];
