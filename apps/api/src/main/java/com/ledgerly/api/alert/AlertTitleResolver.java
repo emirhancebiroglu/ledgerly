@@ -22,6 +22,7 @@ public class AlertTitleResolver {
     return switch (alert.getAlertType()) {
       case "BUDGET_THRESHOLD" -> budgetThresholdTitle(alert);
       case "ANOMALY_HIGH" -> "Unusual spending detected";
+      case "LOW_CONFIDENCE" -> "Low-confidence categorization needs review";
       default -> throw new IllegalStateException("Unknown alert type: " + alert.getAlertType());
     };
   }

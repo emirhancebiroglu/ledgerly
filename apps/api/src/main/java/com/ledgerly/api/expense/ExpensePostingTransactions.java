@@ -41,6 +41,7 @@ public class ExpensePostingTransactions {
   private final LedgerTransactionRepository ledgerTransactionRepository;
   private final ExpenseRepository expenseRepository;
   private final BudgetThresholdEvaluator budgetThresholdEvaluator;
+  private final LowConfidenceAlertEvaluator lowConfidenceAlertEvaluator;
   private final ApplicationEventPublisher eventPublisher;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
@@ -51,6 +52,7 @@ public class ExpensePostingTransactions {
       LedgerTransactionRepository ledgerTransactionRepository,
       ExpenseRepository expenseRepository,
       BudgetThresholdEvaluator budgetThresholdEvaluator,
+      LowConfidenceAlertEvaluator lowConfidenceAlertEvaluator,
       ApplicationEventPublisher eventPublisher,
       AuditService auditService,
       ObjectMapper objectMapper,
@@ -59,6 +61,7 @@ public class ExpensePostingTransactions {
     this.ledgerTransactionRepository = ledgerTransactionRepository;
     this.expenseRepository = expenseRepository;
     this.budgetThresholdEvaluator = budgetThresholdEvaluator;
+    this.lowConfidenceAlertEvaluator = lowConfidenceAlertEvaluator;
     this.eventPublisher = eventPublisher;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
@@ -145,6 +148,8 @@ public class ExpensePostingTransactions {
                 response.confidence(),
                 response.citation()));
     expenseRepository.flush();
+
+    lowConfidenceAlertEvaluator.evaluate(expense, actor);
 
     auditService.record(
         organizationId,
