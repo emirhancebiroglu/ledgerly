@@ -36,19 +36,34 @@ const DASHBOARD_SUMMARY = {
   reviewQueueCount: 3,
   documentsProcessedToday: 17,
   alertCount: 2,
-  recentAlerts: [
-    {
-      id: "alert-1", expenseId: "exp-1", categoryId: "cat-2", period: "2026-07", currency: "EUR",
-      alertType: "BUDGET_THRESHOLD", thresholdPercent: 80, spentMinor: 840000, limitMinor: 1000000,
-      historyCount: null, zScore: null, budgetBurnRate: 0.84, explanation: null, createdAt: "2026-07-24T10:00:00Z",
-    },
-    {
-      id: "alert-2", expenseId: "exp-2", categoryId: "cat-1", period: "2026-07", currency: "EUR",
-      alertType: "ANOMALY_HIGH", thresholdPercent: null, spentMinor: null, limitMinor: null,
-      historyCount: 32, zScore: 3.2, budgetBurnRate: 0.42, explanation: "Spend is unusual for this category.", createdAt: "2026-07-23T09:00:00Z",
-    },
-  ],
+  recentAlerts: [],
 };
+
+const ALERTS_SEED = [
+  {
+    id: "alert-1", expenseId: "exp-1", categoryId: "cat-2", period: "2026-07", currency: "EUR",
+    alertType: "BUDGET_THRESHOLD", thresholdPercent: 80, spentMinor: "840000", limitMinor: "1000000",
+    historyCount: null, zScore: null, budgetBurnRate: 0.84, explanation: null, model: null,
+    createdAt: "2026-07-24T10:00:00Z", categorizationConfidence: null,
+    title: "Travel nearing its budget", read: false, dismissed: false,
+  },
+  {
+    id: "alert-2", expenseId: "exp-2", categoryId: "cat-1", period: "2026-07", currency: "EUR",
+    alertType: "ANOMALY_HIGH", thresholdPercent: null, spentMinor: null, limitMinor: null,
+    historyCount: 32, zScore: 3.2, budgetBurnRate: 0.42,
+    explanation: "Spend is unusual for this category.", model: "gpt-test",
+    createdAt: "2026-07-23T09:00:00Z", categorizationConfidence: null,
+    title: "Unusual spending detected", read: true, dismissed: false,
+  },
+  {
+    id: "alert-3", expenseId: "exp-3", categoryId: "cat-3", period: "2026-07", currency: "EUR",
+    alertType: "LOW_CONFIDENCE", thresholdPercent: null, spentMinor: null, limitMinor: null,
+    historyCount: null, zScore: null, budgetBurnRate: null, explanation: null, model: null,
+    createdAt: "2026-07-22T08:00:00Z", categorizationConfidence: 0.42,
+    title: "Low-confidence categorization needs review", read: false, dismissed: false,
+  },
+];
+let ALERTS = JSON.parse(JSON.stringify(ALERTS_SEED));
 
 let budgetCounter = 5;
 const BUDGETS = [
@@ -644,6 +659,56 @@ function handleBudgetDelete(req, res, isAuthed, id) {
   res.end();
 }
 
+function handleAlertsList(req, res, isAuthed, url) {
+  if (!isAuthed) return send(res, 401, {});
+  const type = url.searchParams.get("type");
+  const validTypes = ["BUDGET_THRESHOLD", "ANOMALY_HIGH", "LOW_CONFIDENCE"];
+  if (type && !validTypes.includes(type)) {
+    return send(res, 400, { detail: `Unknown alert type: ${type}` });
+  }
+  let visible = ALERTS.filter((a) => !a.dismissed);
+  if (type) visible = visible.filter((a) => a.alertType === type);
+  send(res, 200, visible);
+}
+
+function handleAlertsUnreadCount(req, res, isAuthed) {
+  if (!isAuthed) return send(res, 401, {});
+  const unreadCount = ALERTS.filter((a) => !a.dismissed && !a.read).length;
+  send(res, 200, { unreadCount });
+}
+
+function handleAlertRead(req, res, isAuthed, id) {
+  if (!isAuthed) return send(res, 401, {});
+  const alert = ALERTS.find((a) => a.id === id);
+  if (!alert) return send(res, 404, { detail: "Alert not found" });
+  alert.read = true;
+  res.writeHead(204);
+  res.end();
+}
+
+function handleAlertsReadAll(req, res, isAuthed) {
+  if (!isAuthed) return send(res, 401, {});
+  for (const alert of ALERTS) {
+    if (!alert.dismissed) alert.read = true;
+  }
+  res.writeHead(204);
+  res.end();
+}
+
+function handleAlertDismiss(req, res, isAuthed, id) {
+  if (!isAuthed) return send(res, 401, {});
+  const alert = ALERTS.find((a) => a.id === id);
+  if (!alert) return send(res, 404, { detail: "Alert not found" });
+  alert.dismissed = true;
+  res.writeHead(204);
+  res.end();
+}
+
+function handleResetAlerts(req, res) {
+  ALERTS = JSON.parse(JSON.stringify(ALERTS_SEED));
+  send(res, 200, ALERTS);
+}
+
 function handleResetBudgets(req, res) {
   BUDGETS.splice(0, BUDGETS.length, ...JSON.parse(JSON.stringify(BUDGETS_SEED)));
   budgetCounter = 5;
@@ -800,6 +865,26 @@ const server = createServer((req, res) => {
   }
   if (url.pathname === "/api/v1/test/reset-budgets" && req.method === "POST") {
     return handleResetBudgets(req, res);
+  }
+  if (url.pathname === "/api/v1/alerts" && req.method === "GET") {
+    return handleAlertsList(req, res, isAuthed, url);
+  }
+  if (url.pathname === "/api/v1/alerts/unread-count" && req.method === "GET") {
+    return handleAlertsUnreadCount(req, res, isAuthed);
+  }
+  if (url.pathname === "/api/v1/alerts/read-all" && req.method === "POST") {
+    return handleAlertsReadAll(req, res, isAuthed);
+  }
+  if (url.pathname === "/api/v1/test/reset-alerts" && req.method === "POST") {
+    return handleResetAlerts(req, res);
+  }
+  const alertReadMatch = url.pathname.match(/^\/api\/v1\/alerts\/([^/]+)\/read$/);
+  if (alertReadMatch && req.method === "POST") {
+    return handleAlertRead(req, res, isAuthed, alertReadMatch[1]);
+  }
+  const alertDismissMatch = url.pathname.match(/^\/api\/v1\/alerts\/([^/]+)\/dismiss$/);
+  if (alertDismissMatch && req.method === "POST") {
+    return handleAlertDismiss(req, res, isAuthed, alertDismissMatch[1]);
   }
   const budgetMatch = url.pathname.match(/^\/api\/v1\/budgets\/([^/]+)$/);
   if (budgetMatch && req.method === "PUT") {
