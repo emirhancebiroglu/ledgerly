@@ -115,6 +115,7 @@ public class Alert {
     return id;
   }
 
+  public UUID getOrganizationId() { return organizationId; }
   public UUID getExpenseId() { return expenseId; }
   public UUID getCategoryId() { return categoryId; }
   public String getPeriod() { return period; }

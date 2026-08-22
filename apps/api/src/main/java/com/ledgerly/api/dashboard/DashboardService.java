@@ -3,6 +3,7 @@ package com.ledgerly.api.dashboard;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.alert.AlertRepository;
 import com.ledgerly.api.alert.AlertResponse;
+import com.ledgerly.api.alert.AlertTitleResolver;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.time.Clock;
@@ -20,11 +21,17 @@ public class DashboardService {
 
   private final DashboardRepository dashboardRepository;
   private final AlertRepository alertRepository;
+  private final AlertTitleResolver alertTitleResolver;
   private final Clock clock;
 
-  public DashboardService(DashboardRepository dashboardRepository, AlertRepository alertRepository, Clock clock) {
+  public DashboardService(
+      DashboardRepository dashboardRepository,
+      AlertRepository alertRepository,
+      AlertTitleResolver alertTitleResolver,
+      Clock clock) {
     this.dashboardRepository = dashboardRepository;
     this.alertRepository = alertRepository;
+    this.alertTitleResolver = alertTitleResolver;
     this.clock = clock;
   }
 
@@ -50,7 +57,9 @@ public class DashboardService {
     long documentsProcessedToday = dashboardRepository.documentsProcessedSince(organizationId, today);
     long alertCount = alertRepository.countByOrganizationId(organizationId);
     var recentAlerts = alertRepository.findByOrganizationId(organizationId,
-        PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt"))).stream().map(AlertResponse::from).toList();
+        PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt"))).stream()
+        .map(alert -> AlertResponse.from(alert, alertTitleResolver.resolve(alert)))
+        .toList();
 
     return new DashboardSummaryResponse(
         totalsThisMonth,
