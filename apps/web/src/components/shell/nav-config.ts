@@ -30,15 +30,13 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Upload", href: "/upload", icon: Upload },
   { label: "Review", href: "/review", icon: CheckCircle2, countKey: "reviewQueue" },
   { label: "Budgets", href: "/budgets", icon: Wallet },
+  { label: "Policies", href: "/policies", icon: FileText },
 ];
 
 /** Rendered as present-but-disabled so the shell stays honest about what is not built yet.
  * Alerts owns its own route when it ships; M9.4 removed the dashboard's alerts card rather than
  * leaving alert records on a screen that is not about them, so nothing surfaces them today. */
-export const DISABLED_NAV_ITEMS: DisabledNavItem[] = [
-  { label: "Alerts", icon: Bell },
-  { label: "Policies", icon: FileText },
-];
+export const DISABLED_NAV_ITEMS: DisabledNavItem[] = [{ label: "Alerts", icon: Bell }];
 
 export interface QuickJumpItem {
   label: string;
@@ -51,4 +49,5 @@ export const QUICK_JUMP_ITEMS: QuickJumpItem[] = [
   { label: "Go to Review queue", href: "/review" },
   { label: "Go to Expenses", href: "/expenses" },
   { label: "Go to Budgets", href: "/budgets" },
+  { label: "Go to Policies", href: "/policies" },
 ];

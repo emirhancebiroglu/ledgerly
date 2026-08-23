@@ -132,9 +132,14 @@ The panel therefore models a real several-second request, not an optimistic row.
   because they are common.
 - **Every stat is computed from the listed documents.** No time-series, no percentages, no
   "this month" counts — the data to support them does not exist.
-- **Citation provenance is one-directional in this pass.** `expense.citation` stores the chunk
-  *text*, not a chunk id, so "which expense quoted this passage" is resolved by matching text.
-  If that proves costly, the chip is dropped rather than approximated.
+- **Citation provenance chip: dropped for this pass, not shipped.** `expense.citation` stores
+  the chunk *text*, not a chunk id, in an unindexed `TEXT` column with no repository query
+  against it today. Answering "which expense quoted this passage" without an N+1 is feasible —
+  one `findByOrganizationIdAndCitationIn(orgId, chunkTexts)` query per detail-page load — but
+  building it means adding a query method to `ExpenseRepository` and a field to
+  `PolicyChunkResponse`, both in `apps/api/**`, which is outside M9.7b's freeze (`apps/web/**`
+  only; M9.7a already closed). Revisiting this is a small, well-scoped addition to a future
+  policy milestone, not a technical blocker — it just doesn't fit inside a FE-only pass.
 - **Nothing mutates a policy.** No rename, no edit, no enable/disable, no delete. Documents are
   immutable once uploaded; re-uploading is the only corrective action, and it creates a new
   document rather than replacing one.

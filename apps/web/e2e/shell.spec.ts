@@ -115,22 +115,21 @@ test.describe("app shell", () => {
     await expect(page.getByRole("dialog")).toBeHidden();
   });
 
-  test("Budgets is a live nav item while Alerts and Policies remain disabled", async ({
+  test("Budgets and Policies are live nav items while Alerts remains disabled", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
     await expect(page.getByRole("link", { name: "Budgets" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Policies" })).toBeVisible();
 
-    for (const label of ["Alerts", "Policies"]) {
-      const item = page.getByText(label, { exact: true });
-      await expect(item).toBeVisible();
-      const isInsideAnchor = await item.evaluate((el) => el.closest("a") !== null);
-      expect(isInsideAnchor).toBe(false);
-      const disabledAncestor = item.locator("xpath=ancestor-or-self::*[@aria-disabled='true']");
-      await expect(disabledAncestor).toHaveCount(1);
-    }
+    const item = page.getByText("Alerts", { exact: true });
+    await expect(item).toBeVisible();
+    const isInsideAnchor = await item.evaluate((el) => el.closest("a") !== null);
+    expect(isInsideAnchor).toBe(false);
+    const disabledAncestor = item.locator("xpath=ancestor-or-self::*[@aria-disabled='true']");
+    await expect(disabledAncestor).toHaveCount(1);
   });
 
   test("mobile drawer traps focus while open and restores it to the hamburger on close", async ({

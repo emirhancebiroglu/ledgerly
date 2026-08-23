@@ -650,6 +650,90 @@ function handleResetBudgets(req, res) {
   send(res, 200, BUDGETS);
 }
 
+// --- Policies (M9.7) ---
+
+const POLICY_CHUNKS = {
+  "policy-1": [
+    { index: 0, text: "This policy applies to every employee who incurs costs on behalf of Northwind Co." },
+    { index: 1, text: "Meals taken while travelling are reimbursed on actuals up to 50 EUR per day." },
+    { index: 2, text: "An itemised receipt is required for any single expense of 25 EUR or more." },
+  ],
+};
+
+let policyCounter = 3;
+const POLICIES = [
+  {
+    id: "policy-1", filename: "expense-policy-2026.pdf", status: "EMBEDDED", failureReason: null,
+    createdAt: "2026-08-12T00:00:00Z", chunkCount: 3,
+  },
+  {
+    id: "policy-2", filename: "procurement-handbook-v4.pdf", status: "FAILED",
+    failureReason: "pdf_text_extraction_empty: no text layer found on pages 1-48 (scanned image)",
+    createdAt: "2026-07-28T00:00:00Z", chunkCount: 0,
+  },
+];
+const POLICIES_SEED = JSON.parse(JSON.stringify(POLICIES));
+const POLICY_CHUNKS_SEED = JSON.parse(JSON.stringify(POLICY_CHUNKS));
+
+function handlePoliciesList(req, res, isAuthed) {
+  if (!isAuthed) return send(res, 401, {});
+  send(res, 200, POLICIES);
+}
+
+function handlePolicyGet(req, res, isAuthed, id) {
+  if (!isAuthed) return send(res, 401, {});
+  const policy = POLICIES.find((p) => p.id === id);
+  if (!policy) return send(res, 404, { detail: "Policy document not found" });
+  send(res, 200, policy);
+}
+
+function handlePolicyChunks(req, res, isAuthed, id) {
+  if (!isAuthed) return send(res, 401, {});
+  const policy = POLICIES.find((p) => p.id === id);
+  if (!policy) return send(res, 404, { detail: "Policy document not found" });
+  send(res, 200, POLICY_CHUNKS[id] ?? []);
+}
+
+function handlePolicyUpload(req, res, isAuthed) {
+  if (!isAuthed) return send(res, 401, {});
+  const idempotencyKey = req.headers["idempotency-key"];
+  if (!idempotencyKey) {
+    return send(res, 400, { detail: "Idempotency-Key header is required" });
+  }
+  const contentType = req.headers["content-type"] ?? "";
+  readBody(req)
+    .then((body) => {
+      const parsed = parseMultipartFile(body, contentType);
+      if (!parsed || parsed.bytes.length === 0) {
+        return send(res, 415, { detail: "Uploaded policy document is empty" });
+      }
+      const detected = detectContentType(parsed.bytes);
+      if (detected !== "application/pdf") {
+        return send(res, 415, { detail: "Policy documents must be PDF" });
+      }
+      const id = `policy-upload-${policyCounter++}`;
+      const document = {
+        id, filename: parsed.filename, status: "EMBEDDED", failureReason: null,
+        createdAt: new Date().toISOString(), chunkCount: 2,
+      };
+      POLICIES.unshift(document);
+      POLICY_CHUNKS[id] = [
+        { index: 0, text: "This addendum takes effect immediately upon upload." },
+        { index: 1, text: "It supersedes the corresponding section of the base policy." },
+      ];
+      send(res, 201, document);
+    })
+    .catch(() => send(res, 500, { detail: "Policy upload failed" }));
+}
+
+function handleResetPolicies(req, res) {
+  POLICIES.splice(0, POLICIES.length, ...JSON.parse(JSON.stringify(POLICIES_SEED)));
+  Object.keys(POLICY_CHUNKS).forEach((key) => delete POLICY_CHUNKS[key]);
+  Object.assign(POLICY_CHUNKS, JSON.parse(JSON.stringify(POLICY_CHUNKS_SEED)));
+  policyCounter = 3;
+  send(res, 200, POLICIES);
+}
+
 function handleExpenseDetail(req, res, isAuthed, expenseId) {
   if (!isAuthed) return send(res, 401, {});
   const expense = EXPENSES.find((e) => e.id === expenseId);
@@ -832,6 +916,24 @@ const server = createServer((req, res) => {
   const resetMatch = url.pathname.match(/^\/api\/v1\/test\/reset-expense\/([^/]+)$/);
   if (req.method === "POST" && resetMatch) {
     return handleResetExpense(req, res, resetMatch[1]);
+  }
+
+  if (url.pathname === "/api/v1/policies" && req.method === "GET") {
+    return handlePoliciesList(req, res, isAuthed);
+  }
+  if (url.pathname === "/api/v1/policies" && req.method === "POST") {
+    return handlePolicyUpload(req, res, isAuthed);
+  }
+  if (url.pathname === "/api/v1/test/reset-policies" && req.method === "POST") {
+    return handleResetPolicies(req, res);
+  }
+  const policyChunksMatch = url.pathname.match(/^\/api\/v1\/policies\/([^/]+)\/chunks$/);
+  if (policyChunksMatch) {
+    return handlePolicyChunks(req, res, isAuthed, policyChunksMatch[1]);
+  }
+  const policyMatch = url.pathname.match(/^\/api\/v1\/policies\/([^/]+)$/);
+  if (policyMatch) {
+    return handlePolicyGet(req, res, isAuthed, policyMatch[1]);
   }
 
   send(res, 404, { message: "not stubbed in e2e mock-api" });
