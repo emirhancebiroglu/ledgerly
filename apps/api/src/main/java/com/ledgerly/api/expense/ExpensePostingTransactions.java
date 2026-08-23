@@ -106,7 +106,9 @@ public class ExpensePostingTransactions {
                 proposal.totalMinor(),
                 proposal.currency(),
                 response.confidence(),
-                response.citation()));
+                response.citation(),
+                proposal.invoiceNumber(),
+                proposal.documentDate()));
     expenseRepository.flush();
 
     budgetThresholdEvaluator.evaluate(expense, postedAt, actor);
@@ -146,7 +148,9 @@ public class ExpensePostingTransactions {
                 proposal.totalMinor(),
                 proposal.currency(),
                 response.confidence(),
-                response.citation()));
+                response.citation(),
+                proposal.invoiceNumber(),
+                proposal.documentDate()));
     expenseRepository.flush();
 
     lowConfidenceAlertEvaluator.evaluate(expense, actor);

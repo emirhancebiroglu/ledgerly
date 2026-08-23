@@ -53,6 +53,8 @@ class LowConfidenceAlertEvaluatorIT extends AbstractPostgresIT {
                               84_500L,
                               "EUR",
                               0.42,
+                              null,
+                              null,
                               null));
                   expenseRepository.flush();
                   evaluator.evaluate(expense, actor);
@@ -96,6 +98,8 @@ class LowConfidenceAlertEvaluatorIT extends AbstractPostgresIT {
                           10_000L,
                           "EUR",
                           0.95,
+                          null,
+                          null,
                           null));
               expenseRepository.flush();
               // Posted expenses never route through LowConfidenceAlertEvaluator in production —
@@ -130,7 +134,7 @@ class LowConfidenceAlertEvaluatorIT extends AbstractPostgresIT {
               Expense expense =
                   expenseRepository.save(
                       Expense.needsReview(
-                          orgId, documentId, "Rivera Print Co.", categoryId, 12_800L, "EUR", 0.5, null));
+                          orgId, documentId, "Rivera Print Co.", categoryId, 12_800L, "EUR", 0.5, null, null, null));
               expenseRepository.flush();
               evaluator.evaluate(expense, actor);
               evaluator.evaluate(expense, actor);
