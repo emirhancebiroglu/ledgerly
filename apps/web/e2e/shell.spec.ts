@@ -170,7 +170,8 @@ test.describe("app shell", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await login(page);
 
-    await expect(page.getByRole("navigation", { name: "Main" }).getByText("3")).toBeVisible();
+    const reviewLink = page.getByRole("link", { name: "Review" });
+    await expect(reviewLink.getByText("3", { exact: true })).toBeVisible();
   });
 
   test("Alerts nav item shows the unread count from the seeded alerts", async ({ page }) => {
@@ -182,6 +183,6 @@ test.describe("app shell", () => {
     await login(page);
 
     const alertsLink = page.getByRole("link", { name: "Alerts" });
-    await expect(alertsLink.getByText("2", { exact: true })).toBeVisible();
+    await expect(alertsLink.getByText("3", { exact: true })).toBeVisible();
   });
 });

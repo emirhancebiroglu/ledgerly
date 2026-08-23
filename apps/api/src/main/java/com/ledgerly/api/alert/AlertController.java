@@ -1,7 +1,10 @@
 package com.ledgerly.api.alert;
 
+import com.ledgerly.api.alert.AlertResponse.MatchedExpenseSummary;
 import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.auth.CrossOrganizationAccessException;
+import com.ledgerly.api.expense.Expense;
+import com.ledgerly.api.expense.ExpenseRepository;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
@@ -22,19 +25,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class AlertController {
 
   private static final Set<String> VALID_ALERT_TYPES =
-      Set.of("BUDGET_THRESHOLD", "ANOMALY_HIGH", "LOW_CONFIDENCE");
+      Set.of("BUDGET_THRESHOLD", "ANOMALY_HIGH", "LOW_CONFIDENCE", "DUPLICATE_SUSPECTED");
 
   private final AlertRepository alertRepository;
   private final AlertTitleResolver alertTitleResolver;
   private final AlertStateService alertStateService;
+  private final ExpenseRepository expenseRepository;
 
   public AlertController(
       AlertRepository alertRepository,
       AlertTitleResolver alertTitleResolver,
-      AlertStateService alertStateService) {
+      AlertStateService alertStateService,
+      ExpenseRepository expenseRepository) {
     this.alertRepository = alertRepository;
     this.alertTitleResolver = alertTitleResolver;
     this.alertStateService = alertStateService;
+    this.expenseRepository = expenseRepository;
   }
 
   @GetMapping("/api/v1/alerts")
@@ -58,9 +64,33 @@ public class AlertController {
               AlertState state = stateByAlertId.get(alert.getId());
               boolean read = state != null && state.getReadAt() != null;
               boolean dismissed = state != null && state.getDismissedAt() != null;
-              return AlertResponse.from(alert, alertTitleResolver.resolve(alert), read, dismissed);
+              boolean isDuplicateSuspected = "DUPLICATE_SUSPECTED".equals(alert.getAlertType());
+              MatchedExpenseSummary matchedExpense =
+                  expenseSummary(alert.getMatchedExpenseId(), principal.organizationId());
+              MatchedExpenseSummary triggeringExpense =
+                  isDuplicateSuspected
+                      ? expenseSummary(alert.getExpenseId(), principal.organizationId())
+                      : null;
+              return AlertResponse.from(
+                  alert, alertTitleResolver.resolve(alert), read, dismissed,
+                  matchedExpense, triggeringExpense);
             })
         .toList();
+  }
+
+  /** {@code null} when there is no expense to summarize (every non-DUPLICATE_SUSPECTED type) or
+   * the expense was since deleted — the card must degrade to a readable state either way, never a
+   * broken link or a crash. */
+  private MatchedExpenseSummary expenseSummary(UUID expenseId, UUID organizationId) {
+    if (expenseId == null) {
+      return null;
+    }
+    return expenseRepository
+        .findByIdAndOrganizationId(expenseId, organizationId)
+        .map(
+            (Expense e) ->
+                new MatchedExpenseSummary(e.getVendor(), e.getAmountMinor(), e.getCurrency(), e.getCreatedAt()))
+        .orElse(null);
   }
 
   @GetMapping("/api/v1/alerts/unread-count")

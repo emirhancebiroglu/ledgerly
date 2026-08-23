@@ -45,6 +45,7 @@ const ALERTS_SEED = [
     alertType: "BUDGET_THRESHOLD", thresholdPercent: 80, spentMinor: "840000", limitMinor: "1000000",
     historyCount: null, zScore: null, budgetBurnRate: 0.84, explanation: null, model: null,
     createdAt: "2026-07-24T10:00:00Z", categorizationConfidence: null,
+    matchedExpenseId: null, duplicateTier: null, matchedExpense: null, triggeringExpense: null,
     title: "Travel nearing its budget", read: false, dismissed: false,
   },
   {
@@ -53,6 +54,7 @@ const ALERTS_SEED = [
     historyCount: 32, zScore: 3.2, budgetBurnRate: 0.42,
     explanation: "Spend is unusual for this category.", model: "gpt-test",
     createdAt: "2026-07-23T09:00:00Z", categorizationConfidence: null,
+    matchedExpenseId: null, duplicateTier: null, matchedExpense: null, triggeringExpense: null,
     title: "Unusual spending detected", read: true, dismissed: false,
   },
   {
@@ -60,7 +62,18 @@ const ALERTS_SEED = [
     alertType: "LOW_CONFIDENCE", thresholdPercent: null, spentMinor: null, limitMinor: null,
     historyCount: null, zScore: null, budgetBurnRate: null, explanation: null, model: null,
     createdAt: "2026-07-22T08:00:00Z", categorizationConfidence: 0.42,
+    matchedExpenseId: null, duplicateTier: null, matchedExpense: null, triggeringExpense: null,
     title: "Low-confidence categorization needs review", read: false, dismissed: false,
+  },
+  {
+    id: "alert-4", expenseId: "exp-2", categoryId: "cat-1", period: "2026-07", currency: "EUR",
+    alertType: "DUPLICATE_SUSPECTED", thresholdPercent: null, spentMinor: null, limitMinor: null,
+    historyCount: null, zScore: null, budgetBurnRate: null, explanation: null, model: null,
+    createdAt: "2026-07-21T07:00:00Z", categorizationConfidence: null,
+    matchedExpenseId: "exp-3", duplicateTier: "CONFIRMED",
+    matchedExpense: { vendor: "Office Depot", amountMinor: "12800", currency: "EUR", createdAt: "2026-07-12T09:00:00Z" },
+    triggeringExpense: { vendor: "Office Depot", amountMinor: "89900", currency: "EUR", createdAt: "2026-07-21T07:00:00Z" },
+    title: "Office Depot may have been billed twice", read: false, dismissed: false,
   },
 ];
 let ALERTS = JSON.parse(JSON.stringify(ALERTS_SEED));

@@ -20,13 +20,17 @@ describe("parseAlert", () => {
       model: null,
       createdAt: "2026-08-22T10:00:00Z",
       categorizationConfidence: null,
+      matchedExpenseId: null,
+      duplicateTier: null,
+      matchedExpense: null,
+      triggeringExpense: null,
       title: "Marketing budget exceeded",
       read: false,
       dismissed: false,
     });
 
-    expect(alert.spentMinor).toBe(618000n);
-    expect(alert.limitMinor).toBe(600000n);
+    expect(alert.spentMinor).toBe(BigInt(618000));
+    expect(alert.limitMinor).toBe(BigInt(600000));
     expect(alert.historyCount).toBeNull();
     expect(alert.explanation).toBeNull();
   });
@@ -49,6 +53,10 @@ describe("parseAlert", () => {
       model: "gpt-test",
       createdAt: "2026-08-22T10:00:00Z",
       categorizationConfidence: null,
+      matchedExpenseId: null,
+      duplicateTier: null,
+      matchedExpense: null,
+      triggeringExpense: null,
       title: "Unusual spending detected",
       read: false,
       dismissed: false,
@@ -57,6 +65,81 @@ describe("parseAlert", () => {
     expect(alert.spentMinor).toBeNull();
     expect(alert.limitMinor).toBeNull();
     expect(alert.explanation).toMatch(/Delta Airlines/);
+  });
+
+  it("parses a DUPLICATE_SUSPECTED payload's matched and triggering expense summaries, converting amountMinor to bigint", () => {
+    const alert = parseAlert({
+      id: "alert-4",
+      expenseId: "exp-2",
+      categoryId: "cat-1",
+      period: "2026-08",
+      currency: "EUR",
+      alertType: "DUPLICATE_SUSPECTED",
+      thresholdPercent: null,
+      spentMinor: null,
+      limitMinor: null,
+      historyCount: null,
+      zScore: null,
+      budgetBurnRate: null,
+      explanation: null,
+      model: null,
+      createdAt: "2026-08-22T10:00:00Z",
+      categorizationConfidence: null,
+      matchedExpenseId: "exp-3",
+      duplicateTier: "CONFIRMED",
+      matchedExpense: { vendor: "Office Depot", amountMinor: "12800", currency: "EUR", createdAt: "2026-07-12T09:00:00Z" },
+      triggeringExpense: { vendor: "Office Depot", amountMinor: "89900", currency: "EUR", createdAt: "2026-07-21T07:00:00Z" },
+      title: "Office Depot may have been billed twice",
+      read: false,
+      dismissed: false,
+    });
+
+    expect(alert.matchedExpenseId).toBe("exp-3");
+    expect(alert.duplicateTier).toBe("CONFIRMED");
+    expect(alert.matchedExpense).toEqual({
+      vendor: "Office Depot",
+      amountMinor: BigInt(12800),
+      currency: "EUR",
+      createdAt: "2026-07-12T09:00:00Z",
+    });
+    expect(alert.triggeringExpense).toEqual({
+      vendor: "Office Depot",
+      amountMinor: BigInt(89900),
+      currency: "EUR",
+      createdAt: "2026-07-21T07:00:00Z",
+    });
+  });
+
+  it("leaves matchedExpense null when the alert carries no matched expense", () => {
+    const alert = parseAlert({
+      id: "alert-5",
+      expenseId: "exp-5",
+      categoryId: "cat-1",
+      period: "2026-08",
+      currency: "EUR",
+      alertType: "DUPLICATE_SUSPECTED",
+      thresholdPercent: null,
+      spentMinor: null,
+      limitMinor: null,
+      historyCount: null,
+      zScore: null,
+      budgetBurnRate: null,
+      explanation: null,
+      model: null,
+      createdAt: "2026-08-22T10:00:00Z",
+      categorizationConfidence: null,
+      matchedExpenseId: "exp-9",
+      duplicateTier: "SUSPECTED",
+      matchedExpense: null,
+      triggeringExpense: null,
+      title: "Possible duplicate from Acme",
+      read: false,
+      dismissed: false,
+    });
+
+    expect(alert.matchedExpenseId).toBe("exp-9");
+    expect(alert.matchedExpense).toBeNull();
+    expect(alert.triggeringExpense).toBeNull();
   });
 
   it("rejects a malformed minor value rather than coercing it", () => {
@@ -78,6 +161,10 @@ describe("parseAlert", () => {
         model: null,
         createdAt: "2026-08-22T10:00:00Z",
         categorizationConfidence: null,
+        matchedExpenseId: null,
+        duplicateTier: null,
+        matchedExpense: null,
+        triggeringExpense: null,
         title: "SaaS nearing its budget",
         read: false,
         dismissed: false,
