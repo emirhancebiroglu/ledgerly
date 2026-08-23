@@ -1,5 +1,6 @@
 package com.ledgerly.api.expense;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -79,4 +80,40 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
   List<Expense> findByOrganizationIdAndStatusAndVendorIgnoreCaseContaining(
       UUID organizationId, ExpenseStatus status, String vendor, Pageable pageable);
+
+  /** Exact duplicate candidates: same organization, same vendor (case/whitespace-insensitive),
+   * same invoice number, excluding the candidate itself. Most recent first so a caller taking the
+   * first result gets a deterministic, newest-first choice among several matches. */
+  @Query(
+      "SELECT e FROM Expense e WHERE e.organizationId = :organizationId "
+          + "AND e.id <> :excludingId "
+          + "AND LOWER(TRIM(e.vendor)) = :vendorKey "
+          + "AND e.invoiceNumber = :invoiceNumber "
+          + "ORDER BY e.createdAt DESC")
+  List<Expense> findConfirmedDuplicateCandidates(
+      @Param("organizationId") UUID organizationId,
+      @Param("excludingId") UUID excludingId,
+      @Param("vendorKey") String vendorKey,
+      @Param("invoiceNumber") String invoiceNumber);
+
+  /** Heuristic duplicate candidates for when neither expense has a readable invoice number: same
+   * organization, vendor and currency, {@code issueDate} within the given inclusive window.
+   * Windowing is done in SQL (not by loading every same-vendor expense into Java) since an
+   * organization can accumulate years of postings for one recurring vendor. */
+  @Query(
+      "SELECT e FROM Expense e WHERE e.organizationId = :organizationId "
+          + "AND e.id <> :excludingId "
+          + "AND LOWER(TRIM(e.vendor)) = :vendorKey "
+          + "AND e.currency = :currency "
+          + "AND e.amountMinor = :amountMinor "
+          + "AND e.issueDate BETWEEN :windowStart AND :windowEnd "
+          + "ORDER BY e.createdAt DESC")
+  List<Expense> findSuspectedDuplicateCandidates(
+      @Param("organizationId") UUID organizationId,
+      @Param("excludingId") UUID excludingId,
+      @Param("vendorKey") String vendorKey,
+      @Param("currency") String currency,
+      @Param("amountMinor") long amountMinor,
+      @Param("windowStart") LocalDate windowStart,
+      @Param("windowEnd") LocalDate windowEnd);
 }

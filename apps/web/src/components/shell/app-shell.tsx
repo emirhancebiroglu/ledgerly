@@ -11,6 +11,7 @@ import { NAV_ITEMS } from "@/components/shell/nav-config";
 interface AppShellProps {
   children: React.ReactNode;
   reviewQueueCount?: number;
+  unreadAlertCount?: number;
   orgName: string;
   orgInitial: string;
   userInitial: string;
@@ -24,6 +25,7 @@ function pageTitleFor(pathname: string): string {
 export function AppShell({
   children,
   reviewQueueCount,
+  unreadAlertCount,
   orgName,
   orgInitial,
   userInitial,
@@ -68,6 +70,7 @@ export function AppShell({
     <div className="flex h-dvh w-full overflow-hidden">
       <Sidebar
         reviewQueueCount={reviewQueueCount}
+        unreadAlertCount={unreadAlertCount}
         orgName={orgName}
         orgInitial={orgInitial}
         className="hidden shell:flex"
@@ -96,6 +99,7 @@ export function AppShell({
         open={mobileNavOpen}
         onOpenChange={setMobileNavOpen}
         reviewQueueCount={reviewQueueCount}
+        unreadAlertCount={unreadAlertCount}
         orgName={orgName}
         orgInitial={orgInitial}
       />

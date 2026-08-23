@@ -1,5 +1,6 @@
 package com.ledgerly.api;
 
+import com.ledgerly.api.alert.InvalidAlertTypeException;
 import com.ledgerly.api.auth.CrossOrganizationAccessException;
 import com.ledgerly.api.auth.InvalidCredentialsException;
 import com.ledgerly.api.auth.InvalidRefreshTokenException;
@@ -69,6 +70,12 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(InvalidPolicyListQueryException.class)
   public ProblemDetail handleInvalidPolicyListQuery(InvalidPolicyListQueryException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidAlertTypeException.class)
+  public ProblemDetail handleInvalidAlertType(InvalidAlertTypeException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
   }
