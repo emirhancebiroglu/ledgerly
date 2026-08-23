@@ -4,6 +4,7 @@ import com.pgvector.PGvector;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -56,6 +57,58 @@ public class PolicyChunkRepository {
             Long.class,
             organizationId);
     return count == null ? 0 : count;
+  }
+
+  /**
+   * Chunk counts for every given document in one query, so listing N policy documents never
+   * issues N count queries. A document with zero chunks is absent from the map rather than
+   * present with a zero entry; callers default missing keys to zero.
+   */
+  public Map<UUID, Long> countByPolicyDocumentIds(UUID organizationId, List<UUID> policyDocumentIds) {
+    if (policyDocumentIds.isEmpty()) {
+      return Map.of();
+    }
+    List<Map.Entry<UUID, Long>> rows =
+        jdbcTemplate.query(
+            (java.sql.Connection connection) -> {
+              PreparedStatement ps =
+                  connection.prepareStatement(
+                      "SELECT policy_document_id, COUNT(*) AS chunk_count FROM policy_chunk "
+                          + "WHERE organization_id = ? AND policy_document_id = ANY (?) "
+                          + "GROUP BY policy_document_id");
+              ps.setObject(1, organizationId);
+              ps.setArray(2, connection.createArrayOf("uuid", policyDocumentIds.toArray()));
+              return ps;
+            },
+            (RowMapper<Map.Entry<UUID, Long>>)
+                (rs, rowNum) ->
+                    Map.entry(
+                        (UUID) rs.getObject("policy_document_id"), rs.getLong("chunk_count")));
+    return rows.stream().collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  /**
+   * A document's chunks in index order, org-scoped, with the embedding excluded at the SQL
+   * projection — a vector reaching a client-facing response is a data-exposure defect, not a
+   * formatting one, so it must never be selected here in the first place.
+   */
+  public List<PolicyChunk> findByPolicyDocumentIdOrderByChunkIndex(
+      UUID organizationId, UUID policyDocumentId, int offset, int limit) {
+    return jdbcTemplate.query(
+        "SELECT organization_id, policy_document_id, chunk_index, chunk_text "
+            + "FROM policy_chunk WHERE organization_id = ? AND policy_document_id = ? "
+            + "ORDER BY chunk_index ASC LIMIT ? OFFSET ?",
+        (rs, rowNum) ->
+            new PolicyChunk(
+                (UUID) rs.getObject("organization_id"),
+                (UUID) rs.getObject("policy_document_id"),
+                rs.getInt("chunk_index"),
+                rs.getString("chunk_text"),
+                null),
+        organizationId,
+        policyDocumentId,
+        limit,
+        offset);
   }
 
   /**

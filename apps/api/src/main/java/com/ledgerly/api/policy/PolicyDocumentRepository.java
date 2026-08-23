@@ -1,7 +1,9 @@
 package com.ledgerly.api.policy;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PolicyDocumentRepository extends JpaRepository<PolicyDocument, UUID> {
@@ -10,4 +12,6 @@ public interface PolicyDocumentRepository extends JpaRepository<PolicyDocument, 
   Optional<PolicyDocument> findByIdAndOrganizationId(UUID id, UUID organizationId);
 
   long countByOrganizationId(UUID organizationId);
+
+  List<PolicyDocument> findByOrganizationId(UUID organizationId, Pageable pageable);
 }

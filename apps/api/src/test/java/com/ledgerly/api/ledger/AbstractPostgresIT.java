@@ -28,7 +28,12 @@ public abstract class AbstractPostgresIT {
               DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"))
           .withDatabaseName("ledgerly_test")
           .withUsername("ledgerly")
-          .withPassword("ledgerly");
+          .withPassword("ledgerly")
+          // Default max_connections (100) is exhausted once enough IT classes force a distinct
+          // Spring context (each opens its own Hikari pool) in one `mvn verify` run — surfaces as
+          // "sorry, too many clients already" rather than a real test defect. Raised well past
+          // the observed peak; this is a shared JVM-wide container, not per-test state.
+          .withCommand("postgres", "-c", "max_connections=300");
 
   static final RedisContainer REDIS = new RedisContainer(DockerImageName.parse("redis:7-alpine"));
 

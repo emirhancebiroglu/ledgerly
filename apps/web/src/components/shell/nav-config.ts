@@ -22,8 +22,8 @@ export interface DisabledNavItem {
   icon: LucideIcon;
 }
 
-/** Active routes available in the browser. M9.5 gave Alerts its own route and promoted it out of
- * `DISABLED_NAV_ITEMS`. */
+/** Active routes available in the browser. M9.5 gave Alerts its own route and M9.7 gave Policies
+ * its own route; both are promoted out of `DISABLED_NAV_ITEMS`. */
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
   { label: "Expenses", href: "/expenses", icon: Receipt },
@@ -31,12 +31,11 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Review", href: "/review", icon: CheckCircle2, countKey: "reviewQueue" },
   { label: "Budgets", href: "/budgets", icon: Wallet },
   { label: "Alerts", href: "/alerts", icon: Bell, countKey: "unreadAlerts" },
+  { label: "Policies", href: "/policies", icon: FileText },
 ];
 
 /** Rendered as present-but-disabled so the shell stays honest about what is not built yet. */
-export const DISABLED_NAV_ITEMS: DisabledNavItem[] = [
-  { label: "Policies", icon: FileText },
-];
+export const DISABLED_NAV_ITEMS: DisabledNavItem[] = [];
 
 export interface QuickJumpItem {
   label: string;
@@ -50,4 +49,5 @@ export const QUICK_JUMP_ITEMS: QuickJumpItem[] = [
   { label: "Go to Expenses", href: "/expenses" },
   { label: "Go to Budgets", href: "/budgets" },
   { label: "Go to Alerts", href: "/alerts" },
+  { label: "Go to Policies", href: "/policies" },
 ];
