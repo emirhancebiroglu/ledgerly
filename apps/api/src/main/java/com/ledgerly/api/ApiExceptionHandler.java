@@ -16,6 +16,7 @@ import com.ledgerly.api.expense.ExpenseCategoryRequiredException;
 import com.ledgerly.api.expense.InvalidExpenseListQueryException;
 import com.ledgerly.api.idempotency.IdempotencyConflictException;
 import com.ledgerly.api.policy.IllegalPolicyDocumentTransitionException;
+import com.ledgerly.api.policy.InvalidPolicyListQueryException;
 import com.ledgerly.api.ratelimit.RateLimitExceededException;
 import com.ledgerly.api.ratelimit.RateLimitUnavailableException;
 import com.ledgerly.api.storage.StorageKeyNotFoundException;
@@ -62,6 +63,12 @@ public class ApiExceptionHandler {
 
   @ExceptionHandler(InvalidExpenseListQueryException.class)
   public ProblemDetail handleInvalidExpenseListQuery(InvalidExpenseListQueryException exception) {
+    return withCorrelationId(
+        ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
+  }
+
+  @ExceptionHandler(InvalidPolicyListQueryException.class)
+  public ProblemDetail handleInvalidPolicyListQuery(InvalidPolicyListQueryException exception) {
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage()));
   }

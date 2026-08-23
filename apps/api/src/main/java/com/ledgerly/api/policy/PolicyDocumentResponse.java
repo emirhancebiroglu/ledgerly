@@ -14,14 +14,16 @@ public record PolicyDocumentResponse(
     String filename,
     PolicyDocumentStatus status,
     String failureReason,
-    Instant createdAt) {
+    Instant createdAt,
+    long chunkCount) {
 
-  public static PolicyDocumentResponse from(PolicyDocument document) {
+  public static PolicyDocumentResponse from(PolicyDocument document, long chunkCount) {
     return new PolicyDocumentResponse(
         document.getId(),
         document.getFilename(),
         document.getStatus(),
         document.getFailureReason(),
-        document.getCreatedAt());
+        document.getCreatedAt(),
+        chunkCount);
   }
 }
