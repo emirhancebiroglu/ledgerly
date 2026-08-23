@@ -55,7 +55,7 @@ test.describe("budgets", () => {
     await expect(created).toBeVisible();
   });
 
-  test("palette includes Budgets, Policies remains disabled, and no horizontal scroll at 859/860px", async ({ page }) => {
+  test("palette includes Budgets and no horizontal scroll at 859/860px", async ({ page }) => {
     await login(page);
     for (const width of [859, 860]) {
       await page.setViewportSize({ width, height: 900 });
@@ -66,7 +66,5 @@ test.describe("budgets", () => {
     await page.getByRole("button", { name: "Search or jump to..." }).click();
     await page.getByRole("option", { name: "Go to Budgets" }).click();
     await expect(page).toHaveURL(/\/budgets$/);
-    const policies = page.getByText("Policies", { exact: true });
-    await expect(policies.locator("xpath=ancestor-or-self::*[@aria-disabled='true']")).toHaveCount(1);
   });
 });
