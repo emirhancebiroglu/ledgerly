@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<script src="./image-slot.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: oklch(0.99 0.002 265); }
+  * { box-sizing: border-box; }
+  ::selection { background: oklch(0.9 0.05 265); }
+  input::placeholder { color: oklch(0.65 0.01 265); }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes paletteIn { from { opacity:0; transform:translateY(-8px) scale(0.98); } to { opacity:1; transform:translateY(0) scale(1); } }
+  @keyframes popIn { from { transform:scale(0.5); opacity:0; } to { transform:scale(1); opacity:1; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes indet { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+  @keyframes pulse { 0%,100% { opacity: 0.55; } 50% { opacity: 0.9; } }
+  .lg-skel { background: oklch(0.94 0.004 265); border-radius: 6px; animation: pulse 1.4s ease-in-out infinite; }
+  .lg-chunk { transition: background 0.14s ease; }
+  .lg-chunk:hover { background: oklch(0.985 0.002 265); }
+  .lg-nav-row { transition: background 0.15s ease, color 0.15s ease; }
+  .lg-row { transition: background 0.12s ease; }
+  .lg-row:hover { background: oklch(0.98 0.003 265); }
+  .lg-btn { transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease; }
+  .lg-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 10px oklch(0.2 0.02 265 / 0.12); }
+  .lg-btn:active { transform: translateY(0); }
+  .lg-card { animation: fadeUp 0.4s ease; }
+</style>
+</helmet>
+
+<div style="display:flex; height:100vh; width:100%; font-family:'Geist',sans-serif; color:oklch(0.22 0.02 265); background:oklch(0.99 0.002 265); overflow:hidden;">
+
+  <!-- SIDEBAR -->
+  <div style="width:240px; flex-shrink:0; border-right:1px solid oklch(0.91 0.006 265); display:flex; flex-direction:column; background:oklch(0.975 0.003 265); padding:20px 12px; {{ sidebarExtra }}">
+    <div style="display:flex; align-items:center; gap:8px; padding:6px 8px 20px 8px;">
+      <div style="width:24px; height:24px; border-radius:7px; background:{{ accent }}; flex-shrink:0; display:flex; align-items:center; justify-content:center;">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+          <path d="M3 3.5C3 2.67 3.67 2 4.5 2H11l2 2v8.5c0 .83-.67 1.5-1.5 1.5h-7C3.67 14 3 13.33 3 12.5v-9z" fill="white" fill-opacity="0.92"></path>
+          <path d="M5.5 6.5h5M5.5 8.5h5M5.5 10.5h3" stroke="{{ accent }}" stroke-width="1" stroke-linecap="round"></path>
+        </svg>
+      </div>
+      <div style="font-weight:600; font-size:15px; letter-spacing:-0.01em; white-space:nowrap;">Ledgerly</div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; gap:2px;">
+      <div onClick="{{ goToDashboard }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgDashboard }}; color:{{ navColorDashboard }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1.5"></rect><rect x="13" y="3" width="8" height="8" rx="1.5"></rect><rect x="3" y="13" width="8" height="8" rx="1.5"></rect><rect x="13" y="13" width="8" height="8" rx="1.5"></rect></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Dashboard</span>
+      </div>
+      <div onClick="{{ goToExpenses }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgExpenses }}; color:{{ navColorExpenses }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 4h16v16H4z"></path><path d="M8 9h8M8 13h8M8 17h5"></path></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Expenses</span>
+      </div>
+      <div onClick="{{ goToUpload }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgUpload }}; color:{{ navColorUpload }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Upload</span>
+      </div>
+      <div onClick="{{ goToReview }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgReview }}; color:{{ navColorReview }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Review</span>
+        <sc-if value="{{ reviewCount }}" hint-placeholder-val="{{ true }}">
+          <span style="margin-left:auto; flex-shrink:0; font-size:11px; font-weight:600; background:oklch(0.75 0.15 80); color:oklch(0.28 0.05 80); padding:1px 6px; border-radius:10px;">{{ reviewCount }}</span>
+        </sc-if>
+      </div>
+      <div onClick="{{ goToBudgets }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgBudgets }}; color:{{ navColorBudgets }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="18" height="14" rx="2"></rect><path d="M3 10h18"></path><path d="M7 15h4"></path></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Budgets</span>
+      </div>
+
+      <div style="height:1px; background:oklch(0.91 0.006 265); margin:10px 4px;"></div>
+
+      <div onClick="{{ goToAlerts }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgAlerts }}; color:{{ navColorAlerts }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Alerts</span>
+        <sc-if value="{{ unreadCount }}" hint-placeholder-val="{{ true }}">
+          <span style="margin-left:auto; flex-shrink:0; font-size:11px; font-weight:600; background:oklch(0.75 0.15 80); color:oklch(0.28 0.05 80); padding:1px 6px; border-radius:10px;">{{ unreadCount }}</span>
+        </sc-if>
+      </div>
+      <div onClick="{{ goToPolicies }}" class="lg-nav-row" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; min-height:34px; flex-shrink:0; background:{{ navBgPolicies }}; color:{{ navColorPolicies }};">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        <span style="font-size:13.5px; font-weight:500; white-space:nowrap;">Policies</span>
+      </div>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <div onClick="{{ goToSoon }}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; cursor:pointer; color:oklch(0.5 0.015 265);">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      <span style="font-size:13.5px; font-weight:500;">Settings</span>
+    </div>
+
+    <div style="display:flex; align-items:center; gap:8px; padding:10px 8px 4px 8px; margin-top:6px; border-top:1px solid oklch(0.91 0.006 265); cursor:pointer;">
+      <div style="width:24px; height:24px; border-radius:6px; background:oklch(0.9 0.03 265); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:{{ accentText }};">N</div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Northwind Co.</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.55 0.015 265)" stroke-width="2"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"></path></svg>
+    </div>
+  </div>
+
+  <!-- MOBILE BACKDROP -->
+  <sc-if value="{{ showBackdrop }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeMobileNav }}" style="position:fixed; inset:0; background:oklch(0.2 0.01 265 / 0.35); z-index:55;"></div>
+  </sc-if>
+
+  <!-- MAIN -->
+  <div style="flex:1; min-width:0; display:flex; flex-direction:column;">
+    <div style="height:60px; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; padding:{{ topbarPadding }}; border-bottom:1px solid oklch(0.91 0.006 265); gap:12px;">
+      <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+        <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ toggleMobileNav }}" style="flex-shrink:0; cursor:pointer; padding:6px; border-radius:8px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"></path></svg>
+          </div>
+        </sc-if>
+        <div style="font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ pageTitle }}</div>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+          <div onClick="{{ toggleCmdk }}" class="lg-btn" style="display:flex; align-items:center; gap:8px; padding:7px 10px; border-radius:8px; border:1px solid oklch(0.9 0.006 265); background:oklch(1 0 0); cursor:pointer; color:oklch(0.5 0.015 265); font-size:12.5px; white-space:nowrap; flex-shrink:0;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+            <span style="white-space:nowrap;">Search or jump to...</span>
+            <span style="border:1px solid oklch(0.88 0.006 265); border-radius:4px; padding:1px 5px; font-size:10.5px; color:oklch(0.55 0.01 265); white-space:nowrap; flex-shrink:0;">⌘K</span>
+          </div>
+        </sc-if>
+        <sc-if value="{{ isMobile }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ toggleCmdk }}" style="width:30px; height:30px; border-radius:8px; border:1px solid oklch(0.9 0.006 265); display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.5 0.015 265)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          </div>
+        </sc-if>
+        <div style="width:30px; height:30px; border-radius:50%; background:{{ accentSoft }}; color:{{ accentText }}; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; flex-shrink:0;">EK</div>
+      </div>
+    </div>
+
+    <div style="flex:1; overflow:auto; padding:{{ contentPadding }};">
+
+      <!-- DASHBOARD -->
+      <sc-if value="{{ isDashboard }}" hint-placeholder-val="{{ true }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:20px; max-width:1080px;">
+          <div style="display:grid; grid-template-columns:{{ gridCols2 }}; gap:20px;">
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:22px 24px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; white-space:nowrap;">Total spend this month</div>
+                <svg width="90" height="30" viewBox="0 0 160 40" preserveAspectRatio="none" style="flex-shrink:0; margin-left:12px;">
+                  <polyline points="{{ miniTrendPoints }}" fill="none" stroke="{{ accent }}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+                </svg>
+              </div>
+              <div style="display:flex; align-items:baseline; gap:12px; margin-top:4px;">
+                <div style="font-family:'Geist Mono',monospace; font-size:38px; font-weight:600; letter-spacing:-0.02em; font-variant-numeric:tabular-nums;">$84,213</div>
+                <div style="display:flex; align-items:center; gap:4px; color:oklch(0.55 0.13 145); font-size:13px; font-weight:600; background:oklch(0.95 0.04 145); padding:3px 8px; border-radius:6px;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>
+                  12%
+                </div>
+              </div>
+              <div style="font-size:12px; color:oklch(0.6 0.01 265); margin-top:4px;">vs $95,690 last month</div>
+              <sc-if value="{{ showInsight }}" hint-placeholder-val="{{ true }}">
+                <div style="margin-top:16px; padding:11px 13px; border-radius:8px; background:{{ accentSoft }}; font-size:12.5px; color:{{ accentText }}; display:flex; gap:8px;">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-top:1px;"><path d="M12 2l2.4 7.2H22l-6 4.6 2.3 7.2-6.3-4.5-6.3 4.5 2.3-7.2-6-4.6h7.6z"></path></svg>
+                  <span>Spend down 12%, mainly fewer travel bookings and one large one-off consulting invoice from last month.</span>
+                </div>
+              </sc-if>
+            </div>
+
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:22px 24px; display:flex; flex-direction:column; gap:16px;">
+              <div style="display:flex; justify-content:space-between;">
+                <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; white-space:nowrap;">Review queue</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:13px; font-weight:600; white-space:nowrap; flex-shrink:0; margin-left:12px;">4 items</div>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; white-space:nowrap;">Budgets at threshold</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:13px; font-weight:600; color:oklch(0.65 0.14 60); white-space:nowrap; flex-shrink:0; margin-left:12px;">2 of 5</div>
+              </div>
+              <div style="display:flex; justify-content:space-between;">
+                <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; white-space:nowrap;">Documents processed today</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:13px; font-weight:600; white-space:nowrap; flex-shrink:0; margin-left:12px;">17</div>
+              </div>
+              <div onClick="{{ goToReview }}" class="lg-btn" style="margin-top:auto; text-align:center; padding:8px; border-radius:8px; background:{{ accent }}; color:white; font-size:12.5px; font-weight:600; cursor:pointer;">Go to review queue</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:{{ chartCols2 }}; gap:20px;">
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:22px 24px;">
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; margin-bottom:16px;">Spend by category</div>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <sc-for list="{{ categoryData }}" as="cat" hint-placeholder-count="5">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px;">
+                      <span style="font-weight:500;">{{ cat.name }}</span>
+                      <span style="font-family:'Geist Mono',monospace; color:oklch(0.5 0.01 265);">{{ cat.amount }}</span>
+                    </div>
+                    <div style="height:6px; border-radius:4px; background:oklch(0.94 0.004 265); overflow:hidden;">
+                      <div style="height:100%; border-radius:4px; background:{{ accent }}; width:{{ cat.pctStr }};"></div>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:22px 24px;">
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; margin-bottom:10px;">Spend over time</div>
+              <svg width="100%" height="150" viewBox="0 0 480 150" preserveAspectRatio="none">
+                <polyline points="{{ trendPoints }}" fill="none" stroke="{{ accent }}" stroke-width="2.5"></polyline>
+                <sc-for list="{{ trendDots }}" as="dot" hint-placeholder-count="6">
+                  <circle cx="{{ dot.x }}" cy="{{ dot.y }}" r="3" fill="{{ accent }}"></circle>
+                </sc-for>
+              </svg>
+              <div style="display:flex; justify-content:space-between; font-size:11px; color:oklch(0.6 0.01 265); margin-top:4px;">
+                <span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:6px 0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:14px 24px 10px 24px;">
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500;">Recent expenses</div>
+              <div onClick="{{ goToExpenses }}" style="font-size:12.5px; color:{{ accent }}; font-weight:600; cursor:pointer;">View all</div>
+            </div>
+            <sc-for list="{{ recentExpenses }}" as="exp" hint-placeholder-count="5">
+              <div onClick="{{ exp.onClick }}" class="lg-row" style="display:grid; grid-template-columns:{{ expenseRowCols }}; align-items:{{ rowAlign }}; gap:4px 12px; padding:{{ rowPadding }}; padding-left:24px; padding-right:24px; cursor:pointer; border-top:1px solid oklch(0.95 0.003 265);">
+                <div style="font-size:13px; font-weight:500;">{{ exp.vendor }}</div>
+                <div style="font-size:12.5px; color:oklch(0.5 0.01 265);">{{ exp.category }}</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:13px; font-variant-numeric:tabular-nums;">{{ exp.amount }}</div>
+                <div style="display:flex;"><span style="font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; background:{{ exp.chipBg }}; color:{{ exp.chipColor }};">{{ exp.status }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- EXPENSES LIST -->
+      <sc-if value="{{ isExpenses }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:16px; max-width:1080px;">
+          <div style="display:flex; gap:10px;">
+            <div style="flex:1; display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:8px; border:1px solid oklch(0.9 0.006 265); background:oklch(1 0 0);">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.55 0.015 265)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+              <input placeholder="Search vendor, category, amount..." style="border:none; outline:none; font-size:13px; flex:1; background:transparent; font-family:'Geist',sans-serif;"></input>
+            </div>
+            <div style="display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; border:1px solid oklch(0.9 0.006 265); background:oklch(1 0 0); font-size:12.5px; color:oklch(0.5 0.01 265); cursor:pointer;">All statuses</div>
+            <div style="display:flex; align-items:center; gap:6px; padding:8px 14px; border-radius:8px; border:1px solid oklch(0.9 0.006 265); background:oklch(1 0 0); font-size:12.5px; color:oklch(0.5 0.01 265); cursor:pointer;">Newest first</div>
+          </div>
+
+          <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); overflow:hidden;">
+            <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid; grid-template-columns:{{ allExpenseRowCols }}; padding:10px 20px; font-size:11.5px; font-weight:600; color:oklch(0.55 0.01 265); border-bottom:1px solid oklch(0.93 0.004 265); text-transform:uppercase; letter-spacing:0.02em;">
+              <div>Vendor</div><div>Category</div><div>Date</div><div>Amount</div><div>Status</div>
+            </div>
+            </sc-if>
+            <sc-for list="{{ allExpenses }}" as="exp" hint-placeholder-count="10">
+              <div onClick="{{ exp.onClick }}" class="lg-row" style="display:grid; grid-template-columns:{{ allExpenseRowCols }}; align-items:{{ rowAlign }}; gap:4px; padding:{{ rowPadding }}; padding-left:20px; padding-right:20px; cursor:pointer; border-bottom:1px solid oklch(0.95 0.003 265);">
+                <div style="font-size:13px; font-weight:500;">{{ exp.vendor }}</div>
+                <div style="font-size:12.5px; color:oklch(0.5 0.01 265);">{{ exp.category }}</div>
+                <div style="font-size:12.5px; color:oklch(0.5 0.01 265); font-family:'Geist Mono',monospace;">{{ exp.date }}</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:13px; font-variant-numeric:tabular-nums;">{{ exp.amount }}</div>
+                <div><span style="font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; background:{{ exp.chipBg }}; color:{{ exp.chipColor }};">{{ exp.status }}</span></div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- EXPENSE DETAIL -->
+      <sc-if value="{{ isExpenseDetail }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:16px; max-width:1080px;">
+          <div onClick="{{ goToExpenses }}" style="display:flex; align-items:center; gap:6px; font-size:12.5px; color:oklch(0.5 0.01 265); cursor:pointer; width:fit-content;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"></path></svg>
+            Back to expenses
+          </div>
+          <div style="display:grid; grid-template-columns:{{ detailCols }}; gap:20px; align-items:start;">
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:16px; position:sticky; top:0;">
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; margin-bottom:12px;">Source document</div>
+              <image-slot id="receipt-doc-slot" shape="rounded" radius="8" placeholder="Drop the receipt / invoice image here" style="width:100%; height:420px; border:1px dashed oklch(0.85 0.008 265);"></image-slot>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:18px 20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                  <div style="font-size:15px; font-weight:600;">{{ detailExpense.vendor }}</div>
+                  <span style="font-size:11px; font-weight:600; padding:3px 8px; border-radius:6px; background:{{ detailExpense.chipBg }}; color:{{ detailExpense.chipColor }};">{{ detailExpense.status }}</span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px 20px; font-size:12.5px;">
+                  <sc-for list="{{ extractedFields }}" as="f" hint-placeholder-count="6">
+                    <div>
+                      <div style="color:oklch(0.55 0.01 265); font-size:11.5px; margin-bottom:2px;">{{ f.label }}</div>
+                      <div style="font-weight:500; font-family:'Geist Mono',monospace;">{{ f.value }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+
+              <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:18px 20px;">
+                <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; margin-bottom:10px;">Ledger entries</div>
+                <sc-for list="{{ ledgerEntries }}" as="le" hint-placeholder-count="2">
+                  <div style="display:flex; justify-content:space-between; padding:8px 0; border-top:1px solid oklch(0.95 0.003 265); font-size:12.5px;">
+                    <div><span style="font-family:'Geist Mono',monospace; color:oklch(0.5 0.01 265); margin-right:8px;">{{ le.account }}</span>{{ le.label }}</div>
+                    <div style="font-family:'Geist Mono',monospace; font-weight:500;">{{ le.amount }}</div>
+                  </div>
+                </sc-for>
+              </div>
+
+              <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:18px 20px;">
+                <div style="font-size:12.5px; color:oklch(0.55 0.01 265); font-weight:500; margin-bottom:12px;">Agent activity</div>
+                <div style="display:flex; flex-direction:column;">
+                  <sc-for list="{{ agentSteps }}" as="s" hint-placeholder-count="5">
+                    <div style="display:flex; gap:12px;">
+                      <div style="display:flex; flex-direction:column; align-items:center;">
+                        <div style="width:8px; height:8px; border-radius:50%; background:{{ s.dotColor }}; margin-top:4px;"></div>
+                        <div style="width:1px; flex:1; background:oklch(0.92 0.005 265); min-height:20px;"></div>
+                      </div>
+                      <div style="padding-bottom:16px;">
+                        <div style="font-size:12.5px; font-weight:500;">{{ s.label }}</div>
+                        <div style="font-size:11.5px; color:oklch(0.55 0.01 265); margin-top:2px;">{{ s.time }} · {{ s.detail }}</div>
+                      </div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- UPLOAD -->
+      <sc-if value="{{ isUpload }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:20px; max-width:640px; margin:0 auto;">
+          <div onClick="{{ startUpload }}" class="lg-btn" style="border:1.5px dashed oklch(0.82 0.01 265); border-radius:14px; padding:48px 24px; text-align:center; cursor:pointer; background:oklch(1 0 0);">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="{{ accent }}" stroke-width="1.6" style="margin:0 auto 14px auto; display:block;"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+            <div style="font-size:14px; font-weight:600;">Drop a receipt or invoice</div>
+            <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:4px;">PDF, PNG or JPG · click to simulate an upload</div>
+          </div>
+
+          <sc-if value="{{ uploadActive }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:18px 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                <div style="font-size:13px; font-weight:600;">invoice_dl88213.pdf</div>
+                <div style="font-size:11.5px; color:oklch(0.55 0.01 265);">247 KB</div>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <sc-for list="{{ uploadSteps }}" as="st" hint-placeholder-count="5">
+                  <div style="display:flex; align-items:center; gap:10px; opacity:{{ st.opacity }};">
+                    <sc-if value="{{ st.done }}" hint-placeholder-val="{{ false }}">
+                      <div style="width:18px; height:18px; border-radius:50%; background:oklch(0.6 0.13 145); display:flex; align-items:center; justify-content:center; flex-shrink:0; animation:popIn 0.3s ease;">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M5 12l5 5L20 7"></path></svg>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ st.active }}" hint-placeholder-val="{{ false }}">
+                      <div style="width:18px; height:18px; border-radius:50%; border:2px solid {{ accent }}; border-top-color:transparent; flex-shrink:0; animation:spin 0.8s linear infinite;"></div>
+                    </sc-if>
+                    <sc-if value="{{ st.pending }}" hint-placeholder-val="{{ true }}">
+                      <div style="width:18px; height:18px; border-radius:50%; border:2px solid oklch(0.9 0.006 265); flex-shrink:0;"></div>
+                    </sc-if>
+                    <div style="font-size:13px; font-weight:500;">{{ st.label }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- REVIEW QUEUE -->
+      <sc-if value="{{ isReview }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:16px; max-width:1080px;">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <div style="font-size:13px; color:oklch(0.5 0.01 265);"><span style="font-weight:700; color:oklch(0.22 0.02 265);">{{ reviewCount }} items</span> need review before posting to the ledger</div>
+            <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ false }}">
+              <div onClick="{{ approveSelected }}" class="lg-btn" style="font-size:12.5px; font-weight:600; color:white; background:{{ accent }}; padding:7px 14px; border-radius:8px; cursor:pointer;">Approve selected</div>
+            </sc-if>
+          </div>
+          <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); overflow:hidden;">
+            <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid; grid-template-columns:{{ reviewRowCols }}; padding:10px 20px; font-size:11.5px; font-weight:600; color:oklch(0.55 0.01 265); border-bottom:1px solid oklch(0.93 0.004 265); text-transform:uppercase; letter-spacing:0.02em;">
+              <div></div><div>Vendor</div><div>Amount</div><div>Flagged for</div><div>Actions</div>
+            </div>
+            </sc-if>
+            <sc-for list="{{ reviewQueue }}" as="r" hint-placeholder-count="4">
+              <div class="lg-row" style="display:grid; grid-template-columns:{{ reviewRowCols }}; align-items:start; gap:4px 10px; padding:14px 20px; border-bottom:1px solid oklch(0.95 0.003 265);">
+                <input type="checkbox" checked="{{ r.selected }}" onChange="{{ r.toggle }}"></input>
+                <div style="font-size:13px; font-weight:500;">{{ r.vendor }}</div>
+                <div style="font-family:'Geist Mono',monospace; font-size:13px;">{{ r.amount }}</div>
+                <div style="font-size:12px; color:oklch(0.55 0.01 265);">{{ r.reason }}</div>
+                <div style="display:flex; gap:6px;">
+                  <div onClick="{{ r.approve }}" class="lg-btn" style="font-size:11.5px; font-weight:600; padding:5px 10px; border-radius:6px; background:oklch(0.95 0.04 145); color:oklch(0.4 0.1 145); cursor:pointer;">Approve</div>
+                  <div style="font-size:11.5px; font-weight:600; padding:5px 10px; border-radius:6px; background:oklch(0.95 0.003 265); color:oklch(0.5 0.01 265); cursor:pointer;">Correct</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- BUDGETS -->
+      <sc-if value="{{ isBudgets }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:grid; grid-template-columns:{{ budgetsCols }}; gap:16px; max-width:1080px;">
+          <sc-for list="{{ budgets }}" as="b" hint-placeholder-count="5">
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04), 0 8px 20px oklch(0.2 0.02 265 / 0.03); padding:18px 20px;">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                  <div style="font-size:13.5px; font-weight:600;">{{ b.name }}</div>
+                  <span style="font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:6px; background:{{ b.chipBg }}; color:{{ b.chipColor }}; display:inline-block; margin-top:6px;">{{ b.statusLabel }}</span>
+                </div>
+                <div style="width:44px; height:44px; border-radius:50%; background:conic-gradient({{ b.barColor }} {{ b.pctStr }}, oklch(0.94 0.004 265) 0); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <div style="width:34px; height:34px; border-radius:50%; background:oklch(1 0 0); display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; font-family:'Geist Mono',monospace;">{{ b.pctLabel }}</div>
+                </div>
+              </div>
+              <div style="font-family:'Geist Mono',monospace; font-size:20px; font-weight:600; margin-top:14px;">{{ b.spent }}</div>
+              <div style="font-size:12px; color:oklch(0.55 0.01 265); margin-bottom:10px;">of {{ b.limit }} this month</div>
+              <div style="height:6px; border-radius:4px; background:oklch(0.94 0.004 265); overflow:hidden; position:relative;">
+                <div style="height:100%; border-radius:4px; background:{{ b.barColor }}; width:{{ b.pctStr }}; transition:width 0.4s ease;"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- ALERTS -->
+      <sc-if value="{{ isAlerts }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:16px; max-width:820px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <sc-for list="{{ alertTabs }}" as="t" hint-placeholder-count="4">
+                <div onClick="{{ t.onClick }}" class="lg-btn" style="font-size:12.5px; font-weight:500; padding:6px 12px; border-radius:8px; cursor:pointer; background:{{ t.bg }}; color:{{ t.color }}; border:1px solid {{ t.borderColor }}; white-space:nowrap;">{{ t.label }}</div>
+              </sc-for>
+            </div>
+            <div onClick="{{ markAllRead }}" style="font-size:12.5px; font-weight:600; color:{{ accent }}; cursor:pointer; white-space:nowrap;">Mark all as read</div>
+          </div>
+
+          <sc-if value="{{ hasAlerts }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ alerts }}" as="a" hint-placeholder-count="6">
+                <div style="border:1px solid oklch(0.91 0.006 265); background:{{ a.cardBg }}; border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:16px 18px; display:flex; gap:12px;">
+                  <div style="width:8px; height:8px; border-radius:50%; background:{{ a.dot }}; flex-shrink:0; margin-top:6px;"></div>
+                  <div style="flex:1; min-width:0;">
+                    <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                      <div style="font-size:13.5px; font-weight:{{ a.titleWeight }};">{{ a.title }}</div>
+                      <span style="font-size:10.5px; font-weight:600; padding:2px 7px; border-radius:6px; background:{{ a.chipBg }}; color:{{ a.chipColor }}; white-space:nowrap;">{{ a.label }}</span>
+                    </div>
+                    <div style="font-size:12.5px; color:oklch(0.5 0.01 265); line-height:1.55; margin-top:5px; text-wrap:pretty;">{{ a.body }}</div>
+                    <div style="display:flex; align-items:center; gap:14px; margin-top:11px;">
+                      <div onClick="{{ a.onCta }}" style="font-size:12.5px; font-weight:600; color:{{ accent }}; cursor:pointer;">{{ a.cta }}</div>
+                      <div onClick="{{ a.dismiss }}" style="font-size:12.5px; font-weight:500; color:oklch(0.55 0.01 265); cursor:pointer;">Dismiss</div>
+                    </div>
+                  </div>
+                  <div style="font-size:11.5px; color:oklch(0.6 0.01 265); white-space:nowrap; flex-shrink:0;">{{ a.time }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ noAlerts }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.93 0.005 265); background:oklch(1 0 0); border-radius:12px; padding:56px 24px; text-align:center;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="oklch(0.6 0.13 145)" stroke-width="1.8" style="margin:0 auto 12px auto; display:block;"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+              <div style="font-size:14px; font-weight:600;">Nothing needs your attention</div>
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:4px;">You're all caught up in this filter.</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- POLICIES -->
+      <sc-if value="{{ isPolicies }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:18px; max-width:1080px;">
+
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap;">
+            <div style="max-width:560px;">
+              <div style="font-size:13px; color:oklch(0.42 0.012 265); line-height:1.55; text-wrap:pretty;">Policy PDFs indexed for retrieval. When Ledgerly categorizes an expense it reads the nearest chunks from these documents and may quote one as its justification.</div>
+            </div>
+            <div onClick="{{ openUpload }}" class="lg-btn" style="display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; padding:9px 14px; border-radius:9px; cursor:pointer; background:{{ accent }}; color:oklch(1 0 0); white-space:nowrap; flex-shrink:0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+              Upload policy PDF
+            </div>
+          </div>
+
+          <sc-if value="{{ showStats }}" hint-placeholder-val="{{ true }}">
+            <div style="display:grid; grid-template-columns:{{ budgetsCols }}; gap:12px;">
+              <sc-for list="{{ policyStats }}" as="s" hint-placeholder-count="3">
+                <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:15px 17px;">
+                  <div style="font-size:11.5px; font-weight:500; color:oklch(0.55 0.01 265); text-transform:uppercase; letter-spacing:0.05em;">{{ s.label }}</div>
+                  <div style="font-family:'Geist Mono',monospace; font-variant-numeric:tabular-nums; font-size:24px; font-weight:600; letter-spacing:-0.02em; margin-top:7px; color:{{ s.color }};">{{ s.value }}</div>
+                  <div style="font-size:12px; color:oklch(0.55 0.01 265); margin-top:3px;">{{ s.note }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <!-- UPLOAD PANEL -->
+          <sc-if value="{{ uploadOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:18px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <div style="font-size:11.5px; font-weight:600; color:oklch(0.55 0.01 265); text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;">Upload a policy PDF</div>
+                <div onClick="{{ closeUpload }}" style="cursor:pointer; padding:2px; color:oklch(0.55 0.01 265);">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                </div>
+              </div>
+
+              <sc-if value="{{ upIdle }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ pickPdf }}" style="margin-top:13px; border:1.5px dashed oklch(0.87 0.008 265); border-radius:12px; padding:34px 20px; text-align:center; cursor:pointer; background:oklch(0.995 0.002 265);" style-hover="border-color:oklch(0.72 0.09 265); background:oklch(0.985 0.008 265);">
+                  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="{{ accentText }}" stroke-width="1.7" style="display:block; margin:0 auto 11px auto;"><path d="M12 15V5M8 9l4-4 4 4"></path><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path></svg>
+                  <div style="font-size:13.5px; font-weight:600;">Drop a policy PDF here, or browse</div>
+                  <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:5px; line-height:1.5;">PDF only. Embedding runs during the upload and takes a few seconds — keep this tab open until it finishes.</div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ upInflight }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:13px; border:1px solid oklch(0.91 0.006 265); border-radius:12px; padding:22px 20px; background:oklch(0.995 0.002 265);">
+                  <div style="display:flex; align-items:center; gap:11px;">
+                    <div style="width:18px; height:18px; border-radius:50%; border:2px solid oklch(0.9 0.02 265); border-top-color:{{ accent }}; animation:spin 0.8s linear infinite; flex-shrink:0;"></div>
+                    <div style="font-family:'Geist Mono',monospace; font-size:12.5px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ upName }}</div>
+                  </div>
+                  <div style="font-size:12.5px; color:oklch(0.5 0.012 265); margin-top:10px; line-height:1.55;">Splitting the document into chunks and embedding each one. This request stays open until the outcome is final.</div>
+                  <div style="margin-top:13px; height:4px; border-radius:3px; background:oklch(0.94 0.006 265); overflow:hidden;">
+                    <div style="width:32%; height:100%; border-radius:3px; background:{{ accent }}; animation:indet 1.25s ease-in-out infinite;"></div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ upSuccess }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:13px; border:1px solid oklch(0.88 0.04 145); border-radius:12px; padding:20px; background:oklch(0.98 0.02 145);">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.5 0.13 145)" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M8 12.5l2.5 2.5L16 9.5"></path></svg>
+                    <div style="font-family:'Geist Mono',monospace; font-size:12.5px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ upName }}</div>
+                  </div>
+                  <div style="font-size:12.5px; color:oklch(0.38 0.06 145); margin-top:9px;">Indexed. Split into <span style="font-family:'Geist Mono',monospace; font-variant-numeric:tabular-nums; font-weight:600;">{{ upChunks }}</span> chunks, searchable now.</div>
+                  <div style="display:flex; gap:8px; margin-top:14px; flex-wrap:wrap;">
+                    <div onClick="{{ openUploaded }}" class="lg-btn" style="font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:8px; cursor:pointer; background:{{ accent }}; color:oklch(1 0 0);">View document</div>
+                    <div onClick="{{ resetUpload }}" class="lg-btn" style="font-size:12.5px; font-weight:500; padding:7px 13px; border-radius:8px; cursor:pointer; background:oklch(1 0 0); border:1px solid oklch(0.9 0.006 265);">Upload another</div>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ upFailed }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:13px; border:1px solid oklch(0.88 0.05 25); border-radius:12px; padding:20px; background:oklch(0.98 0.02 25);">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.55 0.16 25)" stroke-width="2" style="flex-shrink:0;"><path d="M12 3.5L21.5 20H2.5L12 3.5z"></path><path d="M12 9.5v4.5M12 17h.01"></path></svg>
+                    <div style="font-family:'Geist Mono',monospace; font-size:12.5px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ upName }}</div>
+                  </div>
+                  <div style="font-size:12.5px; color:oklch(0.4 0.1 25); margin-top:9px; line-height:1.55;">Embedding did not complete, so nothing from this document is searchable. Re-uploading the file is the fix.</div>
+                  <div style="font-family:'Geist Mono',monospace; font-size:11.5px; color:oklch(0.45 0.09 25); background:oklch(0.96 0.03 25); border-radius:7px; padding:7px 9px; margin-top:11px; word-break:break-all;">{{ upReason }}</div>
+                  <div onClick="{{ resetUpload }}" class="lg-btn" style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:8px; cursor:pointer; background:oklch(1 0 0); border:1px solid oklch(0.88 0.03 25); color:oklch(0.45 0.13 25); margin-top:14px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg>
+                    Re-upload
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ upRejected }}" hint-placeholder-val="{{ false }}">
+                <div style="margin-top:13px; border:1.5px dashed oklch(0.85 0.06 25); border-radius:12px; padding:20px; background:oklch(0.985 0.015 25);">
+                  <div style="display:flex; align-items:center; gap:10px;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.55 0.16 25)" stroke-width="2" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><path d="M15 9l-6 6M9 9l6 6"></path></svg>
+                    <div style="font-family:'Geist Mono',monospace; font-size:12.5px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ upName }}</div>
+                  </div>
+                  <div style="font-size:12.5px; color:oklch(0.4 0.1 25); margin-top:9px; line-height:1.55;">Not a PDF. Only PDF documents can be split and embedded, so this file was not uploaded.</div>
+                  <div onClick="{{ resetUpload }}" class="lg-btn" style="display:inline-flex; font-size:12.5px; font-weight:600; padding:7px 13px; border-radius:8px; cursor:pointer; background:oklch(1 0 0); border:1px solid oklch(0.9 0.006 265); margin-top:14px;">Choose another file</div>
+                </div>
+              </sc-if>
+
+              <div style="display:flex; align-items:center; gap:8px; margin-top:13px; flex-wrap:wrap;">
+                <span style="font-size:10.5px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:oklch(0.66 0.01 265);">Prototype</span>
+                <sc-for list="{{ upDemo }}" as="d" hint-placeholder-count="3">
+                  <div onClick="{{ d.onClick }}" style="font-size:11.5px; font-weight:500; padding:4px 9px; border-radius:7px; cursor:pointer; color:oklch(0.5 0.01 265); border:1px solid oklch(0.92 0.006 265); background:oklch(0.995 0.002 265); white-space:nowrap;" style-hover="background:oklch(0.97 0.005 265);">{{ d.label }}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- FILTERS -->
+          <sc-if value="{{ showList }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <sc-for list="{{ policyTabs }}" as="t" hint-placeholder-count="4">
+                <div onClick="{{ t.onClick }}" class="lg-btn" style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:500; padding:6px 12px; border-radius:8px; cursor:pointer; background:{{ t.bg }}; color:{{ t.color }}; border:1px solid {{ t.borderColor }}; white-space:nowrap;">
+                  <span>{{ t.label }}</span>
+                  <span style="font-family:'Geist Mono',monospace; font-variant-numeric:tabular-nums; font-size:11px; opacity:0.75;">{{ t.count }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <!-- LOADING -->
+          <sc-if value="{{ listLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ skeletonRows }}" as="k" hint-placeholder-count="4">
+                <div style="border:1px solid oklch(0.93 0.005 265); background:oklch(1 0 0); border-radius:12px; padding:16px 18px; display:flex; align-items:center; gap:14px;">
+                  <div class="lg-skel" style="width:30px; height:30px; border-radius:8px; flex-shrink:0;"></div>
+                  <div style="flex:1; min-width:0;">
+                    <div class="lg-skel" style="width:{{ k.w }}; height:11px;"></div>
+                    <div class="lg-skel" style="width:120px; height:9px; margin-top:8px;"></div>
+                  </div>
+                  <div class="lg-skel" style="width:64px; height:18px; border-radius:7px; flex-shrink:0;"></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <!-- LOAD ERROR -->
+          <sc-if value="{{ listError }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.9 0.03 25); background:oklch(1 0 0); border-radius:12px; padding:44px 24px; text-align:center;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="oklch(0.6 0.16 25)" stroke-width="1.8" style="display:block; margin:0 auto 12px auto;"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4.5M12 16h.01"></path></svg>
+              <div style="font-size:14px; font-weight:600;">Couldn't load policy documents</div>
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:5px;">The request to the ledger service failed. Nothing was changed.</div>
+              <div onClick="{{ retryList }}" class="lg-btn" style="display:inline-flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px; cursor:pointer; background:{{ accent }}; color:oklch(1 0 0); margin-top:16px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></svg>
+                Try again
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- EMPTY ORG -->
+          <sc-if value="{{ listEmptyOrg }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.93 0.005 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:52px 28px; text-align:center;">
+              <div style="width:44px; height:44px; border-radius:12px; background:{{ accentSoft }}; display:flex; align-items:center; justify-content:center; margin:0 auto 16px auto;">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="{{ accentText }}" stroke-width="1.7"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"></path><path d="M14 3v5h5"></path><path d="M9 13h6M9 16.5h4"></path></svg>
+              </div>
+              <div style="font-size:16px; font-weight:600; letter-spacing:-0.01em;">No policy documents yet</div>
+              <div style="font-size:13px; color:oklch(0.5 0.012 265); margin:8px auto 0 auto; max-width:440px; line-height:1.6; text-wrap:pretty;">Until a policy is uploaded, Ledgerly categorizes expenses without any company text to cite. Upload your expense policy, travel policy, or procurement handbook to give it something to quote.</div>
+              <div style="display:grid; grid-template-columns:{{ budgetsCols }}; gap:12px; max-width:660px; margin:26px auto 0 auto; text-align:left;">
+                <sc-for list="{{ emptySteps }}" as="e" hint-placeholder-count="3">
+                  <div style="border:1px solid oklch(0.94 0.005 265); border-radius:10px; padding:13px 14px; background:oklch(0.995 0.002 265);">
+                    <div style="font-family:'Geist Mono',monospace; font-size:11px; font-weight:600; color:{{ accentText }};">{{ e.n }}</div>
+                    <div style="font-size:12.5px; color:oklch(0.4 0.012 265); line-height:1.5; margin-top:6px; text-wrap:pretty;">{{ e.text }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div onClick="{{ openUpload }}" class="lg-btn" style="display:inline-flex; align-items:center; gap:7px; font-size:13px; font-weight:600; padding:10px 16px; border-radius:9px; cursor:pointer; background:{{ accent }}; color:oklch(1 0 0); margin-top:26px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+                Upload your first policy PDF
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- ROWS -->
+          <sc-if value="{{ hasDocs }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <sc-for list="{{ policyDocs }}" as="p" hint-placeholder-count="5">
+                <div onClick="{{ p.open }}" class="lg-row" style="border:1px solid {{ p.borderColor }}; background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:14px 18px; cursor:pointer;">
+                  <div style="display:grid; grid-template-columns:{{ policyRowCols }}; gap:{{ policyRowGap }}; align-items:{{ rowAlign }};">
+                    <div style="display:flex; align-items:center; gap:11px; min-width:0;">
+                      <div style="width:30px; height:30px; border-radius:8px; background:{{ p.iconBg }}; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{ p.iconColor }}" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5z"></path><path d="M14 3v5h5"></path></svg>
+                      </div>
+                      <div style="font-family:'Geist Mono',monospace; font-size:12.5px; font-weight:500; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ p.filename }}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                      <span style="display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:600; padding:3px 8px; border-radius:7px; background:{{ p.chipBg }}; color:{{ p.chipColor }}; white-space:nowrap;">
+                        <sc-if value="{{ p.isEmbedded }}" hint-placeholder-val="{{ true }}">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"></path></svg>
+                        </sc-if>
+                        <sc-if value="{{ p.isProcessing }}" hint-placeholder-val="{{ false }}">
+                          <span style="width:9px; height:9px; border-radius:50%; border:1.8px solid currentColor; border-top-color:transparent; animation:spin 0.9s linear infinite; display:inline-block;"></span>
+                        </sc-if>
+                        <sc-if value="{{ p.isPending }}" hint-placeholder-val="{{ false }}">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                        </sc-if>
+                        <sc-if value="{{ p.isFailed }}" hint-placeholder-val="{{ false }}">
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3.5L21.5 20H2.5L12 3.5z"></path><path d="M12 10v4M12 17h.01"></path></svg>
+                        </sc-if>
+                        {{ p.statusLabel }}
+                      </span>
+                    </div>
+                    <div style="font-family:'Geist Mono',monospace; font-variant-numeric:tabular-nums; font-size:12.5px; color:{{ p.chunkColor }};">{{ p.chunkLabel }}</div>
+                    <div style="font-size:12px; color:oklch(0.58 0.01 265); white-space:nowrap;">{{ p.createdAt }}</div>
+                    <sc-if value="{{ isDesktop }}" hint-placeholder-val="{{ true }}">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.68 0.01 265)" stroke-width="2"><path d="M9 6l6 6-6 6"></path></svg>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ p.isFailed }}" hint-placeholder-val="{{ false }}">
+                    <div style="margin-top:12px; border-radius:9px; background:oklch(0.98 0.02 25); border:1px solid oklch(0.92 0.03 25); padding:11px 13px;">
+                      <div style="font-size:12.5px; color:oklch(0.4 0.1 25); line-height:1.5; text-wrap:pretty;">Embedding did not complete, so none of this document is searchable. Re-upload the file to index it.</div>
+                      <div style="font-family:'Geist Mono',monospace; font-size:11.5px; color:oklch(0.47 0.09 25); margin-top:7px; word-break:break-all;">{{ p.failureReason }}</div>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+
+          <!-- FILTER EMPTY -->
+          <sc-if value="{{ listEmptyFilter }}" hint-placeholder-val="{{ false }}">
+            <div style="border:1px solid oklch(0.93 0.005 265); background:oklch(1 0 0); border-radius:12px; padding:52px 24px; text-align:center;">
+              <div style="font-size:14px; font-weight:600;">No documents with this status</div>
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:5px;">{{ filterEmptyNote }}</div>
+              <div onClick="{{ showAllDocs }}" class="lg-btn" style="display:inline-flex; font-size:12.5px; font-weight:500; padding:8px 14px; border-radius:8px; cursor:pointer; background:oklch(1 0 0); border:1px solid oklch(0.9 0.006 265); margin-top:16px; white-space:nowrap;">Show all documents</div>
+            </div>
+          </sc-if>
+
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding-top:4px;">
+            <span style="font-size:10.5px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:oklch(0.66 0.01 265);">Prototype states</span>
+            <sc-for list="{{ listModes }}" as="m" hint-placeholder-count="4">
+              <div onClick="{{ m.onClick }}" style="font-size:11.5px; font-weight:500; padding:4px 9px; border-radius:7px; cursor:pointer; color:{{ m.color }}; border:1px solid {{ m.borderColor }}; background:{{ m.bg }}; white-space:nowrap;">{{ m.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- POLICY DETAIL -->
+      <sc-if value="{{ isPolicyDetail }}" hint-placeholder-val="{{ false }}">
+        <div class="lg-card" style="display:flex; flex-direction:column; gap:18px; max-width:1080px;">
+          <div onClick="{{ goToPolicies }}" style="display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:500; color:oklch(0.5 0.01 265); cursor:pointer; width:fit-content; white-space:nowrap;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M15 18l-6-6 6-6"></path></svg>
+            All policy documents
+          </div>
+
+          <sc-if value="{{ detailLoading }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex; flex-direction:column; gap:16px;">
+              <div class="lg-skel" style="width:300px; max-width:80%; height:20px;"></div>
+              <div style="border:1px solid oklch(0.93 0.005 265); background:oklch(1 0 0); border-radius:12px; padding:22px;">
+                <sc-for list="{{ skeletonRows }}" as="k" hint-placeholder-count="4">
+                  <div style="padding:14px 0; border-bottom:1px solid oklch(0.96 0.003 265);">
+                    <div class="lg-skel" style="width:34px; height:10px;"></div>
+                    <div class="lg-skel" style="width:100%; height:10px; margin-top:10px;"></div>
+                    <div class="lg-skel" style="width:{{ k.w }}; height:10px; margin-top:7px;"></div>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ detailReady }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="font-family:'Geist Mono',monospace; font-size:18px; font-weight:600; letter-spacing:-0.01em; word-break:break-all;">{{ detailDoc.filename }}</div>
+                <span style="display:inline-flex; align-items:center; gap:5px; font-size:10.5px; font-weight:600; padding:3px 8px; border-radius:7px; background:{{ detailDoc.chipBg }}; color:{{ detailDoc.chipColor }}; white-space:nowrap;">
+                  <sc-if value="{{ detailDoc.isEmbedded }}" hint-placeholder-val="{{ true }}">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M20 6L9 17l-5-5"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ detailDoc.isProcessing }}" hint-placeholder-val="{{ false }}">
+                    <span style="width:9px; height:9px; border-radius:50%; border:1.8px solid currentColor; border-top-color:transparent; animation:spin 0.9s linear infinite; display:inline-block;"></span>
+                  </sc-if>
+                  <sc-if value="{{ detailDoc.isPending }}" hint-placeholder-val="{{ false }}">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5V12l3 2"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ detailDoc.isFailed }}" hint-placeholder-val="{{ false }}">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3.5L21.5 20H2.5L12 3.5z"></path><path d="M12 10v4M12 17h.01"></path></svg>
+                  </sc-if>
+                  {{ detailDoc.statusLabel }}
+                </span>
+              </div>
+              <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:7px;">{{ detailDoc.metaLine }}</div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:{{ policyDetailCols }}; gap:16px; align-items:start;">
+              <div style="min-width:0; display:flex; flex-direction:column; gap:14px;">
+
+                <sc-if value="{{ detailDoc.isEmbedded }}" hint-placeholder-val="{{ true }}">
+                  <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); overflow:hidden;">
+                    <div style="padding:15px 18px; border-bottom:1px solid oklch(0.95 0.003 265); display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                      <div style="font-size:11.5px; font-weight:600; color:oklch(0.55 0.01 265); text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap;">Indexed chunks</div>
+                      <div style="flex:1; min-width:150px; display:flex; align-items:center; gap:8px; border:1px solid oklch(0.91 0.006 265); border-radius:8px; padding:6px 10px; background:oklch(0.995 0.002 265);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.6 0.015 265)" stroke-width="2" style="flex-shrink:0;"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+                        <input value="{{ chunkQuery }}" onChange="{{ onChunkQuery }}" placeholder="Search this document — try meals, mileage, receipts" style="border:none; outline:none; background:transparent; font-size:12.5px; font-family:'Geist',sans-serif; flex:1; min-width:0; color:oklch(0.22 0.02 265);"></input>
+                        <sc-if value="{{ hasChunkQuery }}" hint-placeholder-val="{{ false }}">
+                          <div onClick="{{ clearChunkQuery }}" style="cursor:pointer; color:oklch(0.6 0.015 265); flex-shrink:0; display:flex;">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+                          </div>
+                        </sc-if>
+                      </div>
+                      <div style="font-size:11.5px; color:oklch(0.58 0.01 265); white-space:nowrap;">{{ chunkSummary }}</div>
+                    </div>
+
+                    <sc-for list="{{ visibleChunks }}" as="c" hint-placeholder-count="4">
+                      <div class="lg-chunk" style="display:flex; gap:16px; padding:18px; border-bottom:1px solid oklch(0.96 0.003 265);">
+                        <div style="font-family:'Geist Mono',monospace; font-variant-numeric:tabular-nums; font-size:11.5px; font-weight:500; color:oklch(0.68 0.01 265); flex-shrink:0; width:24px; padding-top:2px;">{{ c.index }}</div>
+                        <div style="min-width:0;">
+                          <div style="font-size:13.5px; line-height:1.68; color:oklch(0.28 0.015 265); max-width:66ch; text-wrap:pretty;">{{ c.text }}</div>
+                          <sc-if value="{{ c.cited }}" hint-placeholder-val="{{ false }}">
+                            <div onClick="{{ c.openCitation }}" style="display:inline-flex; align-items:center; gap:6px; margin-top:11px; font-size:11.5px; font-weight:500; color:{{ accentText }}; background:{{ accentSoft }}; border-radius:7px; padding:4px 9px; cursor:pointer;">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 8h10M7 12h10M7 16h6"></path><rect x="3" y="4" width="18" height="16" rx="2"></rect></svg>
+                              {{ c.citedLabel }}
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"></path></svg>
+                            </div>
+                          </sc-if>
+                        </div>
+                      </div>
+                    </sc-for>
+
+                    <sc-if value="{{ noChunkMatches }}" hint-placeholder-val="{{ false }}">
+                      <div style="padding:44px 20px; text-align:center;">
+                        <div style="font-size:13.5px; font-weight:600;">No chunk matches "{{ chunkQuery }}"</div>
+                        <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin-top:5px;">The AI can only quote text that exists in the document.</div>
+                      </div>
+                    </sc-if>
+
+                    <sc-if value="{{ hasMoreChunks }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ showMoreChunks }}" style="padding:15px 18px; text-align:center; font-size:12.5px; font-weight:600; color:{{ accentText }}; cursor:pointer; background:oklch(0.995 0.002 265);" style-hover="background:oklch(0.98 0.008 265);">{{ moreChunksLabel }}</div>
+                    </sc-if>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ detailDoc.isFailed }}" hint-placeholder-val="{{ false }}">
+                  <div style="border:1px solid oklch(0.9 0.04 25); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:24px;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="oklch(0.55 0.16 25)" stroke-width="2" style="flex-shrink:0;"><path d="M12 3.5L21.5 20H2.5L12 3.5z"></path><path d="M12 9.5v4.5M12 17h.01"></path></svg>
+                      <div style="font-size:14.5px; font-weight:600;">Embedding failed — no chunks were stored</div>
+                    </div>
+                    <div style="font-size:13px; color:oklch(0.42 0.012 265); line-height:1.6; margin-top:11px; max-width:62ch; text-wrap:pretty;">This document produced zero chunks, so nothing in it can be retrieved or quoted. It is not partially indexed. Re-uploading the same file re-runs the split and embed step.</div>
+                    <div style="font-family:'Geist Mono',monospace; font-size:12px; color:oklch(0.45 0.09 25); background:oklch(0.97 0.025 25); border:1px solid oklch(0.93 0.03 25); border-radius:8px; padding:10px 12px; margin-top:14px; word-break:break-all;">{{ detailDoc.failureReason }}</div>
+                    <div onClick="{{ openUploadFromDetail }}" class="lg-btn" style="display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; padding:9px 14px; border-radius:9px; cursor:pointer; background:{{ accent }}; color:oklch(1 0 0); margin-top:18px; white-space:nowrap;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="flex-shrink:0;"><path d="M12 16V4M6 10l6-6 6 6"></path><path d="M4 20h16"></path></svg>
+                      Re-upload this document
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ detailInProgress }}" hint-placeholder-val="{{ false }}">
+                  <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:44px 24px; text-align:center;">
+                    <div style="width:22px; height:22px; border-radius:50%; border:2.5px solid oklch(0.9 0.02 265); border-top-color:{{ accent }}; animation:spin 0.85s linear infinite; margin:0 auto 14px auto;"></div>
+                    <div style="font-size:14px; font-weight:600;">{{ detailDoc.progressTitle }}</div>
+                    <div style="font-size:12.5px; color:oklch(0.55 0.01 265); margin:6px auto 0 auto; max-width:44ch; line-height:1.55; text-wrap:pretty;">{{ detailDoc.progressBody }}</div>
+                  </div>
+                </sc-if>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:14px;">
+                <div style="border:1px solid oklch(0.91 0.006 265); background:oklch(1 0 0); border-radius:12px; box-shadow:0 1px 2px oklch(0.2 0.02 265 / 0.04); padding:18px;">
+                  <div style="font-size:11.5px; font-weight:600; color:oklch(0.55 0.01 265); text-transform:uppercase; letter-spacing:0.05em;">Document</div>
+                  <div style="display:flex; flex-direction:column; gap:11px; margin-top:13px;">
+                    <sc-for list="{{ detailFacts }}" as="f" hint-placeholder-count="3">
+                      <div>
+                        <div style="font-size:11.5px; color:oklch(0.58 0.01 265);">{{ f.label }}</div>
+                        <div style="font-family:{{ f.font }}; font-variant-numeric:tabular-nums; font-size:12.5px; font-weight:500; margin-top:3px; word-break:break-all; color:{{ f.color }};">{{ f.value }}</div>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+
+                <div style="border:1px solid oklch(0.93 0.005 265); background:oklch(0.995 0.002 265); border-radius:12px; padding:16px 18px;">
+                  <div style="font-size:12.5px; font-weight:600;">How this text is used</div>
+                  <div style="font-size:12.5px; color:oklch(0.5 0.012 265); line-height:1.6; margin-top:7px; text-wrap:pretty;">When an expense is categorized, Ledgerly retrieves the chunks closest to it and may quote one as the reason. A quote is checked against the stored chunk before it is saved, so anything you see cited is text from this document.</div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- COMING SOON -->
+      <sc-if value="{{ isSoon }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; padding:80px 0; color:oklch(0.55 0.01 265);">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="oklch(0.7 0.01 265)" stroke-width="1.6"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+          <div style="font-size:14px; font-weight:600; color:oklch(0.35 0.01 265);">Coming in a later milestone</div>
+          <div style="font-size:12.5px;">This section isn't part of the M7 design pass.</div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <!-- COMMAND PALETTE -->
+  <sc-if value="{{ cmdkOpen }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ toggleCmdk }}" style="position:fixed; inset:0; background:oklch(0.2 0.01 265 / 0.35); display:flex; align-items:flex-start; justify-content:center; padding-top:14vh; z-index:50;">
+      <div onClick="{{ stopProp }}" style="width:560px; max-width:90vw; background:oklch(1 0 0); border-radius:14px; box-shadow:0 20px 60px oklch(0.2 0.01 265 / 0.25); overflow:hidden; animation:paletteIn 0.15s ease;">
+        <div style="display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid oklch(0.93 0.004 265);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.55 0.015 265)" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path></svg>
+          <input placeholder="Jump to a page or expense..." style="border:none; outline:none; font-size:14px; flex:1; font-family:'Geist',sans-serif;"></input>
+        </div>
+        <div style="padding:8px;">
+          <div onClick="{{ goToDashboard }}" style="padding:9px 12px; border-radius:8px; font-size:13px; cursor:pointer;" style-hover="background:oklch(0.97 0.003 265);">Go to Dashboard</div>
+          <div onClick="{{ goToUpload }}" style="padding:9px 12px; border-radius:8px; font-size:13px; cursor:pointer;" style-hover="background:oklch(0.97 0.003 265);">Upload a document</div>
+          <div onClick="{{ goToReview }}" style="padding:9px 12px; border-radius:8px; font-size:13px; cursor:pointer;" style-hover="background:oklch(0.97 0.003 265);">Go to Review queue</div>
+          <div onClick="{{ goToBudgets }}" style="padding:9px 12px; border-radius:8px; font-size:13px; cursor:pointer;" style-hover="background:oklch(0.97 0.003 265);">Go to Budgets</div>
+          <div onClick="{{ goToPolicies }}" style="padding:9px 12px; border-radius:8px; font-size:13px; cursor:pointer;" style-hover="background:oklch(0.97 0.003 265);">Go to Policies</div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;: {&quot;width&quot;: 1440, &quot;height&quot;: 900}, &quot;accentTheme&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;indigo&quot;, &quot;teal&quot;], &quot;default&quot;: &quot;indigo&quot;, &quot;tsType&quot;: &quot;'indigo'|'teal'&quot;, &quot;section&quot;: &quot;Theme&quot;}, &quot;density&quot;: {&quot;editor&quot;: &quot;enum&quot;, &quot;options&quot;: [&quot;comfortable&quot;, &quot;compact&quot;], &quot;default&quot;: &quot;comfortable&quot;, &quot;tsType&quot;: &quot;'comfortable'|'compact'&quot;, &quot;section&quot;: &quot;Theme&quot;}, &quot;showAgentInsights&quot;: {&quot;editor&quot;: &quot;boolean&quot;, &quot;default&quot;: true, &quot;tsType&quot;: &quot;boolean&quot;, &quot;section&quot;: &quot;Theme&quot;}}">
+class Component extends DCLogic {
+  state = {
+    view: 'dashboard',
+    detailId: 3,
+    cmdkOpen: false,
+    uploadActive: false,
+    uploadStep: 0,
+    reviewSelected: {},
+    width: typeof window !== 'undefined' ? window.innerWidth : 1440,
+    mobileNavOpen: false,
+  };
+
+  expensesData = [
+    { id: 1, vendor: 'Northwind Logistics', category: 'Shipping', date: '2026-07-24', amount: '$2,340.00', status: 'Approved' },
+    { id: 2, vendor: 'Acme Cloud Services', category: 'Software', date: '2026-07-23', amount: '$1,120.50', status: 'Approved' },
+    { id: 3, vendor: 'Delta Airlines', category: 'Travel', date: '2026-07-22', amount: '$845.00', status: 'Needs review' },
+    { id: 4, vendor: 'Staples Office Supply', category: 'Office', date: '2026-07-21', amount: '$312.40', status: 'Approved' },
+    { id: 5, vendor: 'Meridian Consulting', category: 'Professional services', date: '2026-07-20', amount: '$6,500.00', status: 'Needs review' },
+    { id: 6, vendor: 'Verizon Business', category: 'Telecom', date: '2026-07-19', amount: '$480.00', status: 'Approved' },
+    { id: 7, vendor: 'Hilton Hotels', category: 'Travel', date: '2026-07-18', amount: '$1,290.00', status: 'Approved' },
+    { id: 8, vendor: 'WeWork', category: 'Facilities', date: '2026-07-17', amount: '$3,200.00', status: 'Approved' },
+    { id: 9, vendor: 'Adobe Inc.', category: 'Software', date: '2026-07-16', amount: '$599.00', status: 'Rejected' },
+    { id: 10, vendor: 'Uber for Business', category: 'Travel', date: '2026-07-15', amount: '$214.75', status: 'Approved' },
+  ];
+
+  categoryDataRaw = [
+    { name: 'Travel', amount: '$18,240', pct: 38 },
+    { name: 'Software', amount: '$12,860', pct: 27 },
+    { name: 'Professional services', amount: '$9,400', pct: 20 },
+    { name: 'Facilities', amount: '$4,980', pct: 10 },
+    { name: 'Office & other', amount: '$2,340', pct: 5 },
+  ];
+
+  trendValues = [61200, 58400, 67900, 72300, 79800, 84213];
+
+  reviewQueueRaw = [
+    { id: 3, vendor: 'Delta Airlines', amount: '$845.00', reason: 'Amount mismatch vs OCR (62% confidence)' },
+    { id: 5, vendor: 'Meridian Consulting', amount: '$6,500.00', reason: 'No matching purchase order on file' },
+    { id: 11, vendor: 'Rivera Print Co.', amount: '$128.00', reason: 'Duplicate suspected — similar entry 07/12' },
+    { id: 12, vendor: 'Zenith Analytics', amount: '$2,150.00', reason: 'Category confidence 54%' },
+  ];
+
+  budgetsRaw = [
+    { name: 'Travel', spent: 18240, limit: 20000 },
+    { name: 'Software', spent: 12860, limit: 15000 },
+    { name: 'Professional services', spent: 9400, limit: 8000 },
+    { name: 'Facilities', spent: 4980, limit: 10000 },
+    { name: 'Marketing', spent: 6200, limit: 6000 },
+  ];
+
+  policyDocsRaw = [
+    {
+      id: 1, filename: 'expense-policy-2026.pdf', status: 'EMBEDDED', createdAt: 'Aug 12, 2026',
+      chunks: [
+        { index: 0, text: 'This policy applies to every employee, contractor and intern who incurs costs on behalf of Northwind Co. Expenses must be business related, reasonable in amount, and supported by documentation. Where local law or a client contract imposes a stricter limit, the stricter limit applies.' },
+        { index: 1, text: 'Expenses must be submitted within 60 days of the transaction date. Claims submitted after 60 days require written approval from the employee\u2019s department head, and claims older than 120 days are not reimbursable except where the delay was caused by a vendor invoicing error.' },
+        { index: 2, text: 'An itemised receipt is required for any single expense of 25 EUR or more. A card statement line is not a receipt. Where a receipt has been lost, the employee may submit a missing receipt declaration stating the vendor, date, amount and business purpose; more than three declarations in a rolling quarter will be reviewed by Finance.' },
+        { index: 3, text: 'Meals taken while travelling are reimbursed on actuals up to 50 EUR per day in domestic locations and 75 EUR per day in the designated high-cost cities listed in Appendix B. Alcohol is reimbursable only as part of a client meal and must not exceed 25 percent of the bill.' },
+        { index: 4, text: 'Client entertainment requires the names and employers of all attendees to be recorded in the expense description. Entertainment above 150 EUR per attendee requires prior written approval from a director. Gifts to public officials are prohibited without exception.' },
+        { index: 5, text: 'Air travel must be booked in economy class for all flights under six hours of scheduled flight time. Premium economy is permitted on flights of six hours or more; business class requires prior approval from an executive committee member. Tickets should be booked at least fourteen days in advance where the itinerary is known.' },
+        { index: 6, text: 'Hotel accommodation is reimbursed up to 220 EUR per night excluding tax in standard locations. Room service, minibar charges, in-room entertainment and spa services are not reimbursable. Where a conference offers a discounted room block, the block rate should be used.' },
+        { index: 7, text: 'Personal vehicle mileage is reimbursed at the statutory rate published each January. The claim must state the start and end point of each journey and its business purpose. Mileage between an employee\u2019s home and their normal place of work is commuting and is never reimbursable.' },
+        { index: 8, text: 'Ground transport should use the most economical option consistent with safety and schedule. Ride-hailing and taxis are reimbursable for journeys where public transport is impractical, outside normal hours, or where the employee is carrying equipment. Vehicle upgrades and premium ride tiers are not reimbursable.' },
+        { index: 9, text: 'Any purchase of goods or services above 1,000 EUR requires a purchase order raised before the commitment is made. Purchases above 10,000 EUR require three written quotes, and purchases above 50,000 EUR require a formal tender managed by Procurement. Splitting a purchase to fall below a threshold is a policy breach.' },
+        { index: 10, text: 'Software and cloud subscriptions must be procured through the IT catalogue. Individual subscriptions charged to a corporate card without IT review will not be renewed and may be recharged to the employee\u2019s cost centre. Annual renewals above 2,000 EUR are reviewed by the department owner before payment.' },
+        { index: 11, text: 'Approved expenses are paid in the next scheduled reimbursement run, which closes on the fifteenth and the last working day of each month. Payment is made to the bank account on file within five working days of the run closing. Queries on a payment should be raised with Accounts Payable before submitting a duplicate claim.' },
+      ],
+    },
+    {
+      id: 2, filename: 'travel-addendum-q3-2026.pdf', status: 'EMBEDDED', createdAt: 'Aug 04, 2026',
+      chunks: [
+        { index: 0, text: 'This addendum supplements the 2026 expense policy for the third quarter and expires on 30 September 2026. Where it conflicts with the base policy, this addendum prevails for travel booked within the quarter.' },
+        { index: 1, text: 'Weekend departures and returns are permitted where the total trip cost, including the additional accommodation night, is lower than the equivalent weekday itinerary. The comparison must be attached to the claim.' },
+        { index: 2, text: 'Travel to client sites in the Nordics is subject to a raised daily meal allowance of 90 EUR for the duration of this addendum, reflecting local pricing. All other locations remain at the rates in the base policy.' },
+        { index: 3, text: 'Rail travel is preferred over air travel for any journey where the scheduled rail time is under four hours. First class rail is reimbursable where the ticket price is at or below the flexible standard fare.' },
+        { index: 4, text: 'Conference attendance requires the event code issued by the department to be entered on the claim. Registration fees, materials and one pre-conference workshop are reimbursable; optional social programmes are not.' },
+        { index: 5, text: 'Trip cancellations must be reported within two working days so that refundable components can be recovered. Non-refundable losses are absorbed by the department cost centre and reviewed monthly by Finance.' },
+        { index: 6, text: 'Travel insurance is provided centrally and no employee should purchase separate cover. Premiums bought individually are not reimbursable and may leave the employee outside the corporate policy in the event of a claim.' },
+      ],
+    },
+    {
+      id: 3, filename: 'procurement-handbook-v4.pdf', status: 'FAILED', createdAt: 'Jul 28, 2026',
+      failureReason: 'pdf_text_extraction_empty: no text layer found on pages 1-48 (scanned image)',
+      chunks: [],
+    },
+    {
+      id: 4, filename: 'supplier-code-of-conduct.pdf', status: 'PROCESSING', createdAt: 'Aug 22, 2026',
+      chunks: [],
+    },
+    {
+      id: 5, filename: 'corporate-card-agreement.pdf', status: 'PENDING', createdAt: 'Aug 22, 2026',
+      chunks: [],
+    },
+  ];
+
+  newUploadChunks = [
+    { index: 0, text: 'This travel policy takes effect on 1 January 2027 and replaces the 2026 addendum. It covers booking, allowances, and the documentation required for every trip taken on behalf of the company.' },
+    { index: 1, text: 'Bookings must be made through the corporate travel desk. Direct bookings are reimbursable only where the travel desk was unavailable and the employee has recorded the reason on the claim.' },
+    { index: 2, text: 'Daily meal allowances are reviewed each January against published city indices. The rate applying to a trip is the rate in force on the first day of travel, regardless of when the claim is submitted.' },
+    { index: 3, text: 'Employees travelling for more than five consecutive nights may claim one personal call allowance and one laundry service charge per week of travel, supported by an itemised receipt.' },
+  ];
+
+  alertsRaw = [
+    { id: 1, sev: 'action', title: 'Marketing budget exceeded', body: 'Marketing is at 103% of its $6,000 monthly limit with 2 days left in the period.', time: '9 min ago', cta: 'Review budget', unread: true },
+    { id: 2, sev: 'action', title: 'Duplicate invoice suspected', body: 'Rivera Print Co. $128.00 closely matches an entry posted on 07/12.', time: '42 min ago', cta: 'Compare entries', unread: true },
+    { id: 3, sev: 'warning', title: 'Travel budget near threshold', body: 'Travel is at 91% of its $20,000 limit. Three pending bookings would push it over.', time: '2 hours ago', cta: 'View budget', unread: true },
+    { id: 4, sev: 'warning', title: 'Low extraction confidence', body: 'Delta Airlines $845.00 was flagged at 62% confidence and is waiting in the review queue.', time: 'Yesterday, 09:15', cta: 'Open in review', unread: false },
+    { id: 5, sev: 'info', title: 'Vendor mapping learned', body: 'Ledgerly now maps "AWS EMEA SARL" to Acme Cloud Services automatically. 14 entries updated.', time: 'Yesterday, 08:02', cta: 'See changes', unread: false },
+    { id: 6, sev: 'info', title: 'Month-end close reminder', body: 'July closes in 2 days. 4 items in the review queue must be cleared before posting.', time: 'Mon, 07:30', cta: 'Go to review', unread: false },
+  ];
+
+  agentStepsRaw = [
+    { label: 'Document received — OCR extraction started', time: '09:14', detail: 'invoice_dl88213.pdf', color: 'oklch(0.6 0.01 265)' },
+    { label: 'Fields extracted', time: '09:14', detail: 'vendor, amount, date, tax', color: 'oklch(0.6 0.01 265)' },
+    { label: 'Ledger entry drafted', time: '09:15', detail: 'Travel expense · $845.00', color: 'oklch(0.6 0.01 265)' },
+    { label: 'Confidence check flagged amount mismatch', time: '09:15', detail: '62% confidence, below 80% threshold', color: 'oklch(0.7 0.14 70)' },
+    { label: 'Routed to review queue', time: '09:15', detail: 'awaiting human confirmation', color: 'oklch(0.6 0.01 265)' },
+  ];
+
+  componentDidMount() {
+    this._onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        this.setState(s => ({ cmdkOpen: !s.cmdkOpen }));
+      }
+    };
+    window.addEventListener('keydown', this._onKey);
+    this._onResize = () => this.setState({ width: window.innerWidth });
+    window.addEventListener('resize', this._onResize);
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._onKey);
+    window.removeEventListener('resize', this._onResize);
+    if (this._uploadTimer) clearInterval(this._uploadTimer);
+  }
+
+  toggleMobileNav() { this.setState(s => ({ mobileNavOpen: !s.mobileNavOpen })); }
+  closeMobileNav() { this.setState({ mobileNavOpen: false }); }
+
+  chipStyle(status) {
+    if (status === 'Approved') return { bg: 'oklch(0.95 0.04 145)', color: 'oklch(0.4 0.1 145)' };
+    if (status === 'Needs review') return { bg: 'oklch(0.96 0.05 80)', color: 'oklch(0.42 0.1 70)' };
+    return { bg: 'oklch(0.95 0.05 25)', color: 'oklch(0.45 0.13 25)' };
+  }
+
+  goTo(view) { this.setState({ view, mobileNavOpen: false }); }
+  selectExpense(id) { this.setState({ view: 'expenseDetail', detailId: id, mobileNavOpen: false }); }
+  toggleCmdk() { this.setState(s => ({ cmdkOpen: !s.cmdkOpen })); }
+  stopProp(e) { e.stopPropagation(); }
+
+  startUpload() {
+    if (this.state.uploadActive) return;
+    this.setState({ uploadActive: true, uploadStep: 0 });
+    this._uploadTimer = setInterval(() => {
+      this.setState(s => {
+        const next = s.uploadStep + 1;
+        if (next >= 5) clearInterval(this._uploadTimer);
+        return { uploadStep: Math.min(next, 5) };
+      });
+    }, 650);
+  }
+
+  toggleReviewSelect(id) {
+    this.setState(s => ({ reviewSelected: { ...s.reviewSelected, [id]: !s.reviewSelected[id] } }));
+  }
+
+  approveOne(id) {
+    this.reviewQueueRaw = this.reviewQueueRaw.filter(r => r.id !== id);
+    this.forceUpdate();
+  }
+
+  approveSelected() {
+    const sel = this.state.reviewSelected;
+    this.reviewQueueRaw = this.reviewQueueRaw.filter(r => !sel[r.id]);
+    this.setState({ reviewSelected: {} });
+  }
+
+  renderVals() {
+    const accentTheme = this.props.accentTheme ?? 'indigo';
+    const isTeal = accentTheme === 'teal';
+    const accent = isTeal ? 'oklch(0.56 0.11 195)' : 'oklch(0.5 0.16 265)';
+    const accentSoft = isTeal ? 'oklch(0.95 0.03 195)' : 'oklch(0.95 0.035 265)';
+    const accentText = isTeal ? 'oklch(0.4 0.09 195)' : 'oklch(0.4 0.14 265)';
+
+    const density = this.props.density ?? 'comfortable';
+    const rowPadding = density === 'compact' ? '8px 0' : '14px 0';
+
+    const isMobile = this.state.width < 860;
+    const isDesktop = !isMobile;
+
+    const view = this.state.view;
+    const navBase = { padding: '8px 10px' };
+    const activeBg = accentSoft, activeColor = accentText, inactive = 'oklch(0.4 0.015 265)';
+
+    const withChip = (e) => { const c = this.chipStyle(e.status); return { ...e, chipBg: c.bg, chipColor: c.color, onClick: () => this.selectExpense(e.id) }; };
+    const allExpenses = this.expensesData.map(withChip);
+    const recentExpenses = allExpenses.slice(0, 5);
+    const detailExpense = withChip(this.expensesData.find(e => e.id === this.state.detailId) || this.expensesData[2]);
+
+    const categoryData = this.categoryDataRaw.map(c => ({ ...c, pctStr: c.pct + '%' }));
+
+    const max = Math.max(...this.trendValues) * 1.08;
+    const trendDots = this.trendValues.map((v, i) => ({ x: i * 96, y: 140 - (v / max) * 120 }));
+    const trendPoints = trendDots.map(d => `${d.x},${d.y}`).join(' ');
+    const miniMax = Math.max(...this.trendValues) * 1.05;
+    const miniMin = Math.min(...this.trendValues) * 0.95;
+    const miniTrendPoints = this.trendValues.map((v, i) => `${i * 32},${36 - ((v - miniMin) / (miniMax - miniMin)) * 32}`).join(' ');
+
+    const reviewQueue = this.reviewQueueRaw.map(r => ({
+      ...r,
+      selected: !!this.state.reviewSelected[r.id],
+      toggle: () => this.toggleReviewSelect(r.id),
+      approve: () => this.approveOne(r.id),
+    }));
+    const hasSelection = Object.values(this.state.reviewSelected).some(Boolean);
+
+    const budgets = this.budgetsRaw.map(b => {
+      const pct = Math.round((b.spent / b.limit) * 100);
+      let statusLabel = 'On track', chipBg = 'oklch(0.95 0.04 145)', chipColor = 'oklch(0.4 0.1 145)', barColor = 'oklch(0.6 0.13 145)';
+      if (pct >= 100) { statusLabel = 'Over budget'; chipBg = 'oklch(0.95 0.05 25)'; chipColor = 'oklch(0.45 0.13 25)'; barColor = 'oklch(0.6 0.16 25)'; }
+      else if (pct >= 85) { statusLabel = 'Near threshold'; chipBg = 'oklch(0.96 0.05 80)'; chipColor = 'oklch(0.42 0.1 70)'; barColor = 'oklch(0.72 0.14 70)'; }
+      return { ...b, spent: '$' + b.spent.toLocaleString(), limit: '$' + b.limit.toLocaleString(), pctStr: Math.min(pct, 100) + '%', pctLabel: pct + '%', statusLabel, chipBg, chipColor, barColor };
+    });
+
+    const uploadStep = this.state.uploadStep;
+    const uploadLabels = ['Uploading document...', 'Running OCR extraction...', 'Matching vendor & category...', 'Drafting ledger entry...', 'Complete — routed to Review queue'];
+    const uploadSteps = uploadLabels.map((label, i) => ({
+      label, done: i < uploadStep, active: i === uploadStep, pending: i > uploadStep,
+      opacity: i <= uploadStep ? '1' : '0.45',
+    }));
+
+    const pageTitles = { dashboard: 'Dashboard', expenses: 'Expenses', expenseDetail: 'Expense detail', upload: 'Upload', review: 'Review queue', budgets: 'Budgets', alerts: 'Alerts', policies: 'Policies', policyDetail: 'Policy document', soon: 'Coming soon' };
+
+    const policyStatusMap = {
+      EMBEDDED: { statusLabel: 'Indexed', chipBg: 'oklch(0.95 0.04 145)', chipColor: 'oklch(0.4 0.1 145)', iconBg: 'oklch(0.96 0.025 145)', iconColor: 'oklch(0.5 0.12 145)', borderColor: 'oklch(0.91 0.006 265)', group: 'indexed' },
+      PROCESSING: { statusLabel: 'Processing', chipBg: accentSoft, chipColor: accentText, iconBg: accentSoft, iconColor: accentText, borderColor: 'oklch(0.91 0.006 265)', group: 'processing' },
+      PENDING: { statusLabel: 'Queued', chipBg: 'oklch(0.955 0.004 265)', chipColor: 'oklch(0.48 0.012 265)', iconBg: 'oklch(0.96 0.004 265)', iconColor: 'oklch(0.55 0.012 265)', borderColor: 'oklch(0.91 0.006 265)', group: 'processing' },
+      FAILED: { statusLabel: 'Failed', chipBg: 'oklch(0.95 0.05 25)', chipColor: 'oklch(0.45 0.13 25)', iconBg: 'oklch(0.96 0.03 25)', iconColor: 'oklch(0.55 0.15 25)', borderColor: 'oklch(0.92 0.03 25)', group: 'failed' },
+    };
+    const citations = { 1: { 3: { label: 'Quoted on Delta Airlines \u2014 $845.00' } } };
+    const listMode = this.state.policyListMode || 'ready';
+    const policyFilter = this.state.policyFilter || 'all';
+    const docsSource = listMode === 'empty' ? [] : listMode === 'allIndexed' ? this.policyDocsRaw.filter(d => d.status === 'EMBEDDED') : this.policyDocsRaw;
+    const docsAll = docsSource.map(d => {
+      const m = policyStatusMap[d.status];
+      const count = d.chunks.length;
+      return {
+        ...d, ...m,
+        isEmbedded: d.status === 'EMBEDDED', isProcessing: d.status === 'PROCESSING',
+        isPending: d.status === 'PENDING', isFailed: d.status === 'FAILED',
+        chunkLabel: d.status === 'EMBEDDED' ? count + (count === 1 ? ' chunk' : ' chunks') : '\u2014',
+        chunkColor: d.status === 'EMBEDDED' ? 'oklch(0.3 0.015 265)' : 'oklch(0.68 0.01 265)',
+        metaLine: d.status === 'EMBEDDED'
+          ? 'Uploaded ' + d.createdAt + ' \u00b7 ' + count + ' chunks indexed and searchable'
+          : d.status === 'FAILED'
+            ? 'Uploaded ' + d.createdAt + ' \u00b7 0 chunks \u2014 not searchable'
+            : 'Uploaded ' + d.createdAt + ' \u00b7 chunks appear when embedding completes',
+        progressTitle: d.status === 'PROCESSING' ? 'Splitting and embedding' : 'Queued for embedding',
+        progressBody: d.status === 'PROCESSING'
+          ? 'The document is being split into chunks and each one embedded. Nothing is retrievable until this finishes.'
+          : 'This document is waiting for an embedding worker. It has not been split yet.',
+        open: () => {
+          this.setState({ activePolicy: d.id, chunkQuery: '', chunkShown: 6, detailLoading: true }, () => {
+            this.goTo('policyDetail');
+            clearTimeout(this._pdT);
+            this._pdT = setTimeout(() => this.setState({ detailLoading: false }), 550);
+          });
+        },
+      };
+    });
+    const groupCount = g => docsAll.filter(d => d.group === g).length;
+    const policyDocs = policyFilter === 'all' ? docsAll : docsAll.filter(d => d.group === policyFilter);
+    const policyTabs = [
+      { key: 'all', label: 'All', count: docsAll.length },
+      { key: 'indexed', label: 'Indexed', count: groupCount('indexed') },
+      { key: 'processing', label: 'Processing', count: groupCount('processing') },
+      { key: 'failed', label: 'Failed', count: groupCount('failed') },
+    ].map(t => ({
+      ...t,
+      bg: policyFilter === t.key ? accentSoft : 'oklch(1 0 0)',
+      color: policyFilter === t.key ? accentText : 'oklch(0.5 0.01 265)',
+      borderColor: policyFilter === t.key ? accentSoft : 'oklch(0.9 0.006 265)',
+      onClick: () => this.setState({ policyFilter: t.key }),
+    }));
+    const indexedDocs = docsAll.filter(d => d.status === 'EMBEDDED');
+    const totalChunks = indexedDocs.reduce((s, d) => s + d.chunks.length, 0);
+    const failedDocs = docsAll.filter(d => d.status === 'FAILED');
+    const policyStats = [
+      { label: 'Documents indexed', value: String(indexedDocs.length), note: 'of ' + docsAll.length + ' uploaded', color: 'oklch(0.22 0.02 265)' },
+      { label: 'Chunks indexed', value: totalChunks.toLocaleString('en-US'), note: 'retrievable across the org', color: 'oklch(0.22 0.02 265)' },
+      { label: 'Failed', value: String(failedDocs.length), note: failedDocs.length ? 'needs re-upload' : 'nothing to fix', color: failedDocs.length ? 'oklch(0.5 0.15 25)' : 'oklch(0.22 0.02 265)' },
+    ];
+    const listReady = listMode === 'ready' || listMode === 'allIndexed';
+    const listLoading = listMode === 'loading';
+    const listError = listMode === 'error';
+    const listEmptyOrg = listMode === 'empty';
+    const listModes = [
+      { key: 'ready', label: 'Populated' },
+      { key: 'loading', label: 'Loading' },
+      { key: 'error', label: 'Load error' },
+      { key: 'empty', label: 'Empty org' },
+      { key: 'allIndexed', label: 'Nothing failed' },
+    ].map(m => ({
+      ...m,
+      bg: listMode === m.key ? accentSoft : 'oklch(1 0 0)',
+      color: listMode === m.key ? accentText : 'oklch(0.55 0.01 265)',
+      borderColor: listMode === m.key ? accentSoft : 'oklch(0.92 0.006 265)',
+      onClick: () => this.setState({ policyListMode: m.key, uploadOpen: false }),
+    }));
+    const upState = this.state.upState || 'idle';
+    const runUpload = (name, outcome, reason) => {
+      this.setState({ uploadOpen: true, upState: 'inflight', upName: name });
+      clearTimeout(this._upT);
+      this._upT = setTimeout(() => {
+        if (outcome === 'success') {
+          const id = Date.now();
+          this.policyDocsRaw = [{ id, filename: name, status: 'EMBEDDED', createdAt: 'Aug 22, 2026', chunks: this.newUploadChunks }, ...this.policyDocsRaw];
+          this.setState({ upState: 'success', upNewId: id, policyListMode: 'ready' });
+        } else {
+          this.setState({ upState: 'failed', upReason: reason });
+        }
+      }, 3600);
+    };
+    const upDemo = [
+      { label: 'Valid PDF', onClick: () => runUpload('travel-policy-2027.pdf', 'success') },
+      { label: 'Non-PDF file', onClick: () => this.setState({ uploadOpen: true, upState: 'rejected', upName: 'q3-forecast.xlsx' }) },
+      { label: 'Embedding failure', onClick: () => runUpload('vendor-terms-scan.pdf', 'fail', 'embed_timeout: ai service did not respond within 60s') },
+    ];
+    const activeDoc = docsAll.find(d => d.id === this.state.activePolicy) || docsAll[0] || { chunks: [], ...policyStatusMap.PENDING, filename: '', createdAt: '', metaLine: '' };
+    const chunkQuery = this.state.chunkQuery || '';
+    const q = chunkQuery.trim().toLowerCase();
+    const matchedChunks = q ? activeDoc.chunks.filter(c => c.text.toLowerCase().includes(q)) : activeDoc.chunks;
+    const chunkShown = this.state.chunkShown || 6;
+    const visibleChunks = matchedChunks.slice(0, chunkShown).map(c => {
+      const cite = (citations[activeDoc.id] || {})[c.index];
+      return {
+        ...c, index: String(c.index).padStart(2, '0'),
+        cited: !!cite, citedLabel: cite ? cite.label : '',
+        openCitation: () => this.goTo('expenseDetail'),
+      };
+    });
+    const remaining = Math.max(0, matchedChunks.length - visibleChunks.length);
+    const detailFacts = [
+      { label: 'Filename', value: activeDoc.filename, font: "'Geist Mono',monospace", color: 'oklch(0.22 0.02 265)' },
+      { label: 'Status', value: activeDoc.status, font: "'Geist Mono',monospace", color: activeDoc.isFailed ? 'oklch(0.5 0.15 25)' : 'oklch(0.22 0.02 265)' },
+      { label: 'Uploaded', value: activeDoc.createdAt, font: "'Geist',sans-serif", color: 'oklch(0.22 0.02 265)' },
+      { label: 'Chunks', value: activeDoc.status === 'EMBEDDED' ? String(activeDoc.chunks.length) : '0', font: "'Geist Mono',monospace", color: 'oklch(0.22 0.02 265)' },
+    ];
+    const skeletonRows = [{ w: '62%' }, { w: '78%' }, { w: '54%' }, { w: '70%' }];
+
+    const sevMap = {
+      action: { label: 'Needs action', chipBg: 'oklch(0.95 0.05 25)', chipColor: 'oklch(0.45 0.13 25)', dot: 'oklch(0.6 0.16 25)' },
+      warning: { label: 'Watch', chipBg: 'oklch(0.96 0.05 80)', chipColor: 'oklch(0.42 0.1 70)', dot: 'oklch(0.72 0.14 70)' },
+      info: { label: 'For your info', chipBg: 'oklch(0.95 0.02 265)', chipColor: 'oklch(0.45 0.03 265)', dot: 'oklch(0.65 0.02 265)' },
+    };
+    const alertFilter = this.state.alertFilter || 'all';
+    const alertsAll = this.alertsRaw.map(a => ({
+      ...a, ...sevMap[a.sev],
+      cardBg: a.unread ? 'oklch(1 0 0)' : 'oklch(0.985 0.002 265)',
+      titleWeight: a.unread ? '600' : '500',
+      onCta: () => this.goTo(a.sev === 'info' ? 'expenses' : 'review'),
+      dismiss: () => { this.alertsRaw = this.alertsRaw.filter(x => x.id !== a.id); this.forceUpdate(); },
+    }));
+    const alerts = alertFilter === 'all' ? alertsAll : alertsAll.filter(a => (alertFilter === 'unread' ? a.unread : a.sev === alertFilter));
+    const alertTabs = [
+      { key: 'all', label: 'All' },
+      { key: 'unread', label: 'Unread' },
+      { key: 'action', label: 'Needs action' },
+      { key: 'warning', label: 'Watch' },
+    ].map(t => ({
+      ...t,
+      bg: alertFilter === t.key ? accentSoft : 'oklch(1 0 0)',
+      color: alertFilter === t.key ? accentText : 'oklch(0.5 0.01 265)',
+      borderColor: alertFilter === t.key ? accentSoft : 'oklch(0.9 0.006 265)',
+      onClick: () => this.setState({ alertFilter: t.key }),
+    }));
+    const unreadCount = alertsAll.filter(a => a.unread).length;
+
+    const sidebarExtra = isMobile
+      ? `position:fixed; top:0; left:0; height:100vh; z-index:60; transform:${this.state.mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)'}; transition:transform 0.25s ease; box-shadow:${this.state.mobileNavOpen ? '0 0 40px oklch(0.2 0.02 265 / 0.3)' : 'none'};`
+      : 'position:relative;';
+    const contentPadding = isMobile ? '18px 16px 32px 16px' : '28px 32px 40px 32px';
+    const topbarPadding = isMobile ? '0 16px' : '0 24px';
+    const gridCols2 = isMobile ? '1fr' : '1.1fr 1fr';
+    const chartCols2 = isMobile ? '1fr' : '1fr 1fr';
+    const budgetsCols = isMobile ? '1fr' : '1fr 1fr 1fr';
+    const detailCols = isMobile ? '1fr' : '1fr 1fr';
+    const expenseRowCols = isMobile ? '1fr' : '1.6fr 1fr 1fr 1fr';
+    const allExpenseRowCols = isMobile ? '1fr' : '1.6fr 1fr 0.9fr 0.9fr 0.9fr';
+    const reviewRowCols = isMobile ? '1fr' : '28px 1.3fr 0.8fr 1.6fr 1fr';
+    const rowAlign = isMobile ? 'start' : 'center';
+
+    return {
+      accent, accentSoft, accentText, rowPadding,
+      isMobile, isDesktop, sidebarExtra, contentPadding, topbarPadding,
+      gridCols2, chartCols2, budgetsCols, detailCols, expenseRowCols, allExpenseRowCols, reviewRowCols, rowAlign,
+      showBackdrop: isMobile && this.state.mobileNavOpen,
+      toggleMobileNav: () => this.toggleMobileNav(),
+      closeMobileNav: () => this.closeMobileNav(),
+      pageTitle: pageTitles[view],
+      isDashboard: view === 'dashboard', isExpenses: view === 'expenses', isExpenseDetail: view === 'expenseDetail',
+      isUpload: view === 'upload', isReview: view === 'review', isBudgets: view === 'budgets', isSoon: view === 'soon',
+      isAlerts: view === 'alerts', alerts, alertTabs, unreadCount, hasAlerts: alerts.length > 0, noAlerts: alerts.length === 0,
+      goToAlerts: () => this.goTo('alerts'),
+      markAllRead: () => { this.alertsRaw = this.alertsRaw.map(a => ({ ...a, unread: false })); this.forceUpdate(); },
+      navBgAlerts: view === 'alerts' ? activeBg : 'transparent', navColorAlerts: view === 'alerts' ? activeColor : inactive,
+      showInsight: this.props.showAgentInsights ?? true,
+      goToDashboard: () => this.goTo('dashboard'),
+      goToExpenses: () => this.goTo('expenses'),
+      goToUpload: () => this.goTo('upload'),
+      goToReview: () => this.goTo('review'),
+      goToBudgets: () => this.goTo('budgets'),
+      goToSoon: () => this.goTo('soon'),
+      isPolicies: view === 'policies', isPolicyDetail: view === 'policyDetail',
+      policyDocs, policyTabs, policyStats, listModes, skeletonRows,
+      showStats: listReady || listLoading, showList: listReady,
+      listLoading, listError, listEmptyOrg,
+      hasDocs: listReady && policyDocs.length > 0,
+      listEmptyFilter: listReady && docsAll.length > 0 && policyDocs.length === 0,
+      filterEmptyNote: 'No document in this organization is currently ' + (policyFilter === 'failed' ? 'failed.' : policyFilter === 'processing' ? 'pending or processing.' : 'indexed.'),
+      showAllDocs: () => this.setState({ policyFilter: 'all' }),
+      retryList: () => this.setState({ policyListMode: 'loading' }, () => {
+        clearTimeout(this._plT);
+        this._plT = setTimeout(() => this.setState({ policyListMode: 'ready' }), 900);
+      }),
+      emptySteps: [
+        { n: '01', text: 'Upload a policy PDF \u2014 an expense policy, travel policy or procurement handbook.' },
+        { n: '02', text: 'Ledgerly splits it into chunks and embeds each one for retrieval.' },
+        { n: '03', text: 'The AI quotes a chunk when it explains how it categorized an expense.' },
+      ],
+      uploadOpen: !!this.state.uploadOpen,
+      openUpload: () => this.setState({ uploadOpen: true, upState: 'idle' }),
+      openUploadFromDetail: () => this.setState({ uploadOpen: true, upState: 'idle' }, () => this.goTo('policies')),
+      closeUpload: () => this.setState({ uploadOpen: false, upState: 'idle' }),
+      resetUpload: () => this.setState({ upState: 'idle' }),
+      upIdle: upState === 'idle', upInflight: upState === 'inflight', upSuccess: upState === 'success',
+      upFailed: upState === 'failed', upRejected: upState === 'rejected',
+      upName: this.state.upName || '', upReason: this.state.upReason || '',
+      upChunks: this.newUploadChunks.length, upDemo,
+      pickPdf: () => upDemo[0].onClick(),
+      openUploaded: () => {
+        const d = docsAll.find(x => x.id === this.state.upNewId);
+        if (d) d.open();
+      },
+      detailDoc: activeDoc,
+      detailLoading: !!this.state.detailLoading,
+      detailReady: !this.state.detailLoading,
+      detailInProgress: activeDoc.isProcessing || activeDoc.isPending,
+      detailFacts, visibleChunks,
+      chunkQuery, hasChunkQuery: chunkQuery.length > 0,
+      onChunkQuery: (e) => this.setState({ chunkQuery: e.target.value, chunkShown: 6 }),
+      clearChunkQuery: () => this.setState({ chunkQuery: '', chunkShown: 6 }),
+      chunkSummary: q
+        ? matchedChunks.length + ' of ' + activeDoc.chunks.length + ' match'
+        : 'Showing ' + visibleChunks.length + ' of ' + activeDoc.chunks.length,
+      noChunkMatches: activeDoc.isEmbedded && matchedChunks.length === 0,
+      hasMoreChunks: remaining > 0,
+      moreChunksLabel: 'Show ' + Math.min(remaining, 10) + ' more \u00b7 ' + remaining + ' remaining',
+      showMoreChunks: () => this.setState(s => ({ chunkShown: (s.chunkShown || 6) + 10 })),
+      policyRowCols: isMobile ? '1fr' : 'minmax(0,1.7fr) 130px 110px 118px 16px',
+      policyRowGap: isMobile ? '8px' : '14px',
+      policyDetailCols: isMobile ? '1fr' : 'minmax(0,1fr) 268px',
+      goToPolicies: () => this.setState({ uploadOpen: this.state.uploadOpen }, () => this.goTo('policies')),
+      navBgPolicies: (view === 'policies' || view === 'policyDetail') ? activeBg : 'transparent',
+      navColorPolicies: (view === 'policies' || view === 'policyDetail') ? activeColor : inactive,
+      navBgDashboard: view === 'dashboard' ? activeBg : 'transparent', navColorDashboard: view === 'dashboard' ? activeColor : inactive,
+      navBgExpenses: (view === 'expenses' || view === 'expenseDetail') ? activeBg : 'transparent', navColorExpenses: (view === 'expenses' || view === 'expenseDetail') ? activeColor : inactive,
+      navBgUpload: view === 'upload' ? activeBg : 'transparent', navColorUpload: view === 'upload' ? activeColor : inactive,
+      navBgReview: view === 'review' ? activeBg : 'transparent', navColorReview: view === 'review' ? activeColor : inactive,
+      navBgBudgets: view === 'budgets' ? activeBg : 'transparent', navColorBudgets: view === 'budgets' ? activeColor : inactive,
+      reviewCount: reviewQueue.length,
+      recentExpenses, allExpenses, detailExpense,
+      categoryData, trendPoints, trendDots, miniTrendPoints,
+      extractedFields: [
+        { label: 'Vendor', value: 'Delta Airlines' },
+        { label: 'Invoice #', value: 'DL-88213' },
+        { label: 'Date', value: '2026-07-22' },
+        { label: 'Amount', value: '$845.00' },
+        { label: 'Tax', value: '$38.00' },
+        { label: 'Confidence', value: '62%' },
+      ],
+      ledgerEntries: [
+        { account: '6120', label: 'Travel expense', amount: '$845.00 Dr' },
+        { account: '1000', label: 'Accounts payable', amount: '$845.00 Cr' },
+      ],
+      agentSteps: this.agentStepsRaw.map(s => ({ ...s, dotColor: s.color })),
+      uploadActive: this.state.uploadActive, uploadSteps,
+      startUpload: () => this.startUpload(),
+      reviewQueue, hasSelection,
+      approveSelected: () => this.approveSelected(),
+      budgets,
+      cmdkOpen: this.state.cmdkOpen,
+      toggleCmdk: () => this.toggleCmdk(),
+      stopProp: (e) => this.stopProp(e),
+    };
+  }
+}
+
+</script>
+</body>
+</html>
