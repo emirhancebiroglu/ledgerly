@@ -65,6 +65,19 @@ public class Alert {
   @Column(updatable = false)
   private String model;
 
+  @Column(name = "categorization_confidence", updatable = false)
+  private BigDecimal categorizationConfidence;
+
+  /** The earlier expense this alert believes {@link #expenseId} duplicates. Nullable in the
+   * schema (a matched expense can later be deleted, {@code ON DELETE SET NULL}) even though every
+   * {@code DUPLICATE_SUSPECTED} alert is created with one — {@link
+   * DuplicateAlertEvaluator#evaluate} never persists this type without a match. */
+  @Column(name = "matched_expense_id", updatable = false)
+  private UUID matchedExpenseId;
+
+  @Column(name = "duplicate_tier", updatable = false)
+  private String duplicateTier;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -115,6 +128,7 @@ public class Alert {
     return id;
   }
 
+  public UUID getOrganizationId() { return organizationId; }
   public UUID getExpenseId() { return expenseId; }
   public UUID getCategoryId() { return categoryId; }
   public String getPeriod() { return period; }
@@ -130,6 +144,9 @@ public class Alert {
   public BigDecimal getBudgetBurnRate() { return budgetBurnRate; }
   public String getExplanation() { return explanation; }
   public String getModel() { return model; }
+  public BigDecimal getCategorizationConfidence() { return categorizationConfidence; }
+  public UUID getMatchedExpenseId() { return matchedExpenseId; }
+  public String getDuplicateTier() { return duplicateTier; }
   public Instant getCreatedAt() { return createdAt; }
 
   public static Alert anomalyHigh(
@@ -159,6 +176,46 @@ public class Alert {
     alert.budgetBurnRate = budgetBurnRate == null ? null : BigDecimal.valueOf(budgetBurnRate);
     alert.explanation = explanation;
     alert.model = model;
+    alert.createdAt = Instant.now();
+    return alert;
+  }
+
+  public static Alert lowConfidence(
+      UUID organizationId,
+      UUID expenseId,
+      UUID categoryId,
+      String period,
+      String currency,
+      BigDecimal categorizationConfidence) {
+    Alert alert = new Alert();
+    alert.organizationId = organizationId;
+    alert.expenseId = expenseId;
+    alert.categoryId = categoryId;
+    alert.period = period;
+    alert.currency = currency;
+    alert.alertType = "LOW_CONFIDENCE";
+    alert.categorizationConfidence = categorizationConfidence;
+    alert.createdAt = Instant.now();
+    return alert;
+  }
+
+  public static Alert duplicateSuspected(
+      UUID organizationId,
+      UUID expenseId,
+      UUID categoryId,
+      String period,
+      String currency,
+      UUID matchedExpenseId,
+      String duplicateTier) {
+    Alert alert = new Alert();
+    alert.organizationId = organizationId;
+    alert.expenseId = expenseId;
+    alert.categoryId = categoryId;
+    alert.period = period;
+    alert.currency = currency;
+    alert.alertType = "DUPLICATE_SUSPECTED";
+    alert.matchedExpenseId = matchedExpenseId;
+    alert.duplicateTier = duplicateTier;
     alert.createdAt = Instant.now();
     return alert;
   }

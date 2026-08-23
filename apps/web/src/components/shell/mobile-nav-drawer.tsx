@@ -7,6 +7,7 @@ interface MobileNavDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   reviewQueueCount?: number;
+  unreadAlertCount?: number;
   orgName: string;
   orgInitial: string;
 }
@@ -15,6 +16,7 @@ export function MobileNavDrawer({
   open,
   onOpenChange,
   reviewQueueCount,
+  unreadAlertCount,
   orgName,
   orgInitial,
 }: MobileNavDrawerProps) {
@@ -29,6 +31,7 @@ export function MobileNavDrawer({
           </DialogPrimitive.Description>
           <Sidebar
             reviewQueueCount={reviewQueueCount}
+            unreadAlertCount={unreadAlertCount}
             orgName={orgName}
             orgInitial={orgInitial}
             className="h-full"
