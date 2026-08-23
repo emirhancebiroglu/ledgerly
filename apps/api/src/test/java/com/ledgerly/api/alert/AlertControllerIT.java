@@ -127,6 +127,67 @@ class AlertControllerIT extends AbstractPostgresIT {
   }
 
   @Test
+  void aDuplicateSuspectedAlertCarriesBothEntriesRealFigures() throws Exception {
+    UserSession user = registerAndGetSession();
+    UUID matchedExpenseId;
+    UUID triggeringExpenseId;
+    try (Connection connection = dataSource.getConnection()) {
+      matchedExpenseId = insertExpense(connection, user.organizationId(), user.categoryId(), "Office Depot", 12_800);
+      triggeringExpenseId = insertExpense(connection, user.organizationId(), user.categoryId(), "Office Depot", 89_900);
+    }
+    UUID alertId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO alert (id, organization_id, expense_id, category_id, period, currency, "
+            + "alert_type, matched_expense_id, duplicate_tier, created_at) "
+            + "VALUES (?, ?, ?, ?, '2026-08', 'EUR', 'DUPLICATE_SUSPECTED', ?, 'CONFIRMED', ?)",
+        alertId,
+        user.organizationId(),
+        triggeringExpenseId,
+        user.categoryId(),
+        matchedExpenseId,
+        java.sql.Timestamp.from(Instant.now()));
+
+    mockMvc
+        .perform(get("/api/v1/alerts").header("Authorization", "Bearer " + user.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].matchedExpenseId").value(matchedExpenseId.toString()))
+        .andExpect(jsonPath("$[0].matchedExpense.vendor").value("Office Depot"))
+        .andExpect(jsonPath("$[0].matchedExpense.amountMinor").value("12800"))
+        .andExpect(jsonPath("$[0].triggeringExpense.vendor").value("Office Depot"))
+        .andExpect(jsonPath("$[0].triggeringExpense.amountMinor").value("89900"));
+  }
+
+  @Test
+  void aDuplicateSuspectedAlertDegradesGracefullyWhenTheMatchedExpenseWasDeleted() throws Exception {
+    UserSession user = registerAndGetSession();
+    UUID matchedExpenseId;
+    UUID triggeringExpenseId;
+    try (Connection connection = dataSource.getConnection()) {
+      matchedExpenseId = insertExpense(connection, user.organizationId(), user.categoryId(), "Office Depot", 12_800);
+      triggeringExpenseId = insertExpense(connection, user.organizationId(), user.categoryId(), "Office Depot", 89_900);
+    }
+    UUID alertId = UUID.randomUUID();
+    jdbcTemplate.update(
+        "INSERT INTO alert (id, organization_id, expense_id, category_id, period, currency, "
+            + "alert_type, matched_expense_id, duplicate_tier, created_at) "
+            + "VALUES (?, ?, ?, ?, '2026-08', 'EUR', 'DUPLICATE_SUSPECTED', ?, 'SUSPECTED', ?)",
+        alertId,
+        user.organizationId(),
+        triggeringExpenseId,
+        user.categoryId(),
+        matchedExpenseId,
+        java.sql.Timestamp.from(Instant.now()));
+    jdbcTemplate.update("DELETE FROM expense WHERE id = ?", matchedExpenseId);
+
+    mockMvc
+        .perform(get("/api/v1/alerts").header("Authorization", "Bearer " + user.token()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].matchedExpenseId").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$[0].matchedExpense").value(org.hamcrest.Matchers.nullValue()))
+        .andExpect(jsonPath("$[0].triggeringExpense.vendor").value("Office Depot"));
+  }
+
+  @Test
   void paginationStillBoundsTheAlertsListed() throws Exception {
     UserSession user = registerAndGetSession();
     for (int i = 0; i < 3; i++) {
@@ -184,16 +245,24 @@ class AlertControllerIT extends AbstractPostgresIT {
   }
 
   private UUID insertExpense(Connection connection, UUID orgId, UUID categoryId) throws SQLException {
+    return insertExpense(connection, orgId, categoryId, "Test Vendor", 1000);
+  }
+
+  private UUID insertExpense(
+      Connection connection, UUID orgId, UUID categoryId, String vendor, long amountMinor)
+      throws SQLException {
     UUID documentId = insertDocument(connection, orgId);
     UUID expenseId = UUID.randomUUID();
     try (PreparedStatement ps =
         connection.prepareStatement(
-            "INSERT INTO expense (id, organization_id, document_id, category_id, amount_minor, "
-                + "currency, categorization_confidence, status) VALUES (?, ?, ?, ?, 1000, 'EUR', 0.4, 'NEEDS_REVIEW')")) {
+            "INSERT INTO expense (id, organization_id, document_id, category_id, vendor, amount_minor, "
+                + "currency, categorization_confidence, status) VALUES (?, ?, ?, ?, ?, ?, 'EUR', 0.4, 'NEEDS_REVIEW')")) {
       ps.setObject(1, expenseId);
       ps.setObject(2, orgId);
       ps.setObject(3, documentId);
       ps.setObject(4, categoryId);
+      ps.setString(5, vendor);
+      ps.setLong(6, amountMinor);
       ps.executeUpdate();
     }
     return expenseId;

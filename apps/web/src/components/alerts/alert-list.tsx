@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { BellOff, CircleCheck, TriangleAlert, Wallet } from "lucide-react";
+import { BellOff, CircleCheck, Copy, TriangleAlert, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/date";
@@ -22,6 +22,7 @@ const FILTER_TABS: { key: FilterKey; label: string }[] = [
   { key: "BUDGET_THRESHOLD", label: "Budget" },
   { key: "ANOMALY_HIGH", label: "Anomaly" },
   { key: "LOW_CONFIDENCE", label: "Review" },
+  { key: "DUPLICATE_SUSPECTED", label: "Duplicate" },
 ];
 
 const TYPE_STYLE: Record<
@@ -46,12 +47,24 @@ const TYPE_STYLE: Record<
     dotClassName: "bg-primary",
     icon: CircleCheck,
   },
+  DUPLICATE_SUSPECTED: {
+    label: "Duplicate",
+    chipClassName: "bg-warning-soft text-warning-foreground",
+    dotClassName: "bg-warning",
+    icon: Copy,
+  },
 };
 
+/** DUPLICATE_SUSPECTED's CTA opens the earlier (matched) expense, not the new one carrying the
+ * alert — that's the entry the reader needs to compare against. */
 function ctaFor(alert: Alert): { label: string; href: string } {
-  return alert.alertType === "BUDGET_THRESHOLD"
-    ? { label: "Review budget", href: "/budgets" }
-    : { label: "Open expense", href: `/expenses/${alert.expenseId}` };
+  if (alert.alertType === "BUDGET_THRESHOLD") {
+    return { label: "Review budget", href: "/budgets" };
+  }
+  if (alert.alertType === "DUPLICATE_SUSPECTED" && alert.matchedExpenseId) {
+    return { label: "Compare entries", href: `/expenses/${alert.matchedExpenseId}` };
+  }
+  return { label: "Open expense", href: `/expenses/${alert.expenseId}` };
 }
 
 export function AlertList({ initialAlerts, categories }: AlertListProps) {

@@ -23,10 +23,11 @@ test.describe("alerts", () => {
     await login(page);
     await page.goto("/alerts");
     const cards = page.getByTestId("alert-card");
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(4);
     await expect(cards.filter({ hasText: "Travel nearing its budget" }).getByText("Budget", { exact: true })).toBeVisible();
     await expect(cards.filter({ hasText: "Unusual spending detected" }).getByText("Anomaly", { exact: true })).toBeVisible();
     await expect(cards.filter({ hasText: "Low-confidence categorization needs review" }).getByText("Review", { exact: true })).toBeVisible();
+    await expect(cards.filter({ hasText: "may have been billed twice" }).getByText("Duplicate", { exact: true })).toBeVisible();
   });
 
   test("filter tabs narrow the list to one alert type", async ({ page }) => {
@@ -77,12 +78,28 @@ test.describe("alerts", () => {
 
     await page.reload();
     await expect(page.getByText("Low-confidence categorization needs review")).toHaveCount(0);
-    await expect(page.getByTestId("alert-card")).toHaveCount(2);
+    await expect(page.getByTestId("alert-card")).toHaveCount(3);
   });
 
   test("an unauthenticated request redirects to sign-in", async ({ page, context }) => {
     await context.clearCookies();
     await page.goto("/alerts");
     await expect(page).toHaveURL(/\/login/);
+  });
+
+  test("a duplicate alert states both entries' real figures and its CTA opens the earlier expense", async ({ page }) => {
+    await login(page);
+    await page.goto("/alerts");
+    const card = page.getByTestId("alert-card").filter({ hasText: "may have been billed twice" });
+    await expect(card.getByText("Duplicate", { exact: true })).toBeVisible();
+    await expect(
+      card.getByText(/This entry for €899\.00 carries the same invoice number as an earlier entry for €128\.00/),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Duplicate", exact: true }).click();
+    await expect(page.getByTestId("alert-card")).toHaveCount(1);
+
+    await card.getByRole("link", { name: "Compare entries" }).click();
+    await expect(page).toHaveURL(/\/expenses\/exp-3$/);
   });
 });

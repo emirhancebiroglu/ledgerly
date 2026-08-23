@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/money";
+import { formatDateTime } from "@/lib/date";
 import type { Alert } from "@/lib/alerts";
 
 /** Mirrors `categoryNameLookup` in `@/lib/categories`, duplicated rather than imported: that
@@ -44,6 +45,17 @@ export function alertBody(
       return confidence
         ? `Categorized at ${confidence} confidence, below the review threshold.`
         : "Categorization confidence was below the review threshold.";
+    }
+    case "DUPLICATE_SUSPECTED": {
+      const match = alert.matchedExpense;
+      const trigger = alert.triggeringExpense;
+      const verb = alert.duplicateTier === "CONFIRMED" ? "carries the same invoice number as" : "closely matches";
+      const newEntry = trigger ? `This entry for ${formatMoney(trigger.amountMinor, trigger.currency)}` : "This entry";
+      if (!match) {
+        return `${newEntry} ${verb} an earlier entry that is no longer available to compare.`;
+      }
+      const earlierEntry = `an earlier entry for ${formatMoney(match.amountMinor, match.currency)}, posted ${formatDateTime(match.createdAt)}`;
+      return `${newEntry} ${verb} ${earlierEntry}.`;
     }
     default:
       return "";

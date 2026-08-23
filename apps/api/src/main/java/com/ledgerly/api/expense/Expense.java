@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -62,6 +63,18 @@ public class Expense {
   @Column(updatable = false)
   private String citation;
 
+  /** Nullable — many real invoices carry no printed number. Promoted out of {@code
+   * document.proposal} JSONB (M9.6 T1) so duplicate detection can query it directly. */
+  @Column(name = "invoice_number", updatable = false)
+  private String invoiceNumber;
+
+  /** Nullable for the same reason as {@link #invoiceNumber}. This is the invoice's own date
+   * ({@code ExtractionProposal.documentDate}), not {@link #createdAt} (upload time) — duplicate
+   * detection's windowed heuristic must key off when the invoice says it was issued, not when it
+   * happened to be uploaded. */
+  @Column(name = "issue_date", updatable = false)
+  private LocalDate issueDate;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false)
   private ExpenseStatus status;
@@ -81,6 +94,8 @@ public class Expense {
       String currency,
       double categorizationConfidence,
       String citation,
+      String invoiceNumber,
+      LocalDate issueDate,
       ExpenseStatus status) {
     this.organizationId = organizationId;
     this.documentId = documentId;
@@ -91,6 +106,8 @@ public class Expense {
     this.currency = currency;
     this.categorizationConfidence = BigDecimal.valueOf(categorizationConfidence);
     this.citation = citation;
+    this.invoiceNumber = invoiceNumber;
+    this.issueDate = issueDate;
     this.status = status;
     this.createdAt = Instant.now();
   }
@@ -105,7 +122,9 @@ public class Expense {
       long amountMinor,
       String currency,
       double categorizationConfidence,
-      String citation) {
+      String citation,
+      String invoiceNumber,
+      LocalDate issueDate) {
     return new Expense(
         organizationId,
         documentId,
@@ -116,6 +135,8 @@ public class Expense {
         currency,
         categorizationConfidence,
         citation,
+        invoiceNumber,
+        issueDate,
         ExpenseStatus.POSTED);
   }
 
@@ -128,7 +149,9 @@ public class Expense {
       long amountMinor,
       String currency,
       double categorizationConfidence,
-      String citation) {
+      String citation,
+      String invoiceNumber,
+      LocalDate issueDate) {
     return new Expense(
         organizationId,
         documentId,
@@ -139,6 +162,8 @@ public class Expense {
         currency,
         categorizationConfidence,
         citation,
+        invoiceNumber,
+        issueDate,
         ExpenseStatus.NEEDS_REVIEW);
   }
 
@@ -180,6 +205,14 @@ public class Expense {
 
   public String getCitation() {
     return citation;
+  }
+
+  public String getInvoiceNumber() {
+    return invoiceNumber;
+  }
+
+  public LocalDate getIssueDate() {
+    return issueDate;
   }
 
   public ExpenseStatus getStatus() {

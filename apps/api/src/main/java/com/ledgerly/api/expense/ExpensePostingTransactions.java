@@ -42,6 +42,7 @@ public class ExpensePostingTransactions {
   private final ExpenseRepository expenseRepository;
   private final BudgetThresholdEvaluator budgetThresholdEvaluator;
   private final LowConfidenceAlertEvaluator lowConfidenceAlertEvaluator;
+  private final DuplicateAlertEvaluator duplicateAlertEvaluator;
   private final ApplicationEventPublisher eventPublisher;
   private final AuditService auditService;
   private final ObjectMapper objectMapper;
@@ -53,6 +54,7 @@ public class ExpensePostingTransactions {
       ExpenseRepository expenseRepository,
       BudgetThresholdEvaluator budgetThresholdEvaluator,
       LowConfidenceAlertEvaluator lowConfidenceAlertEvaluator,
+      DuplicateAlertEvaluator duplicateAlertEvaluator,
       ApplicationEventPublisher eventPublisher,
       AuditService auditService,
       ObjectMapper objectMapper,
@@ -62,6 +64,7 @@ public class ExpensePostingTransactions {
     this.expenseRepository = expenseRepository;
     this.budgetThresholdEvaluator = budgetThresholdEvaluator;
     this.lowConfidenceAlertEvaluator = lowConfidenceAlertEvaluator;
+    this.duplicateAlertEvaluator = duplicateAlertEvaluator;
     this.eventPublisher = eventPublisher;
     this.auditService = auditService;
     this.objectMapper = objectMapper;
@@ -106,10 +109,13 @@ public class ExpensePostingTransactions {
                 proposal.totalMinor(),
                 proposal.currency(),
                 response.confidence(),
-                response.citation()));
+                response.citation(),
+                proposal.invoiceNumber(),
+                proposal.documentDate()));
     expenseRepository.flush();
 
     budgetThresholdEvaluator.evaluate(expense, postedAt, actor);
+    duplicateAlertEvaluator.evaluate(expense, actor);
     eventPublisher.publishEvent(new ExpensePostedEvent(organizationId, expense.getId(), postedAt, actor));
 
     auditService.record(
@@ -146,10 +152,13 @@ public class ExpensePostingTransactions {
                 proposal.totalMinor(),
                 proposal.currency(),
                 response.confidence(),
-                response.citation()));
+                response.citation(),
+                proposal.invoiceNumber(),
+                proposal.documentDate()));
     expenseRepository.flush();
 
     lowConfidenceAlertEvaluator.evaluate(expense, actor);
+    duplicateAlertEvaluator.evaluate(expense, actor);
 
     auditService.record(
         organizationId,
