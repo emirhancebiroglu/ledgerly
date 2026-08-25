@@ -19,6 +19,7 @@ here that breaks either side fails that side's contract test.
 | `categorize-response.schema.json` | What `ai` returns — category, confidence, and the citation that justified it. Advisory only. |
 | `anomaly-request.schema.json` | The full body of `POST /anomaly` — candidate, bounded same-category/currency history, and optional budget snapshot. |
 | `anomaly-response.schema.json` | Deterministic risk statistics plus an LLM-written qualitative explanation. |
+| `thresholds.json` | Not a schema — one shared numeric constant. `api`'s categorization confidence gate (`application.yml`'s `ledgerly.categorization.confidence-threshold`) and `ai`'s extraction self-check gate (`extraction_graph.CONFIDENCE_THRESHOLD`) must read the same value; a contract test on each side fails if its own constant diverges from `confidenceThreshold` here. |
 
 `examples/` holds golden fixtures used by the contract tests on both sides:
 
