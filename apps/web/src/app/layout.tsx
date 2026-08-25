@@ -13,8 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Resolves the og:image/twitter:image URLs opengraph-image.tsx generates into absolute
+  // ones — without this Next.js falls back to localhost, which is wrong for a real deploy.
+  // Set NEXT_PUBLIC_SITE_URL to the real Vercel/custom domain once one exists (M10).
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: "Ledgerly",
-  description: "Ledgerly service health dashboard",
+  description:
+    "AI-driven corporate expense ledger. Upload an invoice, an agent extracts and categorizes " +
+    "it, the system posts it to a double-entry ledger, and a budget guard flags anomalies " +
+    "before they become surprises.",
 };
 
 export default function RootLayout({
