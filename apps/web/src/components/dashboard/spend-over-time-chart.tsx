@@ -1,10 +1,9 @@
 import { Card } from "@/components/ui/card";
 import { formatMoney } from "@/lib/money";
-import type { MonthlySpend } from "@/lib/dashboard";
+import { groupByCurrency, type MonthlySpend } from "@/lib/dashboard";
 
 interface SpendOverTimeChartProps {
   series: MonthlySpend[];
-  currency: string;
 }
 
 const CHART_WIDTH = 480;
@@ -24,21 +23,10 @@ function monthLabel(month: string): string {
   });
 }
 
-export function SpendOverTimeChart({ series, currency }: SpendOverTimeChartProps) {
-  if (series.length === 0) {
-    return (
-      <Card className="p-[22px_24px]">
-        <div className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">
-          Spend over time
-        </div>
-        <div className="text-sm text-muted-foreground">No spend history yet.</div>
-      </Card>
-    );
-  }
-
-  const max = Math.max(...series.map((m) => m.amountMinor), 1);
-  const stepX = (CHART_WIDTH - PADDING * 2) / Math.max(series.length - 1, 1);
-  const points = series.map((m, i) => ({
+function CurrencySeries({ currency, points: monthlyPoints }: { currency: string; points: MonthlySpend[] }) {
+  const max = Math.max(...monthlyPoints.map((m) => m.amountMinor), 1);
+  const stepX = (CHART_WIDTH - PADDING * 2) / Math.max(monthlyPoints.length - 1, 1);
+  const points = monthlyPoints.map((m, i) => ({
     x: PADDING + i * stepX,
     y: PADDING + (CHART_HEIGHT - PADDING * 2) * (1 - m.amountMinor / max),
     month: m,
@@ -46,17 +34,14 @@ export function SpendOverTimeChart({ series, currency }: SpendOverTimeChartProps
   const polylinePoints = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 
   return (
-    <Card className="p-[22px_24px]">
-      <div className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">
-        Spend over time
-      </div>
+    <div>
       <svg
         width="100%"
         height="150"
         viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Monthly spend from ${monthLabel(series[0].month)} to ${monthLabel(series[series.length - 1].month)}: ${series
+        aria-label={`Monthly spend from ${monthLabel(monthlyPoints[0].month)} to ${monthLabel(monthlyPoints[monthlyPoints.length - 1].month)}: ${monthlyPoints
           .map((m) => `${monthLabel(m.month)} ${formatMoney(m.amountMinor, currency)}`)
           .join(", ")}`}
       >
@@ -75,7 +60,7 @@ export function SpendOverTimeChart({ series, currency }: SpendOverTimeChartProps
         ))}
       </svg>
       <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
-        {series.map((m) => (
+        {monthlyPoints.map((m) => (
           <span key={m.month}>{monthLabel(m.month)}</span>
         ))}
       </div>
@@ -88,7 +73,7 @@ export function SpendOverTimeChart({ series, currency }: SpendOverTimeChartProps
           </tr>
         </thead>
         <tbody>
-          {series.map((m) => (
+          {monthlyPoints.map((m) => (
             <tr key={m.month}>
               <td>{monthLabel(m.month)}</td>
               <td>{formatMoney(m.amountMinor, currency)}</td>
@@ -96,6 +81,42 @@ export function SpendOverTimeChart({ series, currency }: SpendOverTimeChartProps
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+export function SpendOverTimeChart({ series }: SpendOverTimeChartProps) {
+  if (series.length === 0) {
+    return (
+      <Card className="p-[22px_24px]">
+        <div className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">
+          Spend over time
+        </div>
+        <div className="text-sm text-muted-foreground">No spend history yet.</div>
+      </Card>
+    );
+  }
+
+  const sections = groupByCurrency(series);
+  const multipleCurrencies = sections.length > 1;
+
+  return (
+    <Card className="p-[22px_24px]">
+      <div className="mb-2.5 text-[12.5px] font-medium text-muted-foreground">
+        Spend over time
+      </div>
+      <div className="flex flex-col gap-5">
+        {sections.map(([currency, points]) => (
+          <div key={currency}>
+            {multipleCurrencies && (
+              <div className="mb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
+                {currency}
+              </div>
+            )}
+            <CurrencySeries currency={currency} points={points} />
+          </div>
+        ))}
+      </div>
     </Card>
   );
 }

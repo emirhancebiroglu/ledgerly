@@ -49,6 +49,21 @@ def load_example(name: str) -> dict[str, Any]:
     return json.loads(example_path.read_text(encoding="utf-8"))
 
 
+@lru_cache(maxsize=None)
+def load_thresholds() -> dict[str, Any]:
+    """Load ``thresholds.json`` -- not a schema, one shared numeric constant per key.
+
+    Raises ``ContractsNotFoundError`` rather than returning a default when the file is missing,
+    same as ``load_schema``: a threshold this service silently guessed at is worse than a loud
+    startup/test failure, since a wrong guess changes which extractions and categorizations post
+    without anyone deciding that on purpose.
+    """
+    thresholds_path = contracts_directory() / "thresholds.json"
+    if not thresholds_path.is_file():
+        raise ContractsNotFoundError(f"Missing thresholds contract: {thresholds_path}")
+    return json.loads(thresholds_path.read_text(encoding="utf-8"))
+
+
 EXTRACTION_PROPOSAL_SCHEMA = "extraction-proposal.schema.json"
 EXTRACT_REQUEST_SCHEMA = "extract-request.schema.json"
 EMBED_POLICY_REQUEST_SCHEMA = "embed-policy-request.schema.json"

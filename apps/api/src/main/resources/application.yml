@@ -71,8 +71,10 @@ ledgerly:
     max-age-years: ${EXTRACTION_MAX_AGE_YEARS:10}
     max-future-days: ${EXTRACTION_MAX_FUTURE_DAYS:1}
   categorization:
-    # Below this, an expense routes to review instead of posting silently (M6 T7). Mirrors the
-    # extraction self-check gate's 0.7 threshold in apps/ai/app/llm/extraction_graph.py.
+    # Below this, an expense routes to review instead of posting silently (M6 T7). Must match
+    # docs/contracts/thresholds.json's confidenceThreshold, which also gates ai's extraction
+    # self-check (apps/ai/app/llm/extraction_graph.py) -- ConfidenceThresholdContractTest fails
+    # if this default drifts from the contract.
     confidence-threshold: ${CATEGORIZATION_CONFIDENCE_THRESHOLD:0.7}
   anomaly:
     # The request schema bounds one advisory payload to the newest 1,000 comparable postings;

@@ -8,6 +8,7 @@ export interface CurrencyTotal {
 export interface CategoryBreakdownEntry {
   categoryId: string;
   categoryName: string;
+  currency: string;
   amountMinor: number;
 }
 
@@ -15,6 +16,7 @@ export interface MonthlySpend {
   /** ISO `YearMonth` string, e.g. `"2026-07"` — Spring's default Jackson JSR-310
    * serialization of `java.time.YearMonth` (`MonthlySpend.java` on the api side). */
   month: string;
+  currency: string;
   amountMinor: number;
 }
 
@@ -84,14 +86,21 @@ function parseOptionalMinor(value: string | number | null): bigint | null {
 }
 
 /**
- * `categoryBreakdown`/`monthlySeries` sum across currencies (api's own documented gap —
- * `DashboardSummaryResponse.java`), unlike `totalsThisMonth`, and cover a wider window (trailing
- * 6 months) than `totalsThisMonth` (current calendar month only) — an org with no spend yet this
- * month can still have both months of history and a currency to label it with. Falls back to
- * `totalsLastMonth` before giving up, since an org's currency essentially never changes
- * month-to-month; `undefined` means neither window has any data, so the caller should render an
- * empty state rather than fabricate a currency label.
+ * Splits any list of currency-bearing rows (`CategoryBreakdownEntry`, `MonthlySpend`, ...) into
+ * one array per currency, sorted by currency code — the one grouping pass every per-currency
+ * dashboard section needs, so `CategoryBreakdown` and `SpendOverTimeChart` share it instead of
+ * each keeping its own copy that can drift the way `EXPENSE_GRID_TEMPLATE`'s track-list once did
+ * between the expenses list and dashboard recent-expenses.
  */
-export function resolveDisplayCurrency(summary: DashboardSummary): string | undefined {
-  return summary.totalsThisMonth[0]?.currency ?? summary.totalsLastMonth[0]?.currency;
+export function groupByCurrency<T extends { currency: string }>(rows: T[]): Array<[string, T[]]> {
+  const sections = new Map<string, T[]>();
+  for (const row of rows) {
+    const existing = sections.get(row.currency);
+    if (existing) {
+      existing.push(row);
+    } else {
+      sections.set(row.currency, [row]);
+    }
+  }
+  return [...sections.entries()].sort(([a], [b]) => a.localeCompare(b));
 }

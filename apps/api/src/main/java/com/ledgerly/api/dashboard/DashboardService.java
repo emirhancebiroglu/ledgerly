@@ -4,6 +4,7 @@ import com.ledgerly.api.auth.AuthenticatedPrincipal;
 import com.ledgerly.api.alert.AlertRepository;
 import com.ledgerly.api.alert.AlertResponse;
 import com.ledgerly.api.alert.AlertTitleResolver;
+import com.ledgerly.api.expense.ExpenseStatus;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import java.time.Clock;
@@ -53,7 +54,7 @@ public class DashboardService {
             organizationId, currentMonth.atDay(1), currentMonth.plusMonths(1).atDay(1));
     List<MonthlySpend> monthlySeries =
         dashboardRepository.monthlySeries(organizationId, trailingMonths(currentMonth));
-    long reviewQueueCount = dashboardRepository.countByStatus(organizationId, "NEEDS_REVIEW");
+    long reviewQueueCount = dashboardRepository.countByStatus(organizationId, ExpenseStatus.NEEDS_REVIEW);
     long documentsProcessedToday = dashboardRepository.documentsProcessedSince(organizationId, today);
     long alertCount = alertRepository.countByOrganizationId(organizationId);
     var recentAlerts = alertRepository.findByOrganizationId(organizationId,

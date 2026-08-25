@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 # confident: issuer-vs-recipient confusion is frequently overconfident. The remaining fields are
 # selected by confidence and all re-checks still share the graph's one-pass bound.
 GATED_FIELDS = ("vendor", "currency", "total_minor", "tax_minor", "document_date")
+# Must match docs/contracts/thresholds.json's confidenceThreshold, which also gates api's
+# categorization posting decision (ledgerly.categorization.confidence-threshold in
+# application.yml) -- test_confidence_threshold_contract.py fails if this drifts from the
+# contract.
 CONFIDENCE_THRESHOLD = 0.7
 _FORMAT_RETRY_SUFFIX = (
     "\n\nYour previous response was not valid JSON. Return the required JSON object only, with no "

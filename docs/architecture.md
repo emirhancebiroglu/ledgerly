@@ -41,6 +41,10 @@ Responsibilities:
   confidence.
 - `POST /categorize` — expense + org taxonomy + policy context in, category proposal out.
 - `POST /anomaly` — expense + recent history + budget state in, risk assessment out.
+- `POST /embed-policy` — a policy document's chunked text in, one embedding vector per chunk out.
+  `api` persists these as `policy_chunk` rows for the categorization graph's retrieval step.
+- `POST /embed-query` — free text in, a single embedding vector out. `api` uses this for the
+  pgvector nearest-neighbor search behind policy chunk retrieval.
 - Policy RAG over org-uploaded expense-policy documents (pgvector).
 
 Never: writes to ledger tables, holds authoritative state, is trusted without validation.
@@ -62,14 +66,20 @@ migrations for those types and fails the build if one appears.
 organization ──┬── user
                ├── account            (chart of accounts; type: ASSET|LIABILITY|EXPENSE|REVENUE|EQUITY)
                ├── document           (uploaded file metadata + storage key + status)
+               │     └── document_activity (ordered, replayable pipeline steps; SSE + detail read the same rows)
                ├── expense            (business-level record; links document + ledger_transaction)
                ├── ledger_transaction (header: date, description, org, created_by)
-               │     └── ledger_entry (account_id, direction DEBIT|CREDIT, amount_minor, currency)
+               │     └── ledger_entry (account_id, direction DEBIT|CREDIT, native/base amount, fx_rate)
                ├── category           (org-scoped taxonomy)
                ├── budget             (category + period + limit_minor)
+               ├── alert              (budget-threshold | anomaly | low-confidence | duplicate-suspected)
+               │     └── alert_state  (per-user read/dismiss, so one alert has independent state per viewer)
                ├── audit_log          (append-only)
                ├── idempotency_record (key, endpoint, request_hash, response, status, expires_at)
-               └── policy_chunk       (text + embedding vector, for RAG)
+               ├── refresh_token      (rotation + reuse detection, M3)
+               ├── fx_rate            (from_currency, to_currency, rate, as_of — defined but unpopulated; see §9 Q4)
+               └── policy_document    (uploaded expense-policy PDF)
+                     └── policy_chunk (text + embedding vector, for RAG)
 ```
 
 ### Double-entry invariant
@@ -139,9 +149,10 @@ independently versioned.
 
 ### LLM provider
 
-Deferred. `ai` defines an `LlmClient` port with `complete()` and `complete_vision()`; concrete
-adapters (Gemini, Claude, others) are selected by configuration. The decision is made at M4 when
-extraction accuracy can actually be measured on real invoices, not guessed at now.
+`ai` defines an `LlmClient` port with `complete()` and `complete_vision()`; concrete adapters are
+selected by configuration (`AI_LLM_PROVIDER`, `AI_LLM_MODEL`). The deployed default is
+`anthropic/qwen3.7-plus` via LiteLLM against OpenCode Go's Anthropic-compatible gateway — see §9
+Q1 for how that was decided and why it superseded the original Gemini plan.
 
 ## 6. Security
 
@@ -184,23 +195,37 @@ places where a subtle bug is both most likely and most expensive.
 
 | # | Question | Decide by | Status |
 |---|---|---|---|
-| Q1 | LLM provider and model | **M5** (moved from M4) | Open |
-| Q2 | Object storage — Render disk vs S3-compatible bucket | M4 | **Decided** |
-| Q3 | Async processing — Spring `@Async` vs a real queue | **M5**, from observed latency | Open |
+| Q1 | LLM provider and model | M5 | **Decided** |
+| Q2 | Object storage — Render disk vs S3-compatible bucket | M4 | **Decided**, S3 revisit scheduled for M10 (not yet reached) |
+| Q3 | Async processing — Spring `@Async` vs a real queue | M9 | **Decided** |
 | Q4 | Multi-currency: convert at post time or store native and convert on read | M2 | **Decided** |
 
-**Q1 moved to M5.** The plan was to choose a provider at M4 by running candidates against ten real
-invoices. Measuring that needs the eval harness M5 builds; doing it at M4 would have meant
-hand-grading or guessing, and a guess is exactly what the "decide by measurement" plan was written
-to avoid. M4 ships the `LlmClient` port and a `FakeLlmClient` only — no real adapter is wired.
+**Q1 decided, then superseded.** M5's original candidate, Gemini 3.6 Flash, hit a hard
+20-requests/day free-tier ceiling before the ten-invoice gate could even run. The deployed
+default (`Settings.llm_model`, `apps/ai/app/config.py`) is `anthropic/qwen3.7-plus` via OpenCode
+Go's Anthropic-compatible gateway (`AI_LLM_PROVIDER=litellm`) — a standing change, not a
+one-time substitution, since there is no free-tier Gemini to revert to. `LiteLlmClient` gained an
+`api_base` override and a `supports_native_pdf` flag as part of this switch: non-native-PDF
+providers (every gateway tried except Gemini's own API) render PDF pages to PNG first
+(`apps/ai/app/llm/pdf_to_images.py`) rather than sending the file content-block type Gemini
+accepts natively. Both are provider-agnostic capability, not gateway-specific hacks — switching
+back to a native-PDF provider is a config change (`AI_LLM_MODEL`, `AI_LLM_SUPPORTS_NATIVE_PDF`),
+not a code change. Full rationale and rejected alternatives: `decisions.md`, 2026-07-27.
 
 **Q2 decided at M4: local disk behind a `StorageClient` port.** `LocalDiskStorage` writes under an
 opaque UUID key, outside any web-served directory. An S3 adapter is a new implementation of the
-same port if Render's disk proves insufficient (revisit at M10), with no caller changes. Adding
-MinIO and the AWS SDK to the milestone whose purpose was proving the `api` ↔ `ai` contract would
-have bought nothing that port does not already buy.
+same port if Render's disk proves insufficient, with no caller changes. Adding MinIO and the AWS
+SDK to the milestone whose purpose was proving the `api` ↔ `ai` contract would have bought nothing
+that port does not already buy. **The scheduled M10 revisit has not happened yet** — M10 has not
+started as of this writing, so local disk remains the actual deployed choice and its accepted
+trade-off (not durable across a Render instance replacement) is still live, not yet re-evaluated.
 
-**Q3 stays open; M4 processes synchronously.** The stub returns instantly, so there is no latency to
-design around yet, and the real number first exists at M5. The status lifecycle already models
-`PENDING → PROCESSING → …`, so going asynchronous later is a service-layer change, not a schema
-change.
+**Q3 decided at M9: a durable database-backed queue, not Spring `@Async`.** `document.status`
+already modeled `PENDING → PROCESSING → …`; M9 added `extraction_attempts` and `next_attempt_at`
+columns (V17) plus a partial index on pending work. `DocumentQueuePoller` (`@Scheduled`, default
+5s interval) selects due `PENDING` rows and claims each with a conditional `UPDATE` — concurrent
+pollers can see the same candidate but only one wins the claim — then hands it to
+`DocumentExtractionWorker` for retry-with-backoff dispatch. Chosen over `@Async` because a
+transient `ai` outage must leave uploaded work retryable rather than losing it to a dropped
+in-memory task; the schema was designed at M4 specifically so this became a service-layer change,
+never a schema change.

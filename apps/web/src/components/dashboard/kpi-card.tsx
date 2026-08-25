@@ -13,15 +13,16 @@ function totalFor(totals: CurrencyTotal[], currency: string): number {
   return totals.find((t) => t.currency === currency)?.amountMinor ?? 0;
 }
 
-/** 90×30 mini trend line from the trailing months of `monthlySeries`, in the KPI card's own
- * currency — a real (if coarse) signal, not a decorative fabrication. */
-function sparklinePoints(series: MonthlySpend[]): string {
-  if (series.length === 0) {
+/** 90×30 mini trend line from one currency's own months — a real (if coarse) signal for that
+ * currency specifically, not a decorative fabrication and not another currency's history
+ * plotted under the wrong label. Callers pass the already-filtered series for their section. */
+function sparklinePoints(seriesInCurrency: MonthlySpend[]): string {
+  if (seriesInCurrency.length === 0) {
     return "";
   }
-  const max = Math.max(...series.map((m) => m.amountMinor), 1);
-  const stepX = 160 / Math.max(series.length - 1, 1);
-  return series
+  const max = Math.max(...seriesInCurrency.map((m) => m.amountMinor), 1);
+  const stepX = 160 / Math.max(seriesInCurrency.length - 1, 1);
+  return seriesInCurrency
     .map((m, i) => {
       const x = i * stepX;
       const y = 36 - (m.amountMinor / max) * 32;
@@ -51,7 +52,8 @@ export function KpiCard({ totalsThisMonth, totalsLastMonth, monthlySeries }: Kpi
           ? Math.round(((total.amountMinor - lastMonthAmount) / lastMonthAmount) * 100)
           : null;
         const isUp = (deltaPct ?? 0) >= 0;
-        const points = sparklinePoints(monthlySeries);
+        const seriesInCurrency = monthlySeries.filter((m) => m.currency === total.currency);
+        const points = sparklinePoints(seriesInCurrency);
 
         return (
           <div key={total.currency} className={index > 0 ? "mt-5 border-t border-border pt-5" : ""}>
@@ -67,7 +69,7 @@ export function KpiCard({ totalsThisMonth, totalsLastMonth, monthlySeries }: Kpi
                   preserveAspectRatio="none"
                   className="ml-3 shrink-0"
                   role="img"
-                  aria-label={`Spend trend over the trailing ${monthlySeries.length} months`}
+                  aria-label={`Spend trend over the trailing ${seriesInCurrency.length} months`}
                 >
                   <polyline
                     points={points}

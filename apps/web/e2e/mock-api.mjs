@@ -17,27 +17,70 @@ const CATEGORIES = [
   { id: "cat-3", name: "Office supplies" },
 ];
 
-const DASHBOARD_SUMMARY = {
+const DASHBOARD_SUMMARY_SEED = {
   totalsThisMonth: [{ currency: "EUR", amountMinor: 8421300 }],
   totalsLastMonth: [{ currency: "EUR", amountMinor: 9569000 }],
   categoryBreakdown: [
-    { categoryId: "cat-1", categoryName: "Software", amountMinor: 4200000 },
-    { categoryId: "cat-2", categoryName: "Travel", amountMinor: 2800000 },
-    { categoryId: "cat-3", categoryName: "Office supplies", amountMinor: 1421300 },
+    { categoryId: "cat-1", categoryName: "Software", currency: "EUR", amountMinor: 4200000 },
+    { categoryId: "cat-2", categoryName: "Travel", currency: "EUR", amountMinor: 2800000 },
+    { categoryId: "cat-3", categoryName: "Office supplies", currency: "EUR", amountMinor: 1421300 },
   ],
   monthlySeries: [
-    { month: "2026-02", amountMinor: 6000000 },
-    { month: "2026-03", amountMinor: 7200000 },
-    { month: "2026-04", amountMinor: 5100000 },
-    { month: "2026-05", amountMinor: 8900000 },
-    { month: "2026-06", amountMinor: 9569000 },
-    { month: "2026-07", amountMinor: 8421300 },
+    { month: "2026-02", currency: "EUR", amountMinor: 6000000 },
+    { month: "2026-03", currency: "EUR", amountMinor: 7200000 },
+    { month: "2026-04", currency: "EUR", amountMinor: 5100000 },
+    { month: "2026-05", currency: "EUR", amountMinor: 8900000 },
+    { month: "2026-06", currency: "EUR", amountMinor: 9569000 },
+    { month: "2026-07", currency: "EUR", amountMinor: 8421300 },
   ],
   reviewQueueCount: 3,
   documentsProcessedToday: 17,
   alertCount: 2,
   recentAlerts: [],
 };
+
+// A second currency (TRY) at every level a real org's mixed-currency spend would touch: this
+// month's and last month's totals, one category split across both currencies, and one month
+// where only one currency has spend (proving the other renders an explicit zero, not a gap).
+// M9.8 T4's fixture -- exercised via POST /api/v1/test/set-dashboard-summary, never the default.
+const DASHBOARD_SUMMARY_TWO_CURRENCY = {
+  totalsThisMonth: [
+    { currency: "EUR", amountMinor: 8421300 },
+    { currency: "TRY", amountMinor: 4500000 },
+  ],
+  totalsLastMonth: [
+    { currency: "EUR", amountMinor: 9569000 },
+    { currency: "TRY", amountMinor: 3800000 },
+  ],
+  categoryBreakdown: [
+    { categoryId: "cat-1", categoryName: "Software", currency: "EUR", amountMinor: 4200000 },
+    { categoryId: "cat-2", categoryName: "Travel", currency: "EUR", amountMinor: 2800000 },
+    { categoryId: "cat-3", categoryName: "Office supplies", currency: "EUR", amountMinor: 1421300 },
+    { categoryId: "cat-1", categoryName: "Software", currency: "TRY", amountMinor: 3000000 },
+    { categoryId: "cat-2", categoryName: "Travel", currency: "TRY", amountMinor: 1500000 },
+  ],
+  monthlySeries: [
+    { month: "2026-02", currency: "EUR", amountMinor: 6000000 },
+    { month: "2026-03", currency: "EUR", amountMinor: 7200000 },
+    { month: "2026-04", currency: "EUR", amountMinor: 5100000 },
+    { month: "2026-05", currency: "EUR", amountMinor: 8900000 },
+    { month: "2026-06", currency: "EUR", amountMinor: 9569000 },
+    { month: "2026-07", currency: "EUR", amountMinor: 8421300 },
+    // TRY has no spend in Feb -- an explicit zero row, not a missing month.
+    { month: "2026-02", currency: "TRY", amountMinor: 0 },
+    { month: "2026-03", currency: "TRY", amountMinor: 2100000 },
+    { month: "2026-04", currency: "TRY", amountMinor: 1900000 },
+    { month: "2026-05", currency: "TRY", amountMinor: 3300000 },
+    { month: "2026-06", currency: "TRY", amountMinor: 3800000 },
+    { month: "2026-07", currency: "TRY", amountMinor: 4500000 },
+  ],
+  reviewQueueCount: 3,
+  documentsProcessedToday: 17,
+  alertCount: 2,
+  recentAlerts: [],
+};
+
+let DASHBOARD_SUMMARY = JSON.parse(JSON.stringify(DASHBOARD_SUMMARY_SEED));
 
 const ALERTS_SEED = [
   {
@@ -581,6 +624,27 @@ function handleDashboardSummary(req, res, isAuthed) {
   send(res, 200, DASHBOARD_SUMMARY);
 }
 
+// Test-only: lets a spec swap in a named fixture (currently only "two-currency") before it
+// navigates to the dashboard, then hand it back with reset-dashboard-summary -- same pattern as
+// reset-budgets/reset-alerts, so other specs that never call this keep seeing the default seed.
+function handleSetDashboardSummary(req, res) {
+  readBody(req)
+    .then((body) => {
+      const { fixture } = JSON.parse(body.toString("utf-8"));
+      if (fixture === "two-currency") {
+        DASHBOARD_SUMMARY = JSON.parse(JSON.stringify(DASHBOARD_SUMMARY_TWO_CURRENCY));
+        return send(res, 200, DASHBOARD_SUMMARY);
+      }
+      return send(res, 400, { message: `Unknown dashboard summary fixture: ${fixture}` });
+    })
+    .catch(() => send(res, 400, { message: "Invalid request body." }));
+}
+
+function handleResetDashboardSummary(req, res) {
+  DASHBOARD_SUMMARY = JSON.parse(JSON.stringify(DASHBOARD_SUMMARY_SEED));
+  send(res, 200, DASHBOARD_SUMMARY);
+}
+
 function parseExpenseSort(sort) {
   let sortField = "date";
   let sortDir = "desc";
@@ -962,6 +1026,12 @@ const server = createServer((req, res) => {
   }
   if (url.pathname === "/api/v1/test/reset-budgets" && req.method === "POST") {
     return handleResetBudgets(req, res);
+  }
+  if (url.pathname === "/api/v1/test/set-dashboard-summary" && req.method === "POST") {
+    return handleSetDashboardSummary(req, res);
+  }
+  if (url.pathname === "/api/v1/test/reset-dashboard-summary" && req.method === "POST") {
+    return handleResetDashboardSummary(req, res);
   }
   if (url.pathname === "/api/v1/alerts" && req.method === "GET") {
     return handleAlertsList(req, res, isAuthed, url);

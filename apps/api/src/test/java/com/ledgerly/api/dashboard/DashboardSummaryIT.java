@@ -111,7 +111,9 @@ class DashboardSummaryIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.totalsThisMonth.length()").value(0))
         .andExpect(jsonPath("$.reviewQueueCount").value(0))
         .andExpect(jsonPath("$.documentsProcessedToday").value(0))
-        .andExpect(jsonPath("$.monthlySeries.length()").value(6));
+        // No currency has ever posted, so there is no series to zero-fill -- an empty list, not
+        // a 6-month series with a currency-less zero row.
+        .andExpect(jsonPath("$.monthlySeries.length()").value(0));
   }
 
   @Test
@@ -132,14 +134,44 @@ class DashboardSummaryIT extends AbstractPostgresIT {
   }
 
   @Test
-  void monthlySeriesIsContiguousAndIncludesZeroSpendMonths() throws Exception {
+  void monthlySeriesIsContiguousAndIncludesZeroSpendMonthsForACurrencyThatHasEverPosted()
+      throws Exception {
     String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    insertPostedExpense(org, categoryId, "EUR", 4200);
 
     mockMvc
         .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.monthlySeries.length()").value(6))
-        .andExpect(jsonPath("$.monthlySeries[5].amountMinor").value(0));
+        .andExpect(jsonPath("$.monthlySeries[0].currency").value("EUR"))
+        .andExpect(jsonPath("$.monthlySeries[0].amountMinor").value(0))
+        .andExpect(jsonPath("$.monthlySeries[5].currency").value("EUR"))
+        .andExpect(jsonPath("$.monthlySeries[5].amountMinor").value(4200));
+  }
+
+  @Test
+  void monthlySeriesGivesEachCurrencyItsOwnCompleteSeriesRatherThanSummingThem() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    insertPostedExpense(org, categoryId, "EUR", 1000);
+    insertPostedExpense(org, categoryId, "USD", 2000);
+
+    mockMvc
+        .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        // 2 currencies * 6 months = 12 points, never one summed point per month.
+        .andExpect(jsonPath("$.monthlySeries.length()").value(12))
+        .andExpect(
+            jsonPath("$.monthlySeries[?(@.currency == 'EUR' && @.month == '" + currentMonth()
+                    + "')].amountMinor")
+                .value(1000))
+        .andExpect(
+            jsonPath("$.monthlySeries[?(@.currency == 'USD' && @.month == '" + currentMonth()
+                    + "')].amountMinor")
+                .value(2000));
   }
 
   @Test
@@ -156,6 +188,39 @@ class DashboardSummaryIT extends AbstractPostgresIT {
         .andExpect(jsonPath("$.totalsThisMonth.length()").value(2))
         .andExpect(jsonPath("$.totalsThisMonth[?(@.currency == 'EUR')].amountMinor").value(1000))
         .andExpect(jsonPath("$.totalsThisMonth[?(@.currency == 'USD')].amountMinor").value(2000));
+  }
+
+  @Test
+  void categoryBreakdownReturnsOneRowPerCurrencyRatherThanSummingThem() throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    insertPostedExpense(org, categoryId, "TRY", 45000);
+    insertPostedExpense(org, categoryId, "USD", 2000);
+
+    mockMvc
+        .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.categoryBreakdown.length()").value(2))
+        .andExpect(
+            jsonPath("$.categoryBreakdown[?(@.currency == 'TRY')].amountMinor").value(45000))
+        .andExpect(jsonPath("$.categoryBreakdown[?(@.currency == 'USD')].amountMinor").value(2000));
+  }
+
+  @Test
+  void categoryBreakdownForASingleCurrencyOrgIsUnchangedFromBeforeCurrencyWasAdded()
+      throws Exception {
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    UUID categoryId = createCategory(org);
+    insertPostedExpense(org, categoryId, "EUR", 7500);
+
+    mockMvc
+        .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.categoryBreakdown.length()").value(1))
+        .andExpect(jsonPath("$.categoryBreakdown[0].currency").value("EUR"))
+        .andExpect(jsonPath("$.categoryBreakdown[0].amountMinor").value(7500));
   }
 
   @Test
@@ -176,6 +241,51 @@ class DashboardSummaryIT extends AbstractPostgresIT {
   @Test
   void noTokenReturns401() throws Exception {
     mockMvc.perform(get("/api/v1/dashboard/summary")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void documentsProcessedTodayCountsEveryTerminalStatusIncludingExtractionNeedsReview()
+      throws Exception {
+    // V21 renamed document.status = 'NEEDS_REVIEW' to 'EXTRACTION_NEEDS_REVIEW' and dropped the
+    // old value from the CHECK constraint. A query still filtering on the dead literal would
+    // silently undercount every document routed to extraction review.
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    insertDocumentWithStatus(org, "EXTRACTED");
+    insertDocumentWithStatus(org, "EXTRACTION_NEEDS_REVIEW");
+    insertDocumentWithStatus(org, "FAILED");
+    // Non-terminal statuses must not count as "processed".
+    insertDocumentWithStatus(org, "PENDING");
+    insertDocumentWithStatus(org, "PROCESSING");
+    // Yesterday's document, terminal but out of the "today" window.
+    insertDocumentWithStatusAt(
+        org, "EXTRACTED", ZonedDateTime.now(ZoneOffset.UTC).minusDays(1));
+
+    mockMvc
+        .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.documentsProcessedToday").value(3));
+  }
+
+  private void insertDocumentWithStatus(UUID orgId, String status) {
+    insertDocumentWithStatusAt(orgId, status, ZonedDateTime.now(ZoneOffset.UTC));
+  }
+
+  private void insertDocumentWithStatusAt(UUID orgId, String status, ZonedDateTime updatedAt) {
+    UUID userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM app_user WHERE organization_id = ?", UUID.class, orgId);
+    jdbcTemplate.update(
+        "INSERT INTO document (id, organization_id, uploaded_by, filename, content_type, "
+            + "size_bytes, storage_key, content_hash, status, updated_at) "
+            + "VALUES (?, ?, ?, 'invoice.pdf', 'application/pdf', 100, ?, ?, ?, ?)",
+        UUID.randomUUID(),
+        orgId,
+        userId,
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(),
+        status,
+        java.sql.Timestamp.from(updatedAt.toInstant()));
   }
 
   private void insertPostedExpense(UUID orgId, UUID categoryId, String currency, long amountMinor) {
@@ -268,5 +378,9 @@ class DashboardSummaryIT extends AbstractPostgresIT {
             "test-only-secret-not-for-production-use-0123456789".getBytes(StandardCharsets.UTF_8));
     var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(accessToken).getPayload();
     return UUID.fromString(claims.get("org", String.class));
+  }
+
+  private String currentMonth() {
+    return java.time.YearMonth.now(java.time.ZoneOffset.UTC).toString();
   }
 }
