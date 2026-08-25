@@ -1,4 +1,4 @@
-import { getDashboardSummary, resolveDisplayCurrency } from "@/lib/dashboard";
+import { getDashboardSummary } from "@/lib/dashboard";
 import { listExpenses } from "@/lib/expenses";
 import { listCategories, categoryNameLookup } from "@/lib/categories";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -26,8 +26,7 @@ export default async function DashboardPage() {
   }
 
   const categoryName = categoryNameLookup(categories);
-  const displayCurrency = resolveDisplayCurrency(summary);
-  const hasSpendData = displayCurrency !== undefined;
+  const hasSpendData = summary.totalsThisMonth.length > 0 || summary.totalsLastMonth.length > 0;
 
   return (
     <div className="flex max-w-[1080px] flex-col gap-5 p-6 md:p-8">
@@ -44,14 +43,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 shell:grid-cols-2">
-        <CategoryBreakdown
-          categories={hasSpendData ? summary.categoryBreakdown : []}
-          currency={displayCurrency ?? ""}
-        />
-        <SpendOverTimeChart
-          series={hasSpendData ? summary.monthlySeries : []}
-          currency={displayCurrency ?? ""}
-        />
+        <CategoryBreakdown categories={hasSpendData ? summary.categoryBreakdown : []} />
+        <SpendOverTimeChart series={hasSpendData ? summary.monthlySeries : []} />
       </div>
 
       <RecentExpenses expenses={recentExpenses} categoryName={categoryName} />

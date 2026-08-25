@@ -26,6 +26,30 @@ describe("KpiCard", () => {
     expect(screen.getByText("$500.00")).toBeInTheDocument();
   });
 
+  it("gives each currency's sparkline only that currency's own months, not another's history", () => {
+    render(
+      <KpiCard
+        totalsThisMonth={[
+          { currency: "EUR", amountMinor: 1000 },
+          { currency: "USD", amountMinor: 2000 },
+        ]}
+        totalsLastMonth={[]}
+        monthlySeries={[
+          { month: "2026-06", currency: "EUR", amountMinor: 500 },
+          { month: "2026-07", currency: "EUR", amountMinor: 1000 },
+          { month: "2026-06", currency: "USD", amountMinor: 100 },
+          { month: "2026-07", currency: "USD", amountMinor: 200 },
+          { month: "2026-05", currency: "USD", amountMinor: 300 },
+        ]}
+      />,
+    );
+
+    const eurTrend = screen.getByLabelText("Spend trend over the trailing 2 months");
+    const usdTrend = screen.getByLabelText("Spend trend over the trailing 3 months");
+    expect(eurTrend).toBeInTheDocument();
+    expect(usdTrend).toBeInTheDocument();
+  });
+
   it("shows an up arrow and green delta when spend increased vs last month", () => {
     render(
       <KpiCard

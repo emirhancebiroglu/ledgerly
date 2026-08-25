@@ -1,50 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { resolveDisplayCurrency, type DashboardSummary } from "@/lib/dashboard";
+import { groupByCurrency } from "@/lib/dashboard";
 
-function summary(overrides: Partial<DashboardSummary>): DashboardSummary {
-  return {
-    totalsThisMonth: [],
-    totalsLastMonth: [],
-    categoryBreakdown: [],
-    monthlySeries: [],
-    reviewQueueCount: 0,
-    documentsProcessedToday: 0,
-    alertCount: 0,
-    recentAlerts: [],
-    ...overrides,
-  };
-}
-
-describe("resolveDisplayCurrency", () => {
-  it("prefers this month's currency when present", () => {
-    const result = resolveDisplayCurrency(
-      summary({
-        totalsThisMonth: [{ currency: "EUR", amountMinor: 100 }],
-        totalsLastMonth: [{ currency: "USD", amountMinor: 100 }],
-      }),
-    );
-
-    expect(result).toBe("EUR");
+describe("groupByCurrency", () => {
+  it("returns an empty list for an empty input", () => {
+    expect(groupByCurrency([])).toEqual([]);
   });
 
-  it("falls back to last month's currency when this month has no spend yet", () => {
-    // The exact edge case a naive `?? "USD"` default gets wrong: an org with a real EUR history
-    // but nothing posted yet this month would otherwise have its category breakdown and spend
-    // chart mislabeled in a currency that never appeared anywhere in its data.
-    const result = resolveDisplayCurrency(
-      summary({
-        totalsThisMonth: [],
-        totalsLastMonth: [{ currency: "EUR", amountMinor: 500000 }],
-        categoryBreakdown: [{ categoryId: "1", categoryName: "Software", amountMinor: 500000 }],
-      }),
-    );
+  it("returns a single section for a single-currency list", () => {
+    const rows = [
+      { currency: "EUR", amountMinor: 100 },
+      { currency: "EUR", amountMinor: 200 },
+    ];
 
-    expect(result).toBe("EUR");
+    expect(groupByCurrency(rows)).toEqual([["EUR", rows]]);
   });
 
-  it("returns undefined, not a fabricated default, when neither window has any data", () => {
-    const result = resolveDisplayCurrency(summary({}));
+  it("splits rows into one array per currency, preserving each row's own order", () => {
+    const eur1 = { currency: "EUR", amountMinor: 100 };
+    const usd1 = { currency: "USD", amountMinor: 200 };
+    const eur2 = { currency: "EUR", amountMinor: 300 };
 
-    expect(result).toBeUndefined();
+    const result = groupByCurrency([eur1, usd1, eur2]);
+
+    expect(result).toEqual([
+      ["EUR", [eur1, eur2]],
+      ["USD", [usd1]],
+    ]);
+  });
+
+  it("sorts sections by currency code for a deterministic render order", () => {
+    const rows = [
+      { currency: "USD", amountMinor: 1 },
+      { currency: "TRY", amountMinor: 2 },
+      { currency: "EUR", amountMinor: 3 },
+    ];
+
+    const result = groupByCurrency(rows);
+
+    expect(result.map(([currency]) => currency)).toEqual(["EUR", "TRY", "USD"]);
   });
 });
