@@ -30,13 +30,26 @@ ledgerly:
     jwt-secret: ${JWT_SECRET}
     access-token-ttl-minutes: ${JWT_ACCESS_TOKEN_TTL_MINUTES:15}
     refresh-token-ttl-days: ${JWT_REFRESH_TOKEN_TTL_DAYS:30}
+  cors:
+    # Comma-separated. Defaults to local dev's web origin; a deployed environment overrides
+    # this to the real web origin(s) — see CorsConfig.
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   rate-limit:
     auth:
       max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:5}
       window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:60}
   storage:
     # Deliberately outside any web-served directory; nothing serves static files from disk.
+    # Only read on non-"prod" profiles (LocalDiskStorage's own @Profile), so it's harmless that
+    # this key has no R2 equivalent below.
     root: ${STORAGE_ROOT:./var/storage}
+    r2:
+      # Only read on the "prod" profile (R2ClientConfig/R2StorageClient's own @Profile) — no
+      # default, since a real value only exists once an R2 bucket has been provisioned.
+      account-id: ${R2_ACCOUNT_ID:}
+      access-key-id: ${R2_ACCESS_KEY_ID:}
+      secret-access-key: ${R2_SECRET_ACCESS_KEY:}
+      bucket: ${R2_BUCKET:}
   document:
     max-bytes: ${DOCUMENT_MAX_BYTES:10485760}
     queue:
@@ -84,6 +97,15 @@ logging:
   structured:
     format:
       console: logstash
+
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:local}
+  # No request headers/IP/cookies — an exception's HTTP context can carry a bearer token or a
+  # session cookie, and this is the same PII bar M9's structured-logging review already set.
+  send-default-pii: false
+  # This service never renders a UI; Sentry's session-replay/screenshot features don't apply.
+  max-request-body-size: none
 
 management:
   health:
