@@ -6,6 +6,13 @@ on:
   pull_request:
 
 jobs:
+  env-example:
+    name: .env.example matches docker-compose.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - run: bash scripts/check-env-example.sh
+
   api:
     name: api (Spring Boot)
     runs-on: ubuntu-latest
@@ -99,4 +106,27 @@ jobs:
         env:
           # All Maven POMs must be present locally before offline mode; otherwise Trivy would
           # silently omit unresolved transitive dependencies from the security result.
+          TRIVY_OFFLINE_SCAN: "true"
+      # T7: a separate step (not combined with the vuln scan above) — secret findings have
+      # their own severity scale and skip-dirs needs, and mixing them into one report makes
+      # either kind of finding easier to miss. Excludes invoices/ (real-samples/ is gitignored
+      # personal financial documents; anything caught by mistake here isn't reachable to scan
+      # anyway, this is belt-and-braces) and *.log (scratch output, gitignored, never meant to
+      # be scanned as source).
+      - name: scan for committed secrets
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: secret
+          version: v0.72.0
+          exit-code: '1'
+          format: table
+          timeout: 10m
+          skip-dirs: .git,apps/api/target,apps/ai/.venv,apps/web/node_modules,invoices
+        env:
+          # `--scanners secret` still runs full Maven/pip/npm dependency analysis before
+          # reporting only secret findings — this reuses the already-warmed ~/.m2 cache from
+          # the vuln scan step above (same job) rather than re-triggering Maven Central and
+          # hitting the same 429 that step's own warm-cache step exists to avoid.
           TRIVY_OFFLINE_SCAN: "true"
