@@ -34,6 +34,7 @@
     <spring-framework.version>6.2.19</spring-framework.version>
     <spring-data-bom.version>2025.0.13</spring-data-bom.version>
     <aws-sdk.version>2.46.18</aws-sdk.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
     <sentry.version>8.53.0</sentry.version>
   </properties>
 
@@ -168,6 +169,21 @@
         <version>${testcontainers.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- Pulled in transitively by the AWS SDK's apache5-client (s3 -> httpclient5 -> here),
+           which still resolves 5.3.6: CVE-2026-54399 and CVE-2026-54428, both HIGH DoS via
+           oversized headers. Managed forward to the first fixed release rather than pinned
+           per-dependency, so both core5 artifacts move together and the SDK's own upgrade
+           does not silently drag either back down. -->
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5-h2</artifactId>
+        <version>${httpcore5.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
