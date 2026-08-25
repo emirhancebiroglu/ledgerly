@@ -33,6 +33,7 @@
     <micrometer.version>1.15.12</micrometer.version>
     <spring-framework.version>6.2.19</spring-framework.version>
     <spring-data-bom.version>2025.0.13</spring-data-bom.version>
+    <aws-sdk.version>2.46.18</aws-sdk.version>
   </properties>
 
   <dependencies>
@@ -139,6 +140,14 @@
       <groupId>org.apache.pdfbox</groupId>
       <artifactId>pdfbox</artifactId>
       <version>${pdfbox.version}</version>
+    </dependency>
+    <!-- R2 is S3-compatible; this is the "prod" profile's StorageClient backend (T2). Pinned
+         directly rather than via the awssdk BOM since this is the only AWS SDK module in use —
+         import the BOM instead if a second one is ever added, to avoid transitive version skew. -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${aws-sdk.version}</version>
     </dependency>
   </dependencies>
 

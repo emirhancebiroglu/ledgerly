@@ -7,9 +7,9 @@ import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,17 +20,14 @@ import org.springframework.stereotype.Component;
  * <p>Keys are minted here as a bare UUID, so two stores of byte-identical content still get
  * distinct keys: a document's identity is the upload event, not its content, and de-duplicating
  * across organizations would let one tenant's key collide with another's.
+ *
+ * <p>Active everywhere except the {@code prod} profile (see {@link R2StorageClient}) — a
+ * platform's ephemeral/free-tier disk is fine for local dev and CI, not for a deployment a
+ * stranger's uploaded invoice needs to survive a restart.
  */
 @Component
+@Profile("!prod")
 public class LocalDiskStorage implements StorageClient {
-
-  /**
-   * A key is exactly a canonical lower-case UUID. Anything else — {@code ../}, an absolute path, a
-   * separator, a null byte — fails this match, which is why validation can happen without ever
-   * touching the filesystem.
-   */
-  private static final Pattern KEY_PATTERN =
-      Pattern.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
 
   private final Path root;
   private final Supplier<String> keySupplier;
@@ -117,7 +114,7 @@ public class LocalDiskStorage implements StorageClient {
    * the pattern cannot silently become a traversal bug.
    */
   private Path resolve(String key) {
-    if (key == null || !KEY_PATTERN.matcher(key).matches()) {
+    if (!StorageKeys.isValidShape(key)) {
       throw new InvalidStorageKeyException("Malformed storage key");
     }
     Path resolved = root.resolve(key.substring(0, 2)).resolve(key).normalize();
