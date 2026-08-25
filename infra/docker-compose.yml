@@ -46,6 +46,8 @@ services:
       AI_BASE_URL: http://ai:8000
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN must be set}
       LEDGERLY_RATE_LIMIT_DOCUMENT_UPLOAD_MAX_REQUESTS: ${LOADTEST_DOCUMENT_QUOTA:-30}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-local}
     volumes:
       - api-storage:/app/var/storage
 
@@ -66,16 +68,30 @@ services:
       AI_LLM_API_KEY: ${AI_LLM_API_KEY:?AI_LLM_API_KEY must be set}
       AI_EMBEDDING_PROVIDER: ${AI_EMBEDDING_PROVIDER:-litellm}
       AI_EMBEDDING_API_KEY: ${AI_EMBEDDING_API_KEY:?AI_EMBEDDING_API_KEY must be set}
-    # AI_LLM_MODEL / AI_LLM_API_BASE / AI_LLM_SUPPORTS_NATIVE_PDF are deliberately not set here —
-    # Settings' own defaults (app/config.py) are the single source of truth, so this file cannot
-    # drift out of sync with them the way it did when the Q1 provider changed mid-milestone. To
-    # override any of them for a deployment, add an env_file or pass -e on the CLI; do not hardcode
-    # a duplicate default in this compose file again.
+      AI_SENTRY_DSN: ${AI_SENTRY_DSN:-}
+      AI_SENTRY_ENVIRONMENT: ${AI_SENTRY_ENVIRONMENT:-local}
+    # AI_LLM_MODEL / AI_LLM_API_BASE / AI_LLM_SUPPORTS_NATIVE_PDF / AI_EMBEDDING_MODEL /
+    # AI_EMBEDDING_API_BASE / AI_EMBEDDING_DIMENSIONS are deliberately not set here — Settings'
+    # own defaults (app/config.py) are the single source of truth, so this file cannot drift out
+    # of sync with them the way it did when the Q1 provider changed mid-milestone. To override
+    # any of them for a deployment, add an env_file or pass -e on the CLI; do not hardcode a
+    # duplicate default in this compose file again.
+    #
+    # AI_EMBEDDING_API_KEY above must be a real key for whatever embedding_model's own provider
+    # is (Voyage AI by default, see app/config.py) — it is NOT the same provider as
+    # AI_LLM_API_KEY's OpenCode Go gateway, which cannot serve embedding calls at all.
 
   web:
     build:
       context: ../apps/web
       dockerfile: Dockerfile
+      # NEXT_PUBLIC_* vars are inlined at build time (into the browser bundle, or — for
+      # metadataBase in layout.tsx — into the statically rendered <head>), so each one needs
+      # to be a build arg here in addition to the runtime `environment:` entry below.
+      args:
+        NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+        NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-local}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -84,6 +100,9 @@ services:
       # Compose DNS name; localhost would point back to the web container, not the host API port.
       API_URL: ${API_URL:-http://api:8080}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN:-}
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: ${NEXT_PUBLIC_SENTRY_ENVIRONMENT:-local}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
 
 volumes:
   postgres-data:
