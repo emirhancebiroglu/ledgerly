@@ -178,6 +178,51 @@ class DashboardSummaryIT extends AbstractPostgresIT {
     mockMvc.perform(get("/api/v1/dashboard/summary")).andExpect(status().isUnauthorized());
   }
 
+  @Test
+  void documentsProcessedTodayCountsEveryTerminalStatusIncludingExtractionNeedsReview()
+      throws Exception {
+    // V21 renamed document.status = 'NEEDS_REVIEW' to 'EXTRACTION_NEEDS_REVIEW' and dropped the
+    // old value from the CHECK constraint. A query still filtering on the dead literal would
+    // silently undercount every document routed to extraction review.
+    String token = registerAndGetAccessToken();
+    UUID org = organizationIdOf(token);
+    insertDocumentWithStatus(org, "EXTRACTED");
+    insertDocumentWithStatus(org, "EXTRACTION_NEEDS_REVIEW");
+    insertDocumentWithStatus(org, "FAILED");
+    // Non-terminal statuses must not count as "processed".
+    insertDocumentWithStatus(org, "PENDING");
+    insertDocumentWithStatus(org, "PROCESSING");
+    // Yesterday's document, terminal but out of the "today" window.
+    insertDocumentWithStatusAt(
+        org, "EXTRACTED", ZonedDateTime.now(ZoneOffset.UTC).minusDays(1));
+
+    mockMvc
+        .perform(get("/api/v1/dashboard/summary").header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.documentsProcessedToday").value(3));
+  }
+
+  private void insertDocumentWithStatus(UUID orgId, String status) {
+    insertDocumentWithStatusAt(orgId, status, ZonedDateTime.now(ZoneOffset.UTC));
+  }
+
+  private void insertDocumentWithStatusAt(UUID orgId, String status, ZonedDateTime updatedAt) {
+    UUID userId =
+        jdbcTemplate.queryForObject(
+            "SELECT id FROM app_user WHERE organization_id = ?", UUID.class, orgId);
+    jdbcTemplate.update(
+        "INSERT INTO document (id, organization_id, uploaded_by, filename, content_type, "
+            + "size_bytes, storage_key, content_hash, status, updated_at) "
+            + "VALUES (?, ?, ?, 'invoice.pdf', 'application/pdf', 100, ?, ?, ?, ?)",
+        UUID.randomUUID(),
+        orgId,
+        userId,
+        UUID.randomUUID().toString(),
+        UUID.randomUUID().toString(),
+        status,
+        java.sql.Timestamp.from(updatedAt.toInstant()));
+  }
+
   private void insertPostedExpense(UUID orgId, UUID categoryId, String currency, long amountMinor) {
     insertExpense(orgId, categoryId, currency, amountMinor, "POSTED");
   }

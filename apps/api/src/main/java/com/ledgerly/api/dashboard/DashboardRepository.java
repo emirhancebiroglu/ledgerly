@@ -1,5 +1,7 @@
 package com.ledgerly.api.dashboard;
 
+import com.ledgerly.api.document.DocumentStatus;
+import com.ledgerly.api.expense.ExpenseStatus;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -103,28 +105,41 @@ public class DashboardRepository {
     return series;
   }
 
-  public long countByStatus(UUID organizationId, String status) {
+  public long countByStatus(UUID organizationId, ExpenseStatus status) {
     Long count =
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM expense WHERE organization_id = ? AND status = ?",
             Long.class,
             organizationId,
-            status);
+            status.name());
     return count == null ? 0 : count;
   }
 
-  /** Documents that reached a terminal status ({@code EXTRACTED}/{@code NEEDS_REVIEW}/{@code
-   * FAILED}) since {@code since}. */
+  /** Documents that reached one of {@code DocumentStatus}'s terminal statuses since {@code
+   * since}. Built from the enum rather than a hand-written literal list so a future rename (as
+   * V21 did for {@code NEEDS_REVIEW} -> {@code EXTRACTION_NEEDS_REVIEW}) cannot leave this query
+   * silently counting against a status the schema no longer accepts. */
   public long documentsProcessedSince(UUID organizationId, LocalDate since) {
+    List<String> terminalStatuses =
+        java.util.Arrays.stream(DocumentStatus.values())
+            .filter(DocumentStatus::isTerminal)
+            .map(Enum::name)
+            .toList();
+    String placeholders = String.join(", ", java.util.Collections.nCopies(terminalStatuses.size(), "?"));
+    Object[] args =
+        java.util.stream.Stream.concat(
+                java.util.stream.Stream.of(organizationId),
+                java.util.stream.Stream.concat(
+                    terminalStatuses.stream(), java.util.stream.Stream.of(startOfDayUtc(since))))
+            .toArray();
     Long count =
         jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM document "
                 + "WHERE organization_id = ? "
-                + "AND status IN ('EXTRACTED', 'NEEDS_REVIEW', 'FAILED') "
+                + "AND status IN (" + placeholders + ") "
                 + "AND updated_at >= ?",
             Long.class,
-            organizationId,
-            startOfDayUtc(since));
+            args);
     return count == null ? 0 : count;
   }
 
