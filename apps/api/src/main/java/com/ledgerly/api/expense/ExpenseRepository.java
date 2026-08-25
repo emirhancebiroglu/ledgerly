@@ -72,6 +72,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
   List<Expense> findByOrganizationId(UUID organizationId, Pageable pageable);
 
+  long countByOrganizationId(UUID organizationId);
+
   List<Expense> findByOrganizationIdAndStatus(
       UUID organizationId, ExpenseStatus status, Pageable pageable);
 
