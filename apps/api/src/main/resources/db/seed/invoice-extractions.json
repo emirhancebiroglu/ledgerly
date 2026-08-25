@@ -1,0 +1,776 @@
+{
+  "version": 1,
+  "recordedAt": "2026-08-25",
+  "extractionModel": "anthropic/qwen3.7-plus",
+  "invoices": [
+    {
+      "sourcePdf": "pdfs/invoices/boardroom_bistro_2026-06-05.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Client dinner — party of 4",
+            "amount_minor": 18500
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "BOARDROOM BISTRO",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "c603b6cb-1e39-4fbf-a30c-be99450bd23b",
+        "total_minor": 18500,
+        "document_date": "2026-06-05",
+        "invoice_number": "BB-2026-0605"
+      },
+      "categorization": {
+        "category": "Meals & Entertainment",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 18500,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/boardroom_bistro_2026-06-12.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Client dinner — party of 4",
+            "amount_minor": 21000
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "BOARDROOM BISTRO",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "3f9f85c7-78ec-48bb-bfcd-571f4d5c005a",
+        "total_minor": 21000,
+        "document_date": "2026-06-12",
+        "invoice_number": "BB-2026-0612"
+      },
+      "categorization": {
+        "category": "Meals & Entertainment",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 21000,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/boardroom_bistro_2026-06-19.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Client dinner — party of 4",
+            "amount_minor": 16500
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "BOARDROOM BISTRO",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "a93cc960-ae0b-4e23-8568-373622e851e0",
+        "total_minor": 16500,
+        "document_date": "2026-06-19",
+        "invoice_number": "BB-2026-0619"
+      },
+      "categorization": {
+        "category": "Meals & Entertainment",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 16500,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/boardroom_bistro_2026-06-26.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Client dinner — party of 4",
+            "amount_minor": 19800
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "BOARDROOM BISTRO",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "125266ff-6a1f-4768-bd60-9a36fb7c2ef0",
+        "total_minor": 19800,
+        "document_date": "2026-06-26",
+        "invoice_number": "BB-2026-0626"
+      },
+      "categorization": {
+        "category": "Meals & Entertainment",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 19800,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/cloudhost_2026-03.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Cloud hosting — Standard tier",
+            "amount_minor": 12900
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "CLOUDHOST INC",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "6dea87c0-355e-4bea-b39c-1d03ccd67c45",
+        "total_minor": 12900,
+        "document_date": "2026-03-01",
+        "invoice_number": "CH-2026-0301"
+      },
+      "categorization": {
+        "category": "Software & Subscriptions",
+        "confidence": 0.9,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 12900,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/cloudhost_2026-04.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Cloud hosting — Standard tier",
+            "amount_minor": 12900
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "CLOUDHOST INC",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "dfba3d68-1ad3-4194-9ed0-8b4568a2b14c",
+        "total_minor": 12900,
+        "document_date": "2026-04-01",
+        "invoice_number": "CH-2026-0401"
+      },
+      "categorization": {
+        "category": "Software & Subscriptions",
+        "confidence": 1.0,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 12900,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/cloudhost_2026-05.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Cloud hosting — Standard tier",
+            "amount_minor": 14900
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "CLOUDHOST INC",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "627f73bc-f766-47c5-b4a3-15921ede5314",
+        "total_minor": 14900,
+        "document_date": "2026-05-01",
+        "invoice_number": "CH-2026-0501"
+      },
+      "categorization": {
+        "category": "Software & Subscriptions",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 14900,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/cowork_2026-03.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Monthly desk rental",
+            "amount_minor": 95000
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "COWORK SPACE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "9ac0ff25-fdee-4f13-8622-143fc6132f75",
+        "total_minor": 95000,
+        "document_date": "2026-03-01",
+        "invoice_number": "CW-2026-0301"
+      },
+      "categorization": {
+        "category": "Other Operating Expenses",
+        "confidence": 0.85,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 95000,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/cowork_2026-04.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Monthly desk rental",
+            "amount_minor": 95000
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "COWORK SPACE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "57480d8e-18f2-4173-b55d-324c94c9cef0",
+        "total_minor": 95000,
+        "document_date": "2026-04-01",
+        "invoice_number": "CW-2026-0401"
+      },
+      "categorization": {
+        "category": "Office & Supplies",
+        "confidence": 0.85,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 95000,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/cowork_2026-05.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Monthly desk rental",
+            "amount_minor": 95000
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "COWORK SPACE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "65c4773e-9ade-415d-bb2d-ff115b6d2e78",
+        "total_minor": 95000,
+        "document_date": "2026-05-01",
+        "invoice_number": "CW-2026-0501"
+      },
+      "categorization": {
+        "category": "Other Operating Expenses",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 95000,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/quickprint_2026-03.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Office paper & toner",
+            "amount_minor": 8900
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "QUICKPRINT SUPPLIES",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "7b030b4a-e08c-4efb-b7e8-b78ddde5eb2e",
+        "total_minor": 8900,
+        "document_date": "2026-03-15",
+        "invoice_number": "QP-2026-1001"
+      },
+      "categorization": {
+        "category": "Office & Supplies",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 8900,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/quickprint_2026-03_duplicate.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Office paper & toner",
+            "amount_minor": 8900
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "QUICKPRINT SUPPLIES",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "3e640ce7-abd2-4f80-b3ef-cefb91bd24dd",
+        "total_minor": 8900,
+        "document_date": "2026-03-15",
+        "invoice_number": "QP-2026-1001"
+      },
+      "categorization": {
+        "category": "Office & Supplies",
+        "confidence": 0.9,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 8900,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/quickprint_2026-04.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Office paper & toner",
+            "amount_minor": 6400
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "QUICKPRINT SUPPLIES",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "3787f6ea-8706-42f2-8c22-4401803fc01a",
+        "total_minor": 6400,
+        "document_date": "2026-04-15",
+        "invoice_number": "QP-2026-1102"
+      },
+      "categorization": {
+        "category": "Office & Supplies",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 6400,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/quickprint_2026-05.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Office paper & toner",
+            "amount_minor": 9200
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "QUICKPRINT SUPPLIES",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "5ae3ca75-7bb2-4983-bde9-9b8c4bbd7b79",
+        "total_minor": 9200,
+        "document_date": "2026-05-15",
+        "invoice_number": "QP-2026-1203"
+      },
+      "categorization": {
+        "category": "Office & Supplies",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 9200,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/skyline_flight_april_sparse.pdf",
+      "extraction": {
+        "lines": [],
+        "model": "anthropic/qwen3.7-plus",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 0.0,
+          "currency": 1.0,
+          "tax_minor": 0.5,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "10de9fcb-ed30-479a-a1e7-773c1f3ce433",
+        "total_minor": 41550,
+        "document_date": "2026-04-18"
+      },
+      "categorization": {
+        "category": "Other Operating Expenses",
+        "confidence": 0.9,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 41550,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/skyline_flight_march.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Fare",
+            "amount_minor": 34000
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "SKYLINE AIRLINES",
+        "currency": "USD",
+        "tax_minor": 4200,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "11324f77-04bd-4ab5-9c74-1b31d919fbd4",
+        "total_minor": 38200,
+        "document_date": "2026-03-10",
+        "invoice_number": "SKY-88213"
+      },
+      "categorization": {
+        "category": "Travel & Transport",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 38200,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/techgear_2026-03.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Assorted peripherals",
+            "amount_minor": 4500
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "TECHGEAR WHOLESALE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "61b39ee9-2ae2-4f43-87da-adb8382c06d6",
+        "total_minor": 4500,
+        "document_date": "2026-03-20",
+        "invoice_number": "TG-2026-4401"
+      },
+      "categorization": {
+        "category": "Equipment & Hardware",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 4500,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/techgear_2026-04.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Assorted peripherals",
+            "amount_minor": 5200
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "TECHGEAR WHOLESALE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "cd65fcca-b722-4e57-9c2f-8e3201b09428",
+        "total_minor": 5200,
+        "document_date": "2026-04-20",
+        "invoice_number": "TG-2026-4502"
+      },
+      "categorization": {
+        "category": "Equipment & Hardware",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 5200,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/techgear_2026-05.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Assorted peripherals",
+            "amount_minor": 4800
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "TECHGEAR WHOLESALE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "310a858e-a051-4d4b-9ede-7d6633cc43b0",
+        "total_minor": 4800,
+        "document_date": "2026-05-20",
+        "invoice_number": "TG-2026-4603"
+      },
+      "categorization": {
+        "category": "Equipment & Hardware",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 4800,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/techgear_2026-06.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Assorted peripherals",
+            "amount_minor": 5100
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "TECHGEAR WHOLESALE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "90f306d4-cb08-494c-9e2e-846d90b17a48",
+        "total_minor": 5100,
+        "document_date": "2026-06-20",
+        "invoice_number": "TG-2026-4704"
+      },
+      "categorization": {
+        "category": "Equipment & Hardware",
+        "confidence": 0.85,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 5100,
+        "currency": "USD"
+      }
+    },
+    {
+      "sourcePdf": "pdfs/invoices/techgear_2026-06_outlier.pdf",
+      "extraction": {
+        "lines": [
+          {
+            "quantity": 1000,
+            "description": "Server rack + networking gear",
+            "amount_minor": 480000
+          }
+        ],
+        "model": "anthropic/qwen3.7-plus",
+        "vendor": "TECHGEAR WHOLESALE",
+        "currency": "USD",
+        "tax_minor": 0,
+        "confidence": {
+          "vendor": 1.0,
+          "currency": 1.0,
+          "tax_minor": 1.0,
+          "total_minor": 1.0,
+          "document_date": 1.0
+        },
+        "document_id": "b330a10c-d7ab-4821-a5c7-df8eb3277917",
+        "total_minor": 480000,
+        "document_date": "2026-06-25",
+        "invoice_number": "TG-2026-4899"
+      },
+      "categorization": {
+        "category": "Equipment & Hardware",
+        "confidence": 0.95,
+        "citation": null
+      },
+      "expectedExpense": {
+        "status": "POSTED",
+        "amountMinor": 480000,
+        "currency": "USD"
+      }
+    }
+  ]
+}

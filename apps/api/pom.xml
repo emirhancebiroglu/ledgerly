@@ -34,6 +34,7 @@
     <spring-framework.version>6.2.19</spring-framework.version>
     <spring-data-bom.version>2025.0.13</spring-data-bom.version>
     <aws-sdk.version>2.46.18</aws-sdk.version>
+    <sentry.version>8.53.0</sentry.version>
   </properties>
 
   <dependencies>
@@ -149,6 +150,14 @@
       <artifactId>s3</artifactId>
       <version>${aws-sdk.version}</version>
     </dependency>
+    <!-- T6: minimal error tracking. -jakarta is the Boot 3.x build (javax vs jakarta namespace
+         split) — see docs/decisions.md if the plain sentry-spring-boot-starter is ever tried
+         here by mistake, it silently fails to autoconfigure against jakarta servlet types. -->
+    <dependency>
+      <groupId>io.sentry</groupId>
+      <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+      <version>${sentry.version}</version>
+    </dependency>
   </dependencies>
 
   <dependencyManagement>
@@ -177,6 +186,16 @@
           <include>extraction-proposal.schema.json</include>
         </includes>
         <targetPath>contracts</targetPath>
+      </resource>
+      <!-- T5.1/T5.2 generate these PDFs (scripts/demo_seed/); T5.5's demo seed re-uploads the
+           exact same bytes through the real storage layer, so the fixture and the blob it
+           describes can never drift apart into two hand-copied trees. -->
+      <resource>
+        <directory>${project.basedir}/../../scripts/demo_seed/pdfs</directory>
+        <includes>
+          <include>**/*.pdf</include>
+        </includes>
+        <targetPath>db/seed/pdfs</targetPath>
       </resource>
     </resources>
     <plugins>

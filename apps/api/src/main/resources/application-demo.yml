@@ -1,0 +1,10 @@
+# Overrides for the `demo` profile only (DemoSeedRunner, see com.ledgerly.api.demo). The seed
+# runner uploads more documents in its single startup pass than the default rate limits allow
+# for a real user in the same window — these limits exist to bound paid AI-service calls from a
+# browser, not a one-time, LLM-free replay of already-recorded fixtures.
+ledgerly:
+  rate-limit:
+    document-upload:
+      max-requests: 100
+    policy-upload:
+      max-requests: 10
