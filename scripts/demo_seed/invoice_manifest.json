@@ -1,0 +1,278 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "path": "pdfs/invoices/cloudhost_2026-03.pdf",
+      "expected": {
+        "vendor": "CloudHost Inc",
+        "invoice_number": "CH-2026-0301",
+        "currency": "USD",
+        "total_minor": 12900,
+        "tax_minor": 0,
+        "document_date": "2026-03-01"
+      },
+      "category": "Software & Subscriptions",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/cloudhost_2026-04.pdf",
+      "expected": {
+        "vendor": "CloudHost Inc",
+        "invoice_number": "CH-2026-0401",
+        "currency": "USD",
+        "total_minor": 12900,
+        "tax_minor": 0,
+        "document_date": "2026-04-01"
+      },
+      "category": "Software & Subscriptions",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/cloudhost_2026-05.pdf",
+      "expected": {
+        "vendor": "CloudHost Inc",
+        "invoice_number": "CH-2026-0501",
+        "currency": "USD",
+        "total_minor": 14900,
+        "tax_minor": 0,
+        "document_date": "2026-05-01"
+      },
+      "category": "Software & Subscriptions",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/skyline_flight_march.pdf",
+      "expected": {
+        "vendor": "Skyline Airlines",
+        "invoice_number": "SKY-88213",
+        "currency": "USD",
+        "total_minor": 38200,
+        "tax_minor": 4200,
+        "document_date": "2026-03-10"
+      },
+      "category": "Travel & Transport",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/skyline_flight_april_sparse.pdf",
+      "expected": {
+        "vendor": "Skyline Airlines",
+        "invoice_number": "",
+        "currency": "USD",
+        "total_minor": 41550,
+        "tax_minor": 0,
+        "document_date": "2026-04-18"
+      },
+      "category": "Travel & Transport",
+      "scenario": "low_confidence"
+    },
+    {
+      "path": "pdfs/invoices/boardroom_bistro_2026-06-05.pdf",
+      "expected": {
+        "vendor": "Boardroom Bistro",
+        "invoice_number": "BB-2026-0605",
+        "currency": "USD",
+        "total_minor": 18500,
+        "tax_minor": 0,
+        "document_date": "2026-06-05"
+      },
+      "category": "Meals & Entertainment",
+      "scenario": "budget_threshold"
+    },
+    {
+      "path": "pdfs/invoices/boardroom_bistro_2026-06-12.pdf",
+      "expected": {
+        "vendor": "Boardroom Bistro",
+        "invoice_number": "BB-2026-0612",
+        "currency": "USD",
+        "total_minor": 21000,
+        "tax_minor": 0,
+        "document_date": "2026-06-12"
+      },
+      "category": "Meals & Entertainment",
+      "scenario": "budget_threshold"
+    },
+    {
+      "path": "pdfs/invoices/boardroom_bistro_2026-06-19.pdf",
+      "expected": {
+        "vendor": "Boardroom Bistro",
+        "invoice_number": "BB-2026-0619",
+        "currency": "USD",
+        "total_minor": 16500,
+        "tax_minor": 0,
+        "document_date": "2026-06-19"
+      },
+      "category": "Meals & Entertainment",
+      "scenario": "budget_threshold"
+    },
+    {
+      "path": "pdfs/invoices/boardroom_bistro_2026-06-26.pdf",
+      "expected": {
+        "vendor": "Boardroom Bistro",
+        "invoice_number": "BB-2026-0626",
+        "currency": "USD",
+        "total_minor": 19800,
+        "tax_minor": 0,
+        "document_date": "2026-06-26"
+      },
+      "category": "Meals & Entertainment",
+      "scenario": "budget_threshold"
+    },
+    {
+      "path": "pdfs/invoices/quickprint_2026-03.pdf",
+      "expected": {
+        "vendor": "QuickPrint Supplies",
+        "invoice_number": "QP-2026-1001",
+        "currency": "USD",
+        "total_minor": 8900,
+        "tax_minor": 0,
+        "document_date": "2026-03-15"
+      },
+      "category": "Office & Supplies",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/quickprint_2026-04.pdf",
+      "expected": {
+        "vendor": "QuickPrint Supplies",
+        "invoice_number": "QP-2026-1102",
+        "currency": "USD",
+        "total_minor": 6400,
+        "tax_minor": 0,
+        "document_date": "2026-04-15"
+      },
+      "category": "Office & Supplies",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/quickprint_2026-05.pdf",
+      "expected": {
+        "vendor": "QuickPrint Supplies",
+        "invoice_number": "QP-2026-1203",
+        "currency": "USD",
+        "total_minor": 9200,
+        "tax_minor": 0,
+        "document_date": "2026-05-15"
+      },
+      "category": "Office & Supplies",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/quickprint_2026-03_duplicate.pdf",
+      "expected": {
+        "vendor": "QuickPrint Supplies",
+        "invoice_number": "QP-2026-1001",
+        "currency": "USD",
+        "total_minor": 8900,
+        "tax_minor": 0,
+        "document_date": "2026-03-15"
+      },
+      "category": "Office & Supplies",
+      "scenario": "duplicate_confirmed"
+    },
+    {
+      "path": "pdfs/invoices/techgear_2026-03.pdf",
+      "expected": {
+        "vendor": "TechGear Wholesale",
+        "invoice_number": "TG-2026-4401",
+        "currency": "USD",
+        "total_minor": 4500,
+        "tax_minor": 0,
+        "document_date": "2026-03-20"
+      },
+      "category": "Equipment & Hardware",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/techgear_2026-04.pdf",
+      "expected": {
+        "vendor": "TechGear Wholesale",
+        "invoice_number": "TG-2026-4502",
+        "currency": "USD",
+        "total_minor": 5200,
+        "tax_minor": 0,
+        "document_date": "2026-04-20"
+      },
+      "category": "Equipment & Hardware",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/techgear_2026-05.pdf",
+      "expected": {
+        "vendor": "TechGear Wholesale",
+        "invoice_number": "TG-2026-4603",
+        "currency": "USD",
+        "total_minor": 4800,
+        "tax_minor": 0,
+        "document_date": "2026-05-20"
+      },
+      "category": "Equipment & Hardware",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/techgear_2026-06.pdf",
+      "expected": {
+        "vendor": "TechGear Wholesale",
+        "invoice_number": "TG-2026-4704",
+        "currency": "USD",
+        "total_minor": 5100,
+        "tax_minor": 0,
+        "document_date": "2026-06-20"
+      },
+      "category": "Equipment & Hardware",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/techgear_2026-06_outlier.pdf",
+      "expected": {
+        "vendor": "TechGear Wholesale",
+        "invoice_number": "TG-2026-4899",
+        "currency": "USD",
+        "total_minor": 480000,
+        "tax_minor": 0,
+        "document_date": "2026-06-25"
+      },
+      "category": "Equipment & Hardware",
+      "scenario": "anomaly_high"
+    },
+    {
+      "path": "pdfs/invoices/cowork_2026-03.pdf",
+      "expected": {
+        "vendor": "CoWork Space",
+        "invoice_number": "CW-2026-0301",
+        "currency": "USD",
+        "total_minor": 95000,
+        "tax_minor": 0,
+        "document_date": "2026-03-01"
+      },
+      "category": "Office & Supplies",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/cowork_2026-04.pdf",
+      "expected": {
+        "vendor": "CoWork Space",
+        "invoice_number": "CW-2026-0401",
+        "currency": "USD",
+        "total_minor": 95000,
+        "tax_minor": 0,
+        "document_date": "2026-04-01"
+      },
+      "category": "Office & Supplies",
+      "scenario": "normal"
+    },
+    {
+      "path": "pdfs/invoices/cowork_2026-05.pdf",
+      "expected": {
+        "vendor": "CoWork Space",
+        "invoice_number": "CW-2026-0501",
+        "currency": "USD",
+        "total_minor": 95000,
+        "tax_minor": 0,
+        "document_date": "2026-05-01"
+      },
+      "category": "Office & Supplies",
+      "scenario": "normal"
+    }
+  ]
+}
