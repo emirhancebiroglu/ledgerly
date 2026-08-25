@@ -392,21 +392,185 @@ storage durability, secrets custody, and uptime behavior on the chosen tier.
 
 ---
 
+## M9.9 — Single-instance coordination without Redis
+
+M10 deploys one instance of `api` and one of `ai`. Redis is currently load-bearing on both —
+SSE pub/sub fan-out, auth and upload rate limiting in `api`, cost-bearing agent rate limiting in
+`ai` — and the limiters fail *closed*, so a missing Redis rejects uploads rather than degrading.
+Render's free tier has no managed Redis, and Upstash's free tier is HTTP-based with no persistent
+pub/sub, so it cannot back `RedisMessageListenerContainer`.
+
+The point of Redis here is coordination *between instances*: pub/sub so a status change on
+instance A reaches a browser streaming from instance B, and shared counters so a client cannot
+get N× its quota by spreading requests across N instances. At one instance per service, neither
+job is being done — an in-process implementation enforces the identical limit and delivers the
+identical event.
+
+So this milestone is not a free-tier workaround, it is deleting distributed infrastructure that
+the deployed topology does not use. Nothing is removed: both adapters stay behind a port, Redis
+stays the default in `docker-compose.yml`, and scaling past one instance is a profile flip rather
+than a rewrite.
+
+**Ordering rule:** this lands before M10 so that M10 is a config-only milestone. Write-path code
+changes and deploy wiring must not be verified in the same pass.
+
+- Extract the seams that already exist implicitly: a fixed-window rate limiter (both
+  `AuthRateLimiter` and `UploadRateLimiter` run a byte-identical Lua script; `ai`'s
+  `AiRateLimiter` runs the same algorithm in Python) and a per-document event broker
+  (`DocumentEventPublisher` / `DocumentActivityEventPublisher` publish, `DocumentEventController`
+  subscribes).
+- In-process adapters become the default; the Redis adapters activate on a profile.
+- Behavior that must not change: the exact quota arithmetic, `RateLimitExceededException`'s
+  retry-after seconds, `RateLimitUnavailableException` fail-closed semantics, SSE `AFTER_COMMIT`
+  ordering, and the publisher's existing swallow-and-log on a broker failure.
+
+- [ ] T1 — Extract a `RateLimiter` port in `api` with the fixed-window contract both current
+  limiters implement (`acquire(key, maxRequests, windowSeconds)` returning remaining TTL, negative
+  when exceeded). Move the Lua script into a `RedisRateLimiter` adapter; `AuthRateLimiter` and
+  `UploadRateLimiter` keep their own key derivation (including the email HMAC fingerprint, which
+  must not move) and delegate the counting.
+  **Test:** existing `AuthRateLimiter`/`UploadRateLimiter` tests pass unchanged against the
+  refactored classes — the seam is proven by *not* rewriting the tests that describe the behavior.
+
+- [ ] T2 — Add `InMemoryRateLimiter`, the default when no Redis profile is active: per-key counter
+  with a monotonic-clock window, evicting expired keys so an unbounded key space (one per
+  organization, one per email fingerprint) cannot leak memory.
+  **Test:** a shared test contract runs against *both* adapters and asserts identical results —
+  Nth request inside the window succeeds, N+1th throws `RateLimitExceededException` with the same
+  retry-after, and the window resets on expiry. The Redis run uses the existing Testcontainers
+  setup; a concurrency test asserts exactly `maxRequests` of `maxRequests + 50` parallel attempts
+  are admitted.
+
+- [ ] T3 — Extract a `DocumentEventBroker` port (`publish(channel, payload)` /
+  `subscribe(channel, listener)` returning a closeable registration) and move the current
+  `StringRedisTemplate` + `RedisMessageListenerContainer` usage into a `RedisDocumentEventBroker`
+  adapter. `DocumentEventController` subscribes through the port instead of touching the
+  container directly.
+  **Test:** the existing SSE controller and publisher tests pass unchanged; a test asserts the
+  publisher still swallows and logs a broker failure rather than propagating it into the committed
+  transaction.
+
+- [ ] T4 — Add `InMemoryDocumentEventBroker`, the default when no Redis profile is active:
+  listeners held per channel, removed on unsubscribe, dispatched on the same bounded executor
+  `RedisConfig` already uses so a burst of status changes across open streams stays a queue rather
+  than an unbounded-thread incident.
+  **Test:** a shared contract runs against both adapters — a subscriber receives a published
+  payload, an unsubscribed listener does not, two subscribers on one channel both receive, and a
+  listener that throws does not prevent delivery to the others. An end-to-end test drives a real
+  document status change through to an `SseEmitter` with no Redis running.
+
+- [ ] T5 — Same split in `ai`: a `RateLimiter` protocol with the existing `AiRateLimiter` as the
+  Redis adapter and an in-process default, selected by config (empty/unset
+  `AI_RATE_LIMIT_REDIS_URL` chooses in-process). `main.py` wires whichever is configured.
+  **Test:** the existing `AiRateLimiter` tests keep passing; a shared parametrized test asserts
+  both adapters produce identical admit/reject/retry-after behavior, and that
+  `RateLimitUnavailable` still fails closed.
+
+- [ ] T6 — Make Redis genuinely optional at boot: `RedisConfig`, the connection factory and both
+  adapters activate on a profile; `api` starts with no Redis reachable and serves uploads, auth,
+  and SSE. `docker-compose.yml` keeps Redis and keeps the Redis profile active, so local
+  development still exercises the distributed path.
+  **Test:** `api` boots with no Redis on the network and a full upload → extract → SSE loop
+  completes; `docker compose up` still runs the Redis-backed path and its tests pass.
+
+**Demo**
+```bash
+cd apps/api && ./mvnw clean verify          # both adapters pass one shared contract
+cd apps/ai  && pytest
+# no Redis anywhere: upload succeeds, rate limit still bites, SSE still streams
+docker run --rm -e SPRING_PROFILES_ACTIVE=demo -p 8080:8080 ledgerly-api
+```
+
+**Done when:** `api` and `ai` boot and serve the full loop with no Redis process reachable, the
+in-process and Redis adapters pass the same behavioral contract, and `docker-compose.yml` still
+runs the Redis-backed path unchanged.
+
+---
+
 ## M10 — Production deploy
 
-- Dockerfiles: multi-stage, non-root user, pinned base images.
-- Render: `api`, `ai`, managed PostgreSQL with pgvector.
-- Vercel: `web`.
-- GitHub Actions deploy on merge to `main`.
-- Secrets in the platform's secret store. Never in the repository.
-- Seeded demo account so the live link is explorable without signing up.
-- README: architecture diagram, live link, screenshots, honest "what I would do next".
-- 60–90 second demo recording.
+A stranger with a link can upload an invoice and watch it become a categorized ledger entry,
+with no local setup and no sign-up.
+
+M9.5 already landed the deploy-readiness work (JDBC URL bridge, R2 storage, CORS, demo seed,
+Sentry, secret scanning, SEO) and M9.9 removed the Redis requirement, so this milestone is
+configuration and verification only — no application code changes. If a task here starts
+demanding a code change, that is a signal the change belongs in its own milestone, not that this
+one should grow.
+
+**Platform decisions** (see `docs/decisions.md`): Render free tier for `api`/`ai` + managed
+Postgres, Vercel for `web`, Cloudflare R2 for documents, Sentry for errors. Auto-deploy is
+native to both platforms watching `main` — no deploy workflow, no deploy hooks or platform
+tokens stored as repository secrets.
+
+**Free-tier warming:** Render free services sleep after 15 minutes idle, but the tier also caps
+at 750 instance-hours/month across all free services — pinging two services around the clock
+(~1,460h) exhausts the quota mid-month and suspends them. So UptimeRobot pings `api` only
+(~730h, inside quota) and `ai` is left to sleep: browsing the seeded demo org is instant, and
+only the first *upload* pays a cold start. Documented in the README rather than hidden.
+
+- [ ] T1 — `render.yaml` blueprint: `api` and `ai` web services (Docker runtime, existing
+  Dockerfiles) plus a managed Postgres with pgvector. Health check paths `/actuator/health` and
+  `/health`. Every secret declared `sync: false` — never a literal value in the file. `api` gets
+  `SPRING_PROFILES_ACTIVE=prod,demo` so R2 storage and the demo org are both active.
+  **Test:** `render.yaml` parses in Render's blueprint validation; `git grep` over it finds no
+  value for any of `JWT_SECRET`, `AI_SERVICE_TOKEN`, `AI_LLM_API_KEY`, `AI_EMBEDDING_API_KEY`,
+  `R2_SECRET_ACCESS_KEY`.
+
+- [ ] T2 — Confirm pgvector on Render's managed Postgres: `V11__policy_document_and_chunk.sql`
+  runs `CREATE EXTENSION IF NOT EXISTS vector`, which needs a privilege the platform may not
+  grant to the default role. Verify before the first deploy rather than discovering it in a
+  failed Flyway migration.
+  **Test:** `CREATE EXTENSION IF NOT EXISTS vector;` succeeds against the provisioned database as
+  the application role, and `SELECT extversion FROM pg_extension WHERE extname='vector';` returns
+  a row.
+
+- [ ] T3 — Vercel configuration for `web`: root directory `apps/web`, `API_URL` pointing at the
+  deployed `api`, `NEXT_PUBLIC_SITE_URL` at the Vercel domain (the OG image needs an absolute
+  URL), and Sentry's `NEXT_PUBLIC_*` values present at *build* time, since they are inlined into
+  the client bundle rather than read at startup.
+  **Test:** a production build on Vercel succeeds and the deployed page source contains a
+  non-empty `og:image` with an absolute URL on the real domain.
+
+- [ ] T4 — Deployment handoff document (`docs/deploy.md`): the exact click-path for every step a
+  person must do by hand — connecting each repository, which secret goes into which platform's
+  store, R2 bucket creation and its CORS rules, and the UptimeRobot monitor. Written so the
+  deploy is reproducible from scratch, not remembered.
+  **Test:** every environment variable that `render.yaml` marks `sync: false`, plus every Vercel
+  variable, appears in the document with its source and destination stated.
+
+- [ ] T5 — Deploy: blueprint applied, secrets entered, first successful deploy of all three
+  services. (Manual — the account holder does this; the tasks above exist so it is mechanical.)
+  **Test:** `curl -f https://<api>.onrender.com/actuator/health` and
+  `curl -f https://<ai>.onrender.com/health` both return 200, and the Vercel URL loads.
+
+- [ ] T6 — Cross-service wiring verification: `CORS_ALLOWED_ORIGINS` on `api` contains the real
+  Vercel origin, `api` reaches `ai` with the shared service token, and `api` reaches R2.
+  **Test:** a browser request from the Vercel origin gets `Access-Control-Allow-Origin` back and
+  an origin outside the list does not; an uploaded document's bytes are retrievable from R2 and
+  survive a service restart.
+
+- [ ] T7 — UptimeRobot monitor on `api` only (5-minute interval, `/actuator/health`), per the
+  quota reasoning above.
+  **Test:** at least one successful check visible in the UptimeRobot dashboard, and `api`
+  responds without a cold-start delay after 30+ minutes of no human traffic.
+
+- [ ] T8 — End-to-end verification against production, in a browser, signed in as the demo
+  account: dashboard, expenses list and detail, review queue, budgets, alerts, policies, and a
+  real upload streaming through to a posted ledger entry.
+  **Test:** every route loads with no console errors, the uploaded invoice reaches a terminal
+  status, and the ledger entries it produced sum to zero.
+
+- [ ] T9 — README live link, demo credentials, and screenshots from the deployed system; then a
+  60–90 second recording of the upload → extract → categorize → post loop.
+  **Test:** the README's live link resolves, and the recording shows the loop start to finish
+  with no cuts hiding a failure or a retry.
 
 **Demo**
 ```bash
 curl -f https://<app>.onrender.com/actuator/health
-# open the Vercel URL, log into the demo account, upload the sample invoice
+# open the Vercel URL, log into the demo account, upload the sample invoice,
+# watch the agent panel stream, see the posted entry in the list and the charts
 ```
 
 **Done when:** a stranger with the link can upload an invoice and see it become a categorized
@@ -423,7 +587,7 @@ ledger entry, without any local setup.
 | 3 | M5, M6 |
 | 4 | M7 |
 | 5 | M8, M9 |
-| 6 | M9.5, M10 + buffer |
+| 6 | M9.5, M9.9, M10 + buffer |
 
 Buffer is real, not decorative. M5 (extraction accuracy) and M7 (frontend polish) are the two
 most likely to overrun.

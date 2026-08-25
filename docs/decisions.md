@@ -5,6 +5,82 @@ that replaced it.
 
 ---
 
+## 2026-08-26 — Replace Redis with in-process adapters for a single-instance deployment (M9.9)
+
+**Context.** M10 planning surfaced a blocker M9.5's checklist missed: Redis is load-bearing in
+both services — pub/sub SSE fan-out (`DocumentEventPublisher`, `DocumentActivityEventPublisher`,
+`DocumentEventController` against a shared `RedisMessageListenerContainer`), auth and upload rate
+limiting in `api`, and cost-bearing agent rate limiting in `ai`. Both rate limiters fail *closed*
+(`RateLimitUnavailableException` / `RateLimitUnavailable`), so a deployment with no reachable
+Redis does not degrade, it rejects every upload. Render's free tier has no managed Redis; its Key
+Value offering is paid-only.
+
+**Decision.** Extract a `RateLimiter` port and a `DocumentEventBroker` port, add in-process
+adapters as the default, and keep the Redis adapters behind a profile that `docker-compose.yml`
+continues to activate. Land it as its own milestone (M9.9) *before* M10, so deploy configuration
+is never verified in the same pass as a write-path code change.
+
+**Alternatives.**
+- *Upstash Redis free tier* — rejected on a technical fact, not on cost: its free tier is
+  HTTP/REST-based and does not support the persistent subscriber connection
+  `RedisMessageListenerContainer` requires, so it cannot back SSE at all. It would have solved
+  only the rate-limiting half while appearing to solve both.
+- *Render Key Value (~$10/mo)* — works with zero code change and keeps the deployed system
+  identical to what the existing 219 `api` tests cover. Rejected because it pays monthly to
+  retain coordination machinery that a single-instance topology never exercises.
+- *Delete rate limiting and SSE for the demo* — rejected outright; both are M7/M9 deliverables and
+  removing them to fit a hosting tier would make the deployed system a weaker claim than the
+  repository.
+
+**Rationale.** Redis is here to coordinate *across instances*: pub/sub so a status change on
+instance A reaches a browser streaming from instance B, and shared counters so a client cannot
+obtain N× its quota by spreading requests over N instances. At one instance per service neither
+job is being performed — an in-process counter enforces the identical limit, and an in-process
+listener registry delivers the identical event. This is removing distributed infrastructure the
+topology does not use, which is why it is framed as an architecture correction rather than a
+free-tier workaround.
+
+**Consequence.** Nothing is deleted: both adapters live behind one port and one shared behavioral
+contract test, so scaling past a single instance is a profile flip rather than a rewrite, and
+local development keeps exercising the Redis path through Compose. The cost is real — new code on
+the write path, which is precisely why it gets its own milestone and its own verification pass
+instead of riding along inside M10.
+
+---
+
+## 2026-08-26 — Free tier for Render, with UptimeRobot warming `api` only
+
+**Context.** M10 needed a tier decision for `api` and `ai`. Render's free tier sleeps a service
+after 15 minutes idle, giving a 30–60 second cold start on the first request — poor for a link
+handed to a recruiter. M9.5's T10 had already chosen UptimeRobot as the mitigation but deferred
+configuration until real URLs existed.
+
+**Decision.** Free tier for both services. UptimeRobot pings `api` only, every 5 minutes,
+against `/actuator/health`. `ai` is left to sleep.
+
+**Alternatives.**
+- *Ping both services 24/7* — rejected as self-defeating: the free tier caps at 750 instance-hours
+  per month across all free services, and two services kept awake continuously consume roughly
+  1,460, exhausting the quota around day 15 and suspending both until the month resets. The
+  mitigation would have caused a worse outage than the problem.
+- *Ping both, only during demo windows* — stays inside quota but depends on remembering to toggle
+  monitors before showing the link to anyone.
+- *Starter tier (~$14/mo)* — no quota, no cold starts, nothing to manage. Rejected as unjustified
+  monthly spend for a portfolio deployment.
+
+**Rationale.** ~730 hours for a single warmed service sits just inside the quota. It also puts the
+remaining cold start on the least-likely action: the demo organization is seeded with three months
+of invoices, policies, budgets and alerts, so a visitor can explore the dashboard, expenses,
+review queue and charts without ever uploading anything — and everything on that path is served by
+the warm `api`. Only a visitor who chooses to upload waits for `ai` to wake.
+
+**Consequence.** The README states the cold-start behavior plainly under Known limitations rather
+than letting a stranger discover it as a hang. If the quota math changes or a second free service
+is added, the warming strategy has to be recomputed — 750 hours is shared across the account, not
+per service.
+
+---
+
 ## 2026-08-26 — Policy chunks stay categorization context; enforcement is out of scope
 
 **Context.** Manually testing the categorization pipeline (uploading a Boardroom Bistro invoice
