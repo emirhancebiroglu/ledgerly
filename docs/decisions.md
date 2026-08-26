@@ -369,22 +369,38 @@ connection string. Spring's `spring.datasource.url` needs a JDBC URL, and `appli
 resolves `${DATABASE_URL}` directly into that property before any `@Configuration` bean runs.
 
 **Decision.** `DatabaseUrlEnvironmentPostProcessor` (`apps/api/.../DatabaseUrlEnvironmentPostProcessor.java`)
-rewrites `DATABASE_URL` into `spring.datasource.url`/`username`/`password` via
-`RenderDatabaseUrl.parse()` — a pure function, tested independently — before the environment is
-handed to context refresh. Registered through
-`META-INF/spring/org.springframework.boot.env.EnvironmentPostProcessor.imports`, the only file
-Spring Boot 3.x actually reads for this factory type; the legacy `META-INF/spring.factories`
-mechanism is silently ignored for `EnvironmentPostProcessor` on Boot 3.x and will not error if
-used by mistake.
+rewrites `DATABASE_URL`/`POSTGRES_USER`/`POSTGRES_PASSWORD` in place via `RenderDatabaseUrl.parse()`
+— a pure function, tested independently — before the environment is handed to context refresh.
+`application.yml`'s own `${DATABASE_URL:...}`/`${POSTGRES_USER:...}`/`${POSTGRES_PASSWORD:...}`
+placeholders then resolve to the rewritten values, so there is only ever one definition of each
+key in the system. Registered through `META-INF/spring.factories` — confirmed by unzipping
+`spring-boot-3.5.14.jar` itself and reading its own internal `spring.factories`, where Boot
+registers its own `EnvironmentPostProcessor` implementations (`ConfigDataEnvironmentPostProcessor`
+and others) under this exact key. The newer `META-INF/spring/*.imports` file format exists only
+for `AutoConfiguration`, not `EnvironmentPostProcessor` — an earlier version of this fix
+registered there by mistake, which does not error but leaves the class silently never
+instantiated (Boot logs nothing; the fat jar just boots as if the post-processor didn't exist).
+That shipped to Render undetected because local dev's `DATABASE_URL` is already JDBC-shaped, so
+the post-processor's early-return path never depended on it actually running. Caught only by
+booting the real fat jar with a raw `postgres://` `DATABASE_URL` and observing
+`'url' must start with "jdbc"` from Hikari — a unit test asserting the class's own logic in
+isolation, or even asserting the (wrong) `.imports` file's contents, stayed green throughout.
 
 **Why.** A `@Bean`/`@ConfigurationProperties` approach runs too late — `DataSourceAutoConfiguration`
 already needs the JDBC-shaped URL by then. Parsing must happen at the environment-property level,
-before Spring resolves `${DATABASE_URL}` into `spring.datasource.url` itself.
+before Spring resolves `${DATABASE_URL}` into `spring.datasource.url` itself. Rewriting the raw
+`DATABASE_URL`/`POSTGRES_USER`/`POSTGRES_PASSWORD` keys in place — rather than writing
+`spring.datasource.url`/`username`/`password` directly as a second, competing property source —
+was chosen during the same fix so there is exactly one source of truth for each key regardless of
+property-source ordering, instead of two definitions of the same derived value racing each other.
 
 **Watch for.** Use `getRawUserInfo()`/`getRawQuery()`, not the decoded `getUserInfo()`/`getQuery()`
 — decoding an already-decoded value corrupts any literal `%` in a password. On a malformed
 `DATABASE_URL`, never chain `URISyntaxException` as the exception's cause or echo `e.getMessage()`
 — both embed the full raw connection string, credentials included, into the startup stack trace.
+When adding any future `EnvironmentPostProcessor`, register it in `META-INF/spring.factories` and
+verify it actually ran by booting the real packaged jar with input that would fail loudly if it
+didn't — not by unit-testing the class's logic alone, which cannot detect a registration-file bug.
 
 ---
 

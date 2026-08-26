@@ -13,16 +13,16 @@ class DatabaseUrlEnvironmentPostProcessorTest {
       new DatabaseUrlEnvironmentPostProcessor();
 
   @Test
-  void isRegisteredInTheImportsFileSpringBootActuallyReads() throws java.io.IOException {
-    // Guards against registering in the wrong file (legacy spring.factories is silently
-    // ignored for EnvironmentPostProcessor on Boot 3.x) — a hand-called unit test below would
-    // stay green even if the processor never actually runs in the real application.
+  void isRegisteredInSpringFactoriesSpringBootActuallyReads() throws java.io.IOException {
+    // EnvironmentPostProcessor is discovered via spring.factories, not the newer
+    // META-INF/spring/*.imports mechanism (that one is for AutoConfiguration) — registering it
+    // in the wrong file leaves the class silently never instantiated, so the fat jar boots with
+    // no error but DATABASE_URL is never bridged. A hand-called unit test below would stay
+    // green even in that state, which is exactly what happened here (caught only by a real
+    // fat-jar boot against a postgres:// DATABASE_URL, not by this classpath check alone).
     try (var stream =
-        getClass()
-            .getClassLoader()
-            .getResourceAsStream(
-                "META-INF/spring/org.springframework.boot.env.EnvironmentPostProcessor.imports")) {
-      assertThat(stream).as("imports file must exist on the classpath").isNotNull();
+        getClass().getClassLoader().getResourceAsStream("META-INF/spring.factories")) {
+      assertThat(stream).as("spring.factories must exist on the classpath").isNotNull();
       String contents = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
       assertThat(contents).contains(DatabaseUrlEnvironmentPostProcessor.class.getName());
     }
@@ -41,10 +41,13 @@ class DatabaseUrlEnvironmentPostProcessorTest {
 
     postProcessor.postProcessEnvironment(environment, new SpringApplication());
 
-    assertThat(environment.getProperty("spring.datasource.url"))
+    // Rewrites DATABASE_URL/POSTGRES_USER/POSTGRES_PASSWORD themselves, not
+    // spring.datasource.*: application.yml's own spring.datasource.url:
+    // ${DATABASE_URL:...} placeholder is what actually reads these back.
+    assertThat(environment.getProperty("DATABASE_URL"))
         .isEqualTo("jdbc:postgresql://dpg-abc123:5432/ledgerly_prod");
-    assertThat(environment.getProperty("spring.datasource.username")).isEqualTo("ledgerly");
-    assertThat(environment.getProperty("spring.datasource.password")).isEqualTo("s3cret");
+    assertThat(environment.getProperty("POSTGRES_USER")).isEqualTo("ledgerly");
+    assertThat(environment.getProperty("POSTGRES_PASSWORD")).isEqualTo("s3cret");
   }
 
   @Test
@@ -67,6 +70,6 @@ class DatabaseUrlEnvironmentPostProcessorTest {
 
     postProcessor.postProcessEnvironment(environment, new SpringApplication());
 
-    assertThat(environment.getProperty("spring.datasource.url")).isNull();
+    assertThat(environment.getPropertySources().contains("databaseUrlBridge")).isFalse();
   }
 }
