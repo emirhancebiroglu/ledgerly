@@ -514,12 +514,23 @@ changes and deploy wiring must not be verified in the same pass.
   directly and never touched this class, so "existing tests keep passing" was true but vacuous
   until these were added.
 
-- [ ] T6 — Make Redis genuinely optional at boot: `RedisConfig`, the connection factory and both
-  adapters activate on a profile; `api` starts with no Redis reachable and serves uploads, auth,
-  and SSE. `docker-compose.yml` keeps Redis and keeps the Redis profile active, so local
-  development still exercises the distributed path.
-  **Test:** `api` boots with no Redis on the network and a full upload → extract → SSE loop
-  completes; `docker compose up` still runs the Redis-backed path and its tests pass.
+- [x] T6 — Make Redis genuinely optional at boot.
+  **No code change needed — T1-T4's guards already did this.** Went in assuming `RedisConfig`
+  needed a profile guard, per this task's own wording. Writing `NoRedisBootIT` (a real upload →
+  extraction → SSE loop with `spring.data.redis.host` pointed at an address nothing listens on)
+  proved otherwise on the first correct run: `RedisRateLimiter` and `RedisDocumentEventBroker`
+  are already `@ConditionalOnProperty`-excluded under `backend=in-memory`/
+  `event-broker=in-memory`, and traced through Spring Data Redis's actual source,
+  `RedisMessageListenerContainer.start()` short-circuits before any connection attempt when no
+  listener was ever registered — which is always true here, since the only caller of
+  `addMessageListener` is the adapter that was never constructed. The actuator Redis health
+  indicator is also already off (`management.health.redis.enabled: false`), so a real deployment
+  configured this way would not diverge from what the test proves.
+  `docker-compose.yml` was never touched and still runs the Redis-backed path unchanged.
+  **Test:** `NoRedisBootIT` — real upload, real (stubbed-`ai`) extraction, real SSE subscribe,
+  Redis address unreachable — 1/1, and confirmed by grepping the run for any Redis
+  connection-refused/timeout message: none, meaning nothing in the exercised path ever attempted
+  the address at all.
 
 **Demo**
 ```bash
