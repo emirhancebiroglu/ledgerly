@@ -1,6 +1,7 @@
 package com.ledgerly.api.ratelimit;
 
 import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -13,8 +14,19 @@ import org.springframework.stereotype.Component;
  * <p>The script is atomic by necessity rather than by preference: {@code INCR} followed by a
  * separate {@code EXPIRE} would let two callers interleave between the two commands and leave a key
  * with no expiry, turning a one-minute window into a permanent lockout.
+ *
+ * <p>It reads {@code PTTL}, not {@code TTL}, and rounds up. {@code TTL} reports whole seconds, so
+ * anywhere in the final second of a window it returns {@code 0} — and a rejection built by negating
+ * it is {@code -0}, which is {@code 0}, which every caller reads as an admission. That granted one
+ * extra request past the quota at the end of every window, on a path that spends money. Rounding a
+ * millisecond reading up also matches {@link InMemoryRateLimiter} exactly, so the retry-after a
+ * client receives does not depend on which backend is deployed.
  */
 @Component
+@ConditionalOnProperty(
+    name = "ledgerly.rate-limit.backend",
+    havingValue = "redis",
+    matchIfMissing = true)
 public class RedisRateLimiter implements RateLimiter {
 
   private static final DefaultRedisScript<Long> ACQUIRE_SCRIPT =
@@ -22,9 +34,10 @@ public class RedisRateLimiter implements RateLimiter {
           """
           local count = redis.call('INCR', KEYS[1])
           if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[2]) end
-          local ttl = redis.call('TTL', KEYS[1])
-          if count > tonumber(ARGV[1]) then return -ttl end
-          return ttl
+          local ttl = redis.call('PTTL', KEYS[1])
+          local seconds = math.max(1, math.ceil(ttl / 1000))
+          if count > tonumber(ARGV[1]) then return -seconds end
+          return seconds
           """,
           Long.class);
 
