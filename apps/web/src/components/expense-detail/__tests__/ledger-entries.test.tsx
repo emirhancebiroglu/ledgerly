@@ -9,7 +9,7 @@ describe("LedgerEntries", () => {
     expect(screen.getByText(/Not posted yet/)).toBeInTheDocument();
   });
 
-  it("shows the two entries and a zero balance for a balanced debit/credit pair", () => {
+  it("shows the two entries and a Balanced badge for a balanced debit/credit pair", () => {
     render(
       <LedgerEntries
         entries={[
@@ -33,7 +33,7 @@ describe("LedgerEntries", () => {
 
     expect(screen.getByText("Travel Expense")).toBeInTheDocument();
     expect(screen.getByText("Cash / Bank")).toBeInTheDocument();
-    expect(screen.getByTestId("ledger-balance")).toHaveTextContent("€0.00");
+    expect(screen.getByTestId("ledger-balance")).toHaveTextContent("Balanced");
   });
 
   it("refuses to compute a single balance across mixed currencies rather than mislabeling one", () => {
