@@ -585,13 +585,16 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   `JWT_SECRET`, `AI_SERVICE_TOKEN`, `AI_LLM_API_KEY`, `AI_EMBEDDING_API_KEY`,
   `R2_SECRET_ACCESS_KEY`.
 
-- [ ] T2 — Confirm pgvector on Render's managed Postgres: `V11__policy_document_and_chunk.sql`
+- [x] T2 — Confirm pgvector on Render's managed Postgres: `V11__policy_document_and_chunk.sql`
   runs `CREATE EXTENSION IF NOT EXISTS vector`, which needs a privilege the platform may not
   grant to the default role. Verify before the first deploy rather than discovering it in a
   failed Flyway migration. This is a hard requirement with no fallback: `policy_chunk.embedding`
   is a `vector` column queried natively through `PGvector`, so a host without the extension does
   not degrade M6's policy RAG, it cannot run the migration at all. If Render turns out not to
   grant it, the answer is a different Postgres host — not a different database engine.
+  **Confirmed 2026-08-26** against a manually-created free-tier Postgres 17 instance
+  (Frankfurt): `CREATE EXTENSION IF NOT EXISTS vector;` succeeded as the application role with
+  no privilege error, `pgvector 0.8.0` installed. No fallback needed.
   **Test:** `CREATE EXTENSION IF NOT EXISTS vector;` succeeds against the provisioned database as
   the application role, and `SELECT extversion FROM pg_extension WHERE extname='vector';` returns
   a row.
