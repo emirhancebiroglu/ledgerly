@@ -35,6 +35,11 @@ ledgerly:
     # this to the real web origin(s) — see CorsConfig.
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
   rate-limit:
+    # Where the quota counter lives: "redis" (default) shares it across instances; "in-memory"
+    # keeps it in the process, which enforces the identical limit only while exactly one instance
+    # runs. Defaulting to redis means a multi-instance deployment cannot lose its shared counter
+    # by omitting a setting — opting out has to be deliberate.
+    backend: ${RATE_LIMIT_BACKEND:redis}
     auth:
       max-requests: ${AUTH_RATE_LIMIT_MAX_REQUESTS:5}
       window-seconds: ${AUTH_RATE_LIMIT_WINDOW_SECONDS:60}
