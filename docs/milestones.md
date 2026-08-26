@@ -469,14 +469,23 @@ changes and deploy wiring must not be verified in the same pass.
   publisher still swallows and logs a broker failure rather than propagating it into the committed
   transaction.
 
-- [ ] T4 — Add `InMemoryDocumentEventBroker`, the default when no Redis profile is active:
-  listeners held per channel, removed on unsubscribe, dispatched on the same bounded executor
-  `RedisConfig` already uses so a burst of status changes across open streams stays a queue rather
-  than an unbounded-thread incident.
-  **Test:** a shared contract runs against both adapters — a subscriber receives a published
-  payload, an unsubscribed listener does not, two subscribers on one channel both receive, and a
-  listener that throws does not prevent delivery to the others. An end-to-end test drives a real
-  document status change through to an `SseEmitter` with no Redis running.
+- [x] T4 — Add `InMemoryDocumentEventBroker`: listeners held per channel, removed on unsubscribe,
+  dispatched on the same bounded executor `RedisConfig` already uses so a burst of status changes
+  across open streams stays a queue rather than an unbounded-thread incident.
+  **Amended during execution**, matching T2's precedent: selection is
+  `ledgerly.document.event-broker`, a property rather than a profile, and **Redis stays the
+  default**. A multi-instance deployment that omits the setting keeps its shared fan-out; a
+  single-instance one that omits it keeps a working Redis round trip. An unrecognised value
+  refuses to start (`DocumentEventBrokerGuard`) rather than leaving the SSE and publisher paths
+  with no broker.
+  **Test:** the shared contract runs against both adapters, including delivery order and that a
+  late subscriber receives nothing (§T3) — not incidental here, since `StreamSession` drops any
+  event whose id is not greater than the last one delivered, and the in-process adapter's shared
+  executor makes reordering a real risk a contract stated only as membership would miss. A
+  dedicated stress test (200 payloads, a saturated 2-thread pool, 3 competing channels, 20
+  repetitions) confirmed the per-subscriber sequential dispatch is load-bearing by failing
+  reliably once removed. The end-to-end test points Redis at an address nothing listens on, the
+  `RedisOutageIT` technique, so passing proves the demo works with Redis genuinely unreachable.
 
 - [ ] T5 — Same split in `ai`: a `RateLimiter` protocol with the existing `AiRateLimiter` as the
   Redis adapter and an in-process default, selected by config (empty/unset
