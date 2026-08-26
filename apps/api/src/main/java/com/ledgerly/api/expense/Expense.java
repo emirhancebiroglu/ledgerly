@@ -38,6 +38,13 @@ public class Expense {
   @Column(updatable = false)
   private String vendor;
 
+  /** {@link #vendor}, trimmed and lower-cased with {@code Locale.ROOT} at write time. Duplicate
+   * detection queries against this instead of applying SQL {@code LOWER()} to {@link #vendor} —
+   * Postgres's collation folds Turkish "İ" differently than Java's locale-independent case
+   * folding does, so the two would silently never match for any such vendor name (see V29). */
+  @Column(name = "vendor_key", updatable = false)
+  private String vendorKey;
+
   /**
    * {@code updatable = false} here only means Hibernate's entity dirty-checking never writes this
    * column — it does not stop the schema from changing it. Review-queue resolution (approve keeps
@@ -100,6 +107,7 @@ public class Expense {
     this.organizationId = organizationId;
     this.documentId = documentId;
     this.vendor = vendor;
+    this.vendorKey = normalizeVendor(vendor);
     this.categoryId = categoryId;
     this.ledgerTransactionId = ledgerTransactionId;
     this.amountMinor = amountMinor;
@@ -181,6 +189,21 @@ public class Expense {
 
   public String getVendor() {
     return vendor;
+  }
+
+  public String getVendorKey() {
+    return vendorKey;
+  }
+
+  /** Single source of truth for vendor-key normalization — every reader of {@link #vendorKey}
+   * (this class's constructor, and any caller needing to match a not-yet-persisted vendor string
+   * against it) must derive it identically, or the mismatch V29 fixed comes back in a new form. */
+  static String normalizeVendor(String vendor) {
+    if (vendor == null) {
+      return null;
+    }
+    String trimmed = vendor.trim().toLowerCase(java.util.Locale.ROOT);
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   public UUID getCategoryId() {

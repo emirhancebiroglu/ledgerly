@@ -70,6 +70,55 @@ class DuplicateAlertEvaluatorIT extends AbstractPostgresIT {
   }
 
   @Test
+  void aVendorNameContainingTurkishUppercaseIIsStillMatchedAsADuplicate() throws SQLException {
+    // Regression for the real-world bug this covers: Postgres's LOWER() folds Turkish "İ"
+    // (U+0130) to a bare "i" under this database's collation, while Java's Locale.ROOT case
+    // folding produces "i" plus a combining dot above (U+0307) — two different strings. Comparing
+    // a SQL-side LOWER(TRIM(vendor)) against a Java-side vendorKey made every vendor name
+    // containing "İ" invisible to duplicate detection; 111 repeat postings for one real vendor
+    // went unflagged before this was caught. Expense.vendorKey (written once, in Java, at insert
+    // time) is what closes the gap — this test would have failed against the old
+    // LOWER(TRIM(e.vendor)) query.
+    String vendor = "TURKNET İLETİŞİM HİZMETLERİ A.Ş.";
+    UUID orgId;
+    UUID categoryId;
+    UUID earlier;
+    UUID candidateDocumentId;
+    UUID actor;
+    try (Connection connection = dataSource.getConnection()) {
+      orgId = insertOrganization(connection);
+      categoryId = insertCategory(connection, orgId);
+      earlier = insertExpense(connection, orgId, categoryId, vendor, 108_377L, "TRY", "ZB22025000021168", "2025-01-27");
+      actor = insertUser(connection, orgId);
+      candidateDocumentId = insertDocument(connection, orgId);
+    }
+
+    UUID candidateId =
+        new TransactionTemplate(transactionManager)
+            .execute(
+                status -> {
+                  Expense candidate =
+                      expenseRepository.save(
+                          Expense.posted(
+                              orgId, candidateDocumentId, vendor, categoryId, null, 108_377L,
+                              "TRY", 0.95, null, "ZB22025000021168", java.time.LocalDate.of(2025, 1, 27)));
+                  expenseRepository.flush();
+                  evaluator.evaluate(candidate, actor);
+                  return candidate.getId();
+                });
+
+    List<Alert> alerts =
+        alertRepository.findByOrganizationId(orgId, PageRequest.of(0, 20)).stream()
+            .filter(a -> a.getAlertType().equals("DUPLICATE_SUSPECTED"))
+            .toList();
+    assertThat(alerts).hasSize(1);
+    Alert alert = alerts.get(0);
+    assertThat(alert.getExpenseId()).isEqualTo(candidateId);
+    assertThat(alert.getMatchedExpenseId()).isEqualTo(earlier);
+    assertThat(alert.getDuplicateTier()).isEqualTo("CONFIRMED");
+  }
+
+  @Test
   void theLedgerTransactionIsUnaffectedByADuplicateFinding() throws SQLException {
     UUID orgId;
     UUID categoryId;
@@ -225,18 +274,19 @@ class DuplicateAlertEvaluatorIT extends AbstractPostgresIT {
     try (PreparedStatement ps =
         connection.prepareStatement(
             "INSERT INTO expense (id, organization_id, document_id, category_id, vendor, "
-                + "amount_minor, currency, categorization_confidence, status, invoice_number, "
-                + "issue_date, created_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, 0.9, 'POSTED', ?, ?::date, now())")) {
+                + "vendor_key, amount_minor, currency, categorization_confidence, status, "
+                + "invoice_number, issue_date, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.9, 'POSTED', ?, ?::date, now())")) {
       ps.setObject(1, id);
       ps.setObject(2, orgId);
       ps.setObject(3, insertDocument(connection, orgId));
       ps.setObject(4, categoryId);
       ps.setString(5, vendor);
-      ps.setLong(6, amountMinor);
-      ps.setString(7, currency);
-      ps.setString(8, invoiceNumber);
-      ps.setString(9, issueDate);
+      ps.setString(6, Expense.normalizeVendor(vendor));
+      ps.setLong(7, amountMinor);
+      ps.setString(8, currency);
+      ps.setString(9, invoiceNumber);
+      ps.setString(10, issueDate);
       ps.executeUpdate();
     }
     return id;

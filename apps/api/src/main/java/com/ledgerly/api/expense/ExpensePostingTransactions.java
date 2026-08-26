@@ -193,6 +193,7 @@ public class ExpensePostingTransactions {
                 organizationId,
                 documentId,
                 proposal.vendor(),
+                Expense.normalizeVendor(proposal.vendor()),
                 proposal.totalMinor(),
                 proposal.currency())
             == 1;
