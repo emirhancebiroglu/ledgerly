@@ -1,0 +1,130 @@
+# Render Blueprint — deploys `api` and `ai` as Docker web services plus a managed Postgres
+# with pgvector, on the free plan (M9.9 removed the Redis requirement both services had).
+# https://render.com/docs/blueprint-spec
+#
+# Every secret is `sync: false`: Render prompts for the value once at blueprint creation and
+# never stores it in this file or in git. Non-secret values are plain so a fresh blueprint apply
+# needs no manual entry beyond the secrets docs/deploy.md walks through.
+
+databases:
+  - name: ledgerly-postgres
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "17"
+    # pgvector is available on Render's managed Postgres (verified M10 T2) — no extra
+    # provisioning step; `CREATE EXTENSION IF NOT EXISTS vector` in V11's Flyway migration runs
+    # against this database like any other extension.
+
+services:
+  - type: web
+    name: ledgerly-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    envVars:
+      # Two separate concerns, both set to the same value on purpose. PORT is Render's own
+      # routing config — it tells Render which port the container listens on (default 10000),
+      # nothing more. Spring itself does not read a bare PORT; its relaxed env binding maps
+      # SERVER_PORT to server.port, which is unset in application.yml, so Spring defaults to
+      # 8080 regardless — SERVER_PORT is set here anyway so this stays correct if that default
+      # ever changes, rather than depending on an implicit match with the Dockerfile's EXPOSE.
+      - key: PORT
+        value: "8080"
+      - key: SERVER_PORT
+        value: "8080"
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod,demo
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ledgerly-postgres
+          property: connectionString
+      # api/DatabaseUrlEnvironmentPostProcessor.java rewrites Render's postgres:// connection
+      # string into the jdbc:postgresql:// form Spring's datasource.url requires — no separate
+      # username/password wiring needed here, DATABASE_URL carries all three.
+      - key: JWT_SECRET
+        sync: false
+      - key: AI_BASE_URL
+        sync: false
+        # Render's Blueprint spec has no string interpolation and fromService's host/hostport
+        # properties return a bare hostname with no scheme, but AI_BASE_URL must be a full URL
+        # (application.yml's own default is "http://localhost:8000") — filled in by hand once
+        # ledgerly-ai's public URL exists after its first deploy. docs/deploy.md T6 covers this.
+      - key: AI_SERVICE_TOKEN
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+        # Set once the Vercel domain exists (M10 T3) — docs/deploy.md T6 covers this.
+      # M9.9: Redis is optional and the free tier has no managed Redis. Both switches select
+      # the in-process adapter; there is no separate Redis service in this blueprint at all.
+      - key: RATE_LIMIT_BACKEND
+        value: in-memory
+      - key: DOCUMENT_EVENT_BROKER
+        value: in-memory
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
+
+  - type: web
+    name: ledgerly-ai
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./apps/ai/Dockerfile
+    # Not repo root: unlike apps/api's Dockerfile (which COPYs apps/api/... and needs the
+    # monorepo root as context), apps/ai's Dockerfile COPYs requirements.txt/app/ as paths
+    # relative to itself — the same context docker-compose.yml already uses
+    # (context: ../apps/ai). Building this one from repo root would 404 on requirements.txt.
+    dockerContext: ./apps/ai
+    healthCheckPath: /health
+    envVars:
+      # ai's Dockerfile CMD hardcodes `--port 8000` (uvicorn does not read PORT on its own), so
+      # PORT here tells Render which port to route to rather than changing the image.
+      - key: PORT
+        value: "8000"
+      # No database wiring here: `ai` never touches Postgres (only `api` writes; `ai` returns
+      # structured extraction/categorization proposals) — AI_DATABASE_URL exists in
+      # .env.example but is read by nothing in apps/ai, confirmed by grep before this blueprint
+      # was written.
+      - key: AI_SERVICE_TOKEN
+        sync: false
+        # Must be the identical value entered for ledgerly-api's AI_SERVICE_TOKEN above — this
+        # is the shared secret DocumentQueuePoller's calls into `ai` authenticate with.
+      - key: AI_CORS_ORIGINS
+        sync: false
+        # Without this, web/src/app/health's browser-side fetch to `ai` succeeds at the network
+        # level but the browser blocks reading the response body (config.py's default is
+        # localhost:3000 only) — the health page would report `ai` down when it is actually
+        # fine. Fill in once the Vercel domain exists (M10 T3), same value as
+        # CORS_ALLOWED_ORIGINS above. pydantic-settings parses a list field from an env var as a
+        # JSON array, not a bare comma-separated string — enter it as
+        # ["https://<domain>.vercel.app"], not https://<domain>.vercel.app.
+      - key: AI_LLM_PROVIDER
+        value: litellm
+      - key: AI_LLM_API_KEY
+        sync: false
+      - key: AI_EMBEDDING_PROVIDER
+        value: litellm
+      - key: AI_EMBEDDING_API_KEY
+        sync: false
+        # A Voyage AI key, not the same value as AI_LLM_API_KEY — see docs/decisions.md,
+        # 2026-08-25, on why the two providers cannot share one key.
+      # M9.9: no managed Redis on the free tier; empty/unset AI_RATE_LIMIT_REDIS_URL selects
+      # the in-process rate limiter. Deliberately omitted here rather than set to "" — Render's
+      # blueprint apply prompts for any sync:false var with no default, and this one has none,
+      # so leaving it out of envVars entirely is what keeps it genuinely unset.
+      - key: AI_SENTRY_DSN
+        sync: false
+      - key: AI_SENTRY_ENVIRONMENT
+        value: production
