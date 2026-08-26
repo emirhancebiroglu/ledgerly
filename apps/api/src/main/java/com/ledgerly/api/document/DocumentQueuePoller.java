@@ -52,8 +52,14 @@ public class DocumentQueuePoller {
     this.dispatchRetryDelay = Duration.ofSeconds(dispatchRetrySeconds);
   }
 
+  // initialDelay is configurable purely so tests can push the first tick out of their own run.
+  // fixedDelay alone fires once immediately at startup no matter how long the interval is, and a
+  // test that drives this poller by hand would then be racing the scheduled copy for the same rows
+  // — the losing side sees PROCESSING where it expected PENDING, depending on which IT class
+  // happened to warm the shared context first.
   @Scheduled(
       fixedDelayString = "${ledgerly.document.queue.interval-seconds:5}",
+      initialDelayString = "${ledgerly.document.queue.initial-delay-seconds:0}",
       timeUnit = java.util.concurrent.TimeUnit.SECONDS)
   public void processDueDocuments() {
     Instant now = Instant.now(clock);
