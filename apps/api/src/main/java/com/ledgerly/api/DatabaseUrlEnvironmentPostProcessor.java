@@ -12,8 +12,17 @@ import org.springframework.core.env.MutablePropertySources;
 /**
  * Render's managed Postgres hands out a single {@code postgres://user:pass@host:port/db}
  * connection string. Spring's datasource wants a JDBC URL and separate username/password
- * properties. This runs before context refresh, so by the time {@code application.yml}
- * resolves {@code ${DATABASE_URL}} the bridged properties already win by precedence.
+ * properties, and {@code application.yml} gets there by resolving {@code ${DATABASE_URL}} /
+ * {@code ${POSTGRES_USER}} / {@code ${POSTGRES_PASSWORD}} placeholders itself — so this
+ * rewrites those three keys in place rather than writing a separate {@code spring.datasource.*}
+ * property source. Writing separate keys was tried first and lost the precedence race: Boot's
+ * own {@code ConfigDataEnvironmentPostProcessor} loads {@code application.yml} and adds its
+ * property source at the front of the list too, after this post-processor already ran, so
+ * application.yml's {@code spring.datasource.url: ${DATABASE_URL:...}} placeholder resolution
+ * saw this class's addition and application.yml's own definition as two competing
+ * spring.datasource.url values — and on Render, application.yml's (still unresolved, so still
+ * the raw postgres:// string) won. Rewriting DATABASE_URL/POSTGRES_USER/POSTGRES_PASSWORD
+ * instead means there is only ever one definition of each key, so there is nothing left to race.
  */
 public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProcessor, Ordered {
 
@@ -35,10 +44,10 @@ public class DatabaseUrlEnvironmentPostProcessor implements EnvironmentPostProce
         .ifPresent(
             parsed -> {
               Map<String, Object> properties = new HashMap<>();
-              properties.put("spring.datasource.url", parsed.jdbcUrl());
+              properties.put("DATABASE_URL", parsed.jdbcUrl());
               if (parsed.username() != null) {
-                properties.put("spring.datasource.username", parsed.username());
-                properties.put("spring.datasource.password", parsed.password());
+                properties.put("POSTGRES_USER", parsed.username());
+                properties.put("POSTGRES_PASSWORD", parsed.password());
               }
 
               MutablePropertySources sources = environment.getPropertySources();
