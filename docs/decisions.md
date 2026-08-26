@@ -112,6 +112,16 @@ local development keeps exercising the Redis path through Compose. The cost is r
 the write path, which is precisely why it gets its own milestone and its own verification pass
 instead of riding along inside M10.
 
+**Addendum, 2026-08-26 (T6 closed).** T6's own text called for a profile guard on `RedisConfig`.
+Writing the real end-to-end test (`NoRedisBootIT`: upload → extraction → SSE with Redis pointed at
+an unreachable address) found that no guard was needed — T1-T4's `@ConditionalOnProperty` guards
+on the two Redis adapters were already sufficient, because `RedisMessageListenerContainer.start()`
+short-circuits before any connection attempt when no listener was ever registered, which is always
+true once `RedisDocumentEventBroker` itself is never constructed. Confirmed the actuator Redis
+health indicator is also already off (`management.health.redis.enabled: false`), so this holds for
+an actual deployment's health checks too, not only for the request path a test can exercise. M9.9
+is closed: `api` and `ai` both boot and serve their full loop with no Redis reachable.
+
 ---
 
 ## 2026-08-26 — Free tier for Render, with UptimeRobot warming `api` only
