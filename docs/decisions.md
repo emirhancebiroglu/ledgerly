@@ -36,6 +36,14 @@ both adapters under the shared contract, and any assertion there stated as a ran
 exact value should be treated as a gap — a range wide enough to accept both backends is wide enough
 to hide a disagreement between them.
 
+**Addendum, 2026-08-26 (M9.9 T5).** The identical bug existed in `ai`'s `AiRateLimiter`, an
+independent Lua script written before this fix and never audited against it. Found by writing the
+same exact-value contract test against `ai`'s Redis adapter and watching the boundary case fail —
+not by inspection, since the two scripts are separate files in separate languages with no shared
+source to have caught the drift automatically. Fixed the same way (`PTTL`, ceiling). No other Lua
+script exists in the repo as of this addendum; any future one must be checked against this same
+boundary before being trusted, since nothing enforces the fix propagating on its own.
+
 ---
 
 ## 2026-08-26 — Replace Redis with in-process adapters for a single-instance deployment (M9.9)
