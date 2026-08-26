@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* This app has no dark theme yet — `--card`/`--foreground` etc. only have light values. Without
+   this, Tailwind's default `dark:` variant follows `prefers-color-scheme`, so shadcn defaults
+   like Input's `dark:bg-input/30` silently paint a grey fill on any OS in dark mode. Scope
+   `dark:` to an explicit `.dark` class (never applied here) until a real dark theme exists. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   /* Shell breakpoint from docs/design/m7/README.md — the sidebar becomes an off-canvas drawer
      below this width. Not one of Tailwind's default breakpoints. */
@@ -154,7 +160,7 @@
   input:-webkit-autofill:active {
     -webkit-background-clip: text;
     background-clip: text;
-    box-shadow: 0 0 0 1000px transparent inset;
+    box-shadow: 0 0 0 1000px var(--card) inset;
     -webkit-text-fill-color: var(--foreground);
     /* The UA applies its own fade-in on autofill; keep the field from flashing the default fill. */
     transition: background-color 5000000s ease-in-out 0s;

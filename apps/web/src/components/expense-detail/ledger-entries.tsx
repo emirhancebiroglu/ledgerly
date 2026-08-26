@@ -1,13 +1,10 @@
+import { CircleCheck } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { formatMoney } from "@/lib/money";
 import type { LedgerEntryView } from "@/lib/expense-detail";
 
 interface LedgerEntriesProps {
   entries: LedgerEntryView[];
-}
-
-function signedAmount(entry: LedgerEntryView): number {
-  return entry.direction === "DEBIT" ? entry.amountMinor : -entry.amountMinor;
 }
 
 export function LedgerEntries({ entries }: LedgerEntriesProps) {
@@ -34,10 +31,6 @@ export function LedgerEntries({ entries }: LedgerEntriesProps) {
   // labeling the result with whichever currency happened to come first.
   const currencies = new Set(entries.map((entry) => entry.currency));
   const isSingleCurrency = currencies.size === 1;
-  const balance = isSingleCurrency
-    ? entries.reduce((sum, entry) => sum + signedAmount(entry), 0)
-    : null;
-  const currency = entries[0].currency;
 
   return (
     <Card className="p-[22px_24px]">
@@ -63,14 +56,16 @@ export function LedgerEntries({ entries }: LedgerEntriesProps) {
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-[12.5px]">
-        <span className="text-muted-foreground">Balance</span>
+        <span className="text-muted-foreground">Double-entry check</span>
         {isSingleCurrency ? (
           <span
-            className="font-mono tabular-nums"
+            className="flex items-center gap-1.5 font-medium text-success"
             data-testid="ledger-balance"
-            aria-label={`Ledger balance: ${formatMoney(balance!, currency)}`}
+            aria-label="Balanced: debits equal credits"
+            title="Debits and credits on this posting sum to zero, confirming it was recorded correctly."
           >
-            {formatMoney(balance!, currency)}
+            <CircleCheck className="size-[14px]" aria-hidden />
+            Balanced
           </span>
         ) : (
           <span

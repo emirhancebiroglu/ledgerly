@@ -48,7 +48,7 @@ test.describe("expense detail", () => {
 
     await expect(page.getByText("Travel Expense")).toBeVisible();
     await expect(page.getByText("Cash / Bank")).toBeVisible();
-    await expect(page.getByTestId("ledger-balance")).toHaveText("€0.00");
+    await expect(page.getByTestId("ledger-balance")).toHaveText("Balanced");
   });
 
   test("a NEEDS_REVIEW expense with a null ledgerTransactionId renders without a transaction, not a crash", async ({

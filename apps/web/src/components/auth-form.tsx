@@ -109,14 +109,14 @@ export function AuthForm({ mode, next }: AuthFormProps) {
             Password
           </label>
           <div
-            className="flex h-[42px] items-center gap-2.5 rounded-lg border border-[oklch(0.9_0.006_265)] bg-card px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-[oklch(0.6_0.13_265)] focus-within:shadow-[0_0_0_3px_oklch(0.5_0.16_265_/_0.12)]"
+            className="flex h-[42px] items-center gap-2.5 rounded-lg border border-[oklch(0.9_0.006_265)] bg-card px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-[oklch(0.6_0.13_265)] focus-within:shadow-[0_0_0_3px_oklch(0.5_0.16_265_/_0.12)] data-[invalid=true]:border-[oklch(0.6_0.16_25)] data-[invalid=true]:shadow-[0_0_0_3px_oklch(0.6_0.16_25_/_0.12)]"
             data-invalid={Boolean(fieldErrors.password)}
           >
             <LockKeyhole aria-hidden="true" className="size-[15px] shrink-0 text-[oklch(0.6_0.015_265)]" />
             <Input
               aria-describedby={fieldErrors.password ? "password-error" : undefined}
               aria-invalid={Boolean(fieldErrors.password)}
-              className="h-full border-0 p-0 text-[13.5px] shadow-none focus-visible:border-0 focus-visible:ring-0"
+              className="h-full border-0 p-0 text-[13.5px] shadow-none focus-visible:border-0 focus-visible:ring-0 aria-invalid:border-0 aria-invalid:ring-0"
               id="password"
               minLength={isRegister ? 12 : undefined}
               name="password"
@@ -206,13 +206,16 @@ function AuthField({
       <label className="mb-1.5 block text-[12.5px] font-medium" htmlFor={name}>
         {label}
       </label>
-      <div className="flex h-[42px] items-center gap-2.5 rounded-lg border border-[oklch(0.9_0.006_265)] bg-card px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-[oklch(0.6_0.13_265)] focus-within:shadow-[0_0_0_3px_oklch(0.5_0.16_265_/_0.12)]">
+      <div
+        className="flex h-[42px] items-center gap-2.5 rounded-lg border border-[oklch(0.9_0.006_265)] bg-card px-3 transition-[border-color,box-shadow] duration-150 focus-within:border-[oklch(0.6_0.13_265)] focus-within:shadow-[0_0_0_3px_oklch(0.5_0.16_265_/_0.12)] data-[invalid=true]:border-[oklch(0.6_0.16_25)] data-[invalid=true]:shadow-[0_0_0_3px_oklch(0.6_0.16_25_/_0.12)]"
+        data-invalid={Boolean(error)}
+      >
         {icon && <span className="shrink-0 text-[oklch(0.6_0.015_265)]">{icon}</span>}
         <Input
           aria-describedby={error ? errorId : undefined}
           aria-invalid={Boolean(error)}
           autoComplete={type === "email" ? "email" : "name"}
-          className="h-full border-0 p-0 text-[13.5px] shadow-none focus-visible:border-0 focus-visible:ring-0"
+          className="h-full border-0 p-0 text-[13.5px] shadow-none focus-visible:border-0 focus-visible:ring-0 aria-invalid:border-0 aria-invalid:ring-0"
           id={name}
           name={name}
           onBlur={onBlur}
