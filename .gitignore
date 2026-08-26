@@ -4,6 +4,7 @@
 .env.*.local
 *.pem
 *.key
+infra/docker-compose.override.yml
 
 # Java / Maven
 target/

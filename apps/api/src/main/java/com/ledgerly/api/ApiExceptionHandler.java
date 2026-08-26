@@ -21,6 +21,7 @@ import com.ledgerly.api.policy.InvalidPolicyListQueryException;
 import com.ledgerly.api.ratelimit.RateLimitExceededException;
 import com.ledgerly.api.ratelimit.RateLimitUnavailableException;
 import com.ledgerly.api.storage.StorageKeyNotFoundException;
+import io.sentry.Sentry;
 import java.util.NoSuchElementException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,6 +163,11 @@ public class ApiExceptionHandler {
     // Logged, never returned: the client gets a correlation id to quote, and the detail stays
     // server-side where it cannot leak internals.
     log.error("Unhandled exception type={} status=500", exception.getClass().getSimpleName());
+    // This @RestControllerAdvice catches every exception before it can reach the servlet
+    // container, which is exactly the layer Sentry's Spring auto-instrumentation listens at —
+    // without this call, nothing an application exception handler catches (i.e. everything)
+    // would ever reach Sentry. A no-op when SENTRY_DSN is unset (SDK not initialized).
+    Sentry.captureException(exception);
     return withCorrelationId(
         ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"));
   }

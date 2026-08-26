@@ -2,10 +2,12 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
+from sentry_sdk.integrations.logging import LoggingIntegration
 
 from app.anomaly.anomaly import AnomalyFailedError, AnomalyService
 from app.categorization.categorization import CategorizationFailedError, CategorizationService
@@ -23,6 +25,28 @@ from app.service_auth import is_cost_bearing_agent_request, require_service_auth
 
 configure_logging()
 logger = logging.getLogger(__name__)
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.sentry_environment,
+        # No request bodies (invoice bytes, extracted field values) and no PII (client IP,
+        # headers) — same bar as M9's structured-logging review. Error tracking only: no
+        # performance tracing, no profiling.
+        send_default_pii=False,
+        max_request_body_size="never",
+        integrations=[
+            # T8: the default LoggingIntegration reads the raw stdlib LogRecord before
+            # observability.py's JsonFormatter ever runs _redact() on it — every log call this
+            # service makes would reach Sentry unredacted as a breadcrumb (INFO+) or its own
+            # separate event (ERROR+), bypassing the one PII safeguard this codebase has for
+            # logging. Real exceptions already reach Sentry through FastAPI's own automatic
+            # exception capture; log breadcrumbs add no exception-tracking value here, only
+            # PII risk. level=None/event_level=None disables both entirely rather than trying
+            # to keep the integration "on" at a level that never actually fires.
+            LoggingIntegration(level=None, event_level=None, sentry_logs_level=None),
+        ],
+    )
 
 app = FastAPI(
     title=settings.service_name,

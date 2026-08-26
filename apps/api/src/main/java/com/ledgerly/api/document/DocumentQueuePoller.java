@@ -9,6 +9,7 @@ import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,8 +17,14 @@ import org.springframework.stereotype.Component;
  * Dispatches durable extraction work without tying upload availability to the agent. A candidate
  * scan is intentionally not a lock: every selected row is claimed by a conditional UPDATE, so
  * concurrent pollers can harmlessly see the same row but only one can dispatch it.
+ *
+ * <p>Disabled on the {@code demo} profile: {@link com.ledgerly.api.demo.DemoSeedRunner} writes
+ * its own (fixture-recorded, LLM-free) extraction outcome for each seeded document between
+ * upload and {@code markProcessing} — a poll tick landing in that window would otherwise race
+ * a real {@code ai} call against the seed and abort it via the status transition guard.
  */
 @Component
+@Profile("!demo")
 public class DocumentQueuePoller {
 
   private final DocumentRepository documentRepository;

@@ -5,6 +5,7 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
@@ -48,6 +49,10 @@ public class SecurityConfig {
       HttpSecurity http, JwtAuthenticationFilter jwtFilter, IdempotencyFilter idempotencyFilter)
       throws Exception {
     http.csrf(csrf -> csrf.disable())
+        // Picks up the CorsConfigurationSource bean (see CorsConfig) — without this, that bean
+        // being registered is not enough, Spring Security never consults it and every
+        // cross-origin request is rejected before reaching a controller.
+        .cors(Customizer.withDefaults())
         .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         // Explicit, not relied on as a framework default: `nosniff` is the control that stops a
         // polyglot upload (valid magic bytes, HTML payload after the header) from being executed

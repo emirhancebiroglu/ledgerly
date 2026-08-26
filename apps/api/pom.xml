@@ -33,6 +33,9 @@
     <micrometer.version>1.15.12</micrometer.version>
     <spring-framework.version>6.2.19</spring-framework.version>
     <spring-data-bom.version>2025.0.13</spring-data-bom.version>
+    <aws-sdk.version>2.46.18</aws-sdk.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
+    <sentry.version>8.53.0</sentry.version>
   </properties>
 
   <dependencies>
@@ -140,6 +143,22 @@
       <artifactId>pdfbox</artifactId>
       <version>${pdfbox.version}</version>
     </dependency>
+    <!-- R2 is S3-compatible; this is the "prod" profile's StorageClient backend (T2). Pinned
+         directly rather than via the awssdk BOM since this is the only AWS SDK module in use —
+         import the BOM instead if a second one is ever added, to avoid transitive version skew. -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>${aws-sdk.version}</version>
+    </dependency>
+    <!-- T6: minimal error tracking. -jakarta is the Boot 3.x build (javax vs jakarta namespace
+         split) — see docs/decisions.md if the plain sentry-spring-boot-starter is ever tried
+         here by mistake, it silently fails to autoconfigure against jakarta servlet types. -->
+    <dependency>
+      <groupId>io.sentry</groupId>
+      <artifactId>sentry-spring-boot-starter-jakarta</artifactId>
+      <version>${sentry.version}</version>
+    </dependency>
   </dependencies>
 
   <dependencyManagement>
@@ -150,6 +169,21 @@
         <version>${testcontainers.version}</version>
         <type>pom</type>
         <scope>import</scope>
+      </dependency>
+      <!-- Pulled in transitively by the AWS SDK's apache5-client (s3 -> httpclient5 -> here),
+           which still resolves 5.3.6: CVE-2026-54399 and CVE-2026-54428, both HIGH DoS via
+           oversized headers. Managed forward to the first fixed release rather than pinned
+           per-dependency, so both core5 artifacts move together and the SDK's own upgrade
+           does not silently drag either back down. -->
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5</artifactId>
+        <version>${httpcore5.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.httpcomponents.core5</groupId>
+        <artifactId>httpcore5-h2</artifactId>
+        <version>${httpcore5.version}</version>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -168,6 +202,16 @@
           <include>extraction-proposal.schema.json</include>
         </includes>
         <targetPath>contracts</targetPath>
+      </resource>
+      <!-- T5.1/T5.2 generate these PDFs (scripts/demo_seed/); T5.5's demo seed re-uploads the
+           exact same bytes through the real storage layer, so the fixture and the blob it
+           describes can never drift apart into two hand-copied trees. -->
+      <resource>
+        <directory>${project.basedir}/../../scripts/demo_seed/pdfs</directory>
+        <includes>
+          <include>**/*.pdf</include>
+        </includes>
+        <targetPath>db/seed/pdfs</targetPath>
       </resource>
     </resources>
     <plugins>

@@ -5,6 +5,7 @@ COPY apps/api/mvnw apps/api/pom.xml ./
 RUN ./mvnw -B dependency:go-offline
 COPY apps/api/src/ src/
 COPY docs/contracts/extraction-proposal.schema.json /workspace/docs/contracts/extraction-proposal.schema.json
+COPY scripts/demo_seed/pdfs/ /workspace/scripts/demo_seed/pdfs/
 RUN ./mvnw -B package -DskipTests
 
 FROM eclipse-temurin:21.0.11_10-jre-jammy

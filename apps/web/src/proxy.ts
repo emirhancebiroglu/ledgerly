@@ -43,5 +43,9 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  // opengraph-image and icon excluded alongside the existing infra paths: both are fetched
+  // unauthenticated (a social-media crawler unfurling a shared link; a browser tab requesting
+  // the favicon) rather than navigated to — gating either behind login breaks the thing it's
+  // for (a blank link preview; a browser retrying/failing to load the tab icon).
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|opengraph-image|icon).*)"],
 };

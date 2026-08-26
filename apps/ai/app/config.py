@@ -67,16 +67,25 @@ class Settings(BaseSettings):
     # Which EmbeddingClient adapter to use. "litellm" is the real M6 adapter; "fake" keeps a
     # deterministic stub available for tests and offline runs, same split as llm_provider above.
     embedding_provider: str = "litellm"
-    embedding_model: str = "anthropic/qwen3.7-plus"
+    # The OpenCode Go gateway (llm_api_base above) only proxies chat completion, not embeddings —
+    # every embedding-capable model tried through it 404s or hits "Unmapped LLM provider for this
+    # endpoint" (Anthropic itself has no native embedding API). Voyage is called directly instead:
+    # free tier (50M tokens), no credit card, and it actually works. See docs/decisions.md,
+    # 2026-08-25 entry on the embedding provider.
+    embedding_model: str = "voyage/voyage-3"
     embedding_api_key: str | None = None
-    embedding_dimensions: int = 1536
+    embedding_dimensions: int = 1024
     embedding_timeout_seconds: float = 30.0
-    embedding_api_base: str | None = "https://opencode.ai/zen/go"
+    embedding_api_base: str | None = None
 
     anomaly_medium_z_score: float = Field(default=2.0, gt=0)
     anomaly_high_z_score: float = Field(default=3.0, gt=0)
     anomaly_medium_burn_rate: float = Field(default=0.80, ge=0)
     anomaly_high_burn_rate: float = Field(default=1.0, ge=0)
+
+    # T6: minimal error tracking. Empty/unset disables the SDK entirely (see main.py).
+    sentry_dsn: str | None = None
+    sentry_environment: str = "local"
 
 
 settings = Settings()
