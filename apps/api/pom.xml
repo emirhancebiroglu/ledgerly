@@ -226,6 +226,17 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
+        <configuration>
+          <!-- Stated rather than left to the default (which also matches IT*.java and
+               *ITCase.java) so one suffix decides membership. Failsafe scans compiled classes,
+               so a target/test-classes entry whose source has since been deleted or renamed is
+               still a candidate: it then fails to resolve with a message naming the class, not
+               the staleness. `mvn clean verify` is the reliable invocation after a branch
+               switch, and what CI runs. -->
+          <includes>
+            <include>**/*IT.java</include>
+          </includes>
+        </configuration>
         <executions>
           <execution>
             <goals>
