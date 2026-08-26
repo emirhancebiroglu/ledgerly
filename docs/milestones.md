@@ -487,12 +487,32 @@ changes and deploy wiring must not be verified in the same pass.
   reliably once removed. The end-to-end test points Redis at an address nothing listens on, the
   `RedisOutageIT` technique, so passing proves the demo works with Redis genuinely unreachable.
 
-- [ ] T5 — Same split in `ai`: a `RateLimiter` protocol with the existing `AiRateLimiter` as the
-  Redis adapter and an in-process default, selected by config (empty/unset
-  `AI_RATE_LIMIT_REDIS_URL` chooses in-process). `main.py` wires whichever is configured.
-  **Test:** the existing `AiRateLimiter` tests keep passing; a shared parametrized test asserts
-  both adapters produce identical admit/reject/retry-after behavior, and that
-  `RateLimitUnavailable` still fails closed.
+- [x] T5 — Same split in `ai`: a `RateLimiter` protocol, `RedisRateLimiter` and
+  `InMemoryRateLimiter` behind it, `AiRateLimiter` keeping key derivation the way api's
+  `UploadRateLimiter`/`AuthRateLimiter` do. Selected by config: empty/unset
+  `AI_RATE_LIMIT_REDIS_URL` chooses in-process, any other value chooses Redis. `main.py`'s call
+  site needed no change.
+  **Found the identical `-0` admission bug api's `RedisRateLimiter` had until M9.9 T2** — the
+  Lua script negated a whole-second `TTL` directly, so a rejection in a window's final second was
+  `-0` (`== 0`), admitted by any sign check. Reproduced against a real Redis (revert the script,
+  watch the boundary case fail with `assert 0 < 0`) before fixing it the same way: read `PTTL`,
+  round up. CI's `ai` job gained a Redis service container so `RedisRateLimiter` is exercised on
+  every push, not only locally. `InMemoryRateLimiter` also gained api's call-triggered sweep,
+  missing from the first draft — `ai`'s keyspace is small and fixed (five paths) so the exposure
+  was low, but leaving it out would have been an unexplained divergence from the milestone's own
+  "same split" framing rather than a reasoned tradeoff.
+  **Known gap, not closed here:** a syntactically valid but unreachable `AI_RATE_LIMIT_REDIS_URL`
+  fails only on the first live request (`RateLimitUnavailable`, closed — not silently admitted),
+  not at startup the way `RateLimiterBackendGuard` fails for a bad `api` config value. A
+  malformed URL (wrong scheme) does fail at construction, via `redis-py`'s own validation. Closing
+  the reachability gap needs a startup health check, a different task than protocol extraction.
+  **Test:** a shared contract (exact values, not ranges — the same lesson T2's first draft
+  contract learned) asserts identical admit/reject/retry-after behavior across both adapters,
+  including the `-0` boundary case for each; `RateLimitUnavailable` is asserted only for Redis,
+  since the in-process adapter has no I/O and structurally cannot raise it. `AiRateLimiter` gained
+  its own unit tests — the pre-existing `test_rate_limit.py` mocks the `check()` protocol
+  directly and never touched this class, so "existing tests keep passing" was true but vacuous
+  until these were added.
 
 - [ ] T6 — Make Redis genuinely optional at boot: `RedisConfig`, the connection factory and both
   adapters activate on a profile; `api` starts with no Redis reachable and serves uploads, auth,

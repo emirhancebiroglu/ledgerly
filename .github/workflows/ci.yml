@@ -48,6 +48,21 @@ jobs:
   ai:
     name: ai (FastAPI)
     runs-on: ubuntu-latest
+    # RedisRateLimiter (M9.9 T5) is tested against a real Redis rather than a mock — its Lua
+    # script's arithmetic is exactly what the M9.9 T2 -0 admission bug lived in on the api side,
+    # and a mock would only prove the test calls the same methods the implementation does, not
+    # that the script itself is correct. A GitHub Actions service container is the Docker-less
+    # equivalent of api's Testcontainers pattern for the same job.
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
     defaults:
       run:
         working-directory: apps/ai
