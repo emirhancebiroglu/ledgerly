@@ -7,13 +7,21 @@ that replaced it.
 
 ## 2026-08-26 — Replace Redis with in-process adapters for a single-instance deployment (M9.9)
 
-**Context.** M10 planning surfaced a blocker M9.5's checklist missed: Redis is load-bearing in
-both services — pub/sub SSE fan-out (`DocumentEventPublisher`, `DocumentActivityEventPublisher`,
-`DocumentEventController` against a shared `RedisMessageListenerContainer`), auth and upload rate
-limiting in `api`, and cost-bearing agent rate limiting in `ai`. Both rate limiters fail *closed*
-(`RateLimitUnavailableException` / `RateLimitUnavailable`), so a deployment with no reachable
-Redis does not degrade, it rejects every upload. Render's free tier has no managed Redis; its Key
-Value offering is paid-only.
+**Context.** This is not a newly discovered blocker — it is a deferred verification coming due.
+The M7a T6 entry (2026-07-28, below) records that an in-process `ApplicationEvent` + emitter
+registry was *the recommended option* for SSE fan-out, that Redis was chosen anyway after the
+question "would Redis push the deployment into a paid tier?" could not be answered from inside
+the session, and that the entry closed with an explicit instruction: *"Verify actual billing
+impact before deploying — that lookup was never done, by either party, at decision time."* M10 is
+that deploy, so the lookup is now due, and its answer is the one the original decision could not
+obtain.
+
+Redis is load-bearing in both services — pub/sub SSE fan-out (`DocumentEventPublisher`,
+`DocumentActivityEventPublisher`, `DocumentEventController` against a shared
+`RedisMessageListenerContainer`), auth and upload rate limiting in `api`, and cost-bearing agent
+rate limiting in `ai`. Both rate limiters fail *closed* (`RateLimitUnavailableException` /
+`RateLimitUnavailable`), so a deployment with no reachable Redis does not degrade, it rejects
+every upload. Render's free tier has no managed Redis; its Key Value offering is paid-only.
 
 **Decision.** Extract a `RateLimiter` port and a `DocumentEventBroker` port, add in-process
 adapters as the default, and keep the Redis adapters behind a profile that `docker-compose.yml`
@@ -31,6 +39,16 @@ is never verified in the same pass as a write-path code change.
 - *Delete rate limiting and SSE for the demo* — rejected outright; both are M7/M9 deliverables and
   removing them to fit a hosting tier would make the deployed system a weaker claim than the
   repository.
+- *Cloudflare, for Redis or for the database* — checked, since R2 is already in use for documents
+  and extending the same free tier would have been the cheapest answer. Neither part works.
+  Cloudflare has no Redis; its nearest equivalents (Durable Objects, KV) live inside the Workers
+  runtime, and `api`/`ai` are ordinary containers on Render, so there is nothing for
+  `RedisMessageListenerContainer` to connect to — the same runtime mismatch that rules out
+  Upstash. Its database, D1, is SQLite, which cannot host `pgvector`: `policy_chunk.embedding` is
+  a `vector` column queried natively through `PGvector` (`PolicyChunkRepository`), and the whole
+  of M6's policy RAG rests on it. Moving to D1 would mean rewriting every Flyway migration and
+  every Testcontainers-backed test since M2. R2 stays the right use of Cloudflare here; storage
+  is the part of the stack that is genuinely portable.
 
 **Rationale.** Redis is here to coordinate *across instances*: pub/sub so a status change on
 instance A reaches a browser streaming from instance B, and shared counters so a client cannot

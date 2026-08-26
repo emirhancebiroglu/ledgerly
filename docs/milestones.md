@@ -398,7 +398,13 @@ M10 deploys one instance of `api` and one of `ai`. Redis is currently load-beari
 SSE pub/sub fan-out, auth and upload rate limiting in `api`, cost-bearing agent rate limiting in
 `ai` — and the limiters fail *closed*, so a missing Redis rejects uploads rather than degrading.
 Render's free tier has no managed Redis, and Upstash's free tier is HTTP-based with no persistent
-pub/sub, so it cannot back `RedisMessageListenerContainer`.
+pub/sub, so it cannot back `RedisMessageListenerContainer`. Cloudflare cannot substitute either:
+it has no Redis, and its Workers-runtime equivalents are unreachable from ordinary containers.
+
+This milestone was scheduled at M7a, not discovered at M10. That decision (`docs/decisions.md`,
+2026-07-28) recorded an in-process event bus as the recommended option, noted that the paid-tier
+question could not be answered at the time, and closed by requiring the billing check *before
+deploying*. M10 is that deploy; this is the check being paid off.
 
 The point of Redis here is coordination *between instances*: pub/sub so a status change on
 instance A reaches a browser streaming from instance B, and shared counters so a client cannot
@@ -520,7 +526,10 @@ only the first *upload* pays a cold start. Documented in the README rather than 
 - [ ] T2 — Confirm pgvector on Render's managed Postgres: `V11__policy_document_and_chunk.sql`
   runs `CREATE EXTENSION IF NOT EXISTS vector`, which needs a privilege the platform may not
   grant to the default role. Verify before the first deploy rather than discovering it in a
-  failed Flyway migration.
+  failed Flyway migration. This is a hard requirement with no fallback: `policy_chunk.embedding`
+  is a `vector` column queried natively through `PGvector`, so a host without the extension does
+  not degrade M6's policy RAG, it cannot run the migration at all. If Render turns out not to
+  grant it, the answer is a different Postgres host — not a different database engine.
   **Test:** `CREATE EXTENSION IF NOT EXISTS vector;` succeeds against the provisioned database as
   the application role, and `SELECT extversion FROM pg_extension WHERE extname='vector';` returns
   a row.
