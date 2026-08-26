@@ -26,7 +26,8 @@ class UploadRateLimiterTest {
             redisTemplate.execute(
                 any(DefaultRedisScript.class), anyList(), anyString(), anyString()))
         .thenThrow(new RedisConnectionFailureException("redis unavailable"));
-    UploadRateLimiter limiter = new UploadRateLimiter(redisTemplate, 2, 60, 1, 60);
+    UploadRateLimiter limiter =
+        new UploadRateLimiter(new RedisRateLimiter(redisTemplate), 2, 60, 1, 60);
 
     assertThatThrownBy(() -> limiter.checkDocumentUpload(UUID.randomUUID()))
         .isInstanceOf(RateLimitUnavailableException.class);

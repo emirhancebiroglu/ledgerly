@@ -32,7 +32,18 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - run: ./mvnw -B test
+          cache: maven
+          cache-dependency-path: apps/api/pom.xml
+      # `verify`, not `test`: Spring Boot's parent excludes **/*IT.java from surefire, so `test`
+      # runs the unit tests and silently skips every integration test — the ledger-write,
+      # tenant-isolation, idempotency and pipeline assertions among them. Those need Docker for
+      # Testcontainers, which the runner provides.
+      #
+      # `clean` because a stale target/test-classes entry whose source no longer exists (after a
+      # branch switch or a rename) makes failsafe try to load a class it cannot resolve, failing
+      # with a message that names the class and not the cause. Harmless on a fresh CI checkout,
+      # kept so this command means the same thing here as it does locally.
+      - run: ./mvnw -B clean verify
 
   ai:
     name: ai (FastAPI)

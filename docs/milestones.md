@@ -398,7 +398,13 @@ M10 deploys one instance of `api` and one of `ai`. Redis is currently load-beari
 SSE pub/sub fan-out, auth and upload rate limiting in `api`, cost-bearing agent rate limiting in
 `ai` — and the limiters fail *closed*, so a missing Redis rejects uploads rather than degrading.
 Render's free tier has no managed Redis, and Upstash's free tier is HTTP-based with no persistent
-pub/sub, so it cannot back `RedisMessageListenerContainer`.
+pub/sub, so it cannot back `RedisMessageListenerContainer`. Cloudflare cannot substitute either:
+it has no Redis, and its Workers-runtime equivalents are unreachable from ordinary containers.
+
+This milestone was scheduled at M7a, not discovered at M10. That decision (`docs/decisions.md`,
+2026-07-28) recorded an in-process event bus as the recommended option, noted that the paid-tier
+question could not be answered at the time, and closed by requiring the billing check *before
+deploying*. M10 is that deploy; this is the check being paid off.
 
 The point of Redis here is coordination *between instances*: pub/sub so a status change on
 instance A reaches a browser streaming from instance B, and shared counters so a client cannot
@@ -432,9 +438,22 @@ changes and deploy wiring must not be verified in the same pass.
   **Test:** existing `AuthRateLimiter`/`UploadRateLimiter` tests pass unchanged against the
   refactored classes — the seam is proven by *not* rewriting the tests that describe the behavior.
 
-- [ ] T2 — Add `InMemoryRateLimiter`, the default when no Redis profile is active: per-key counter
-  with a monotonic-clock window, evicting expired keys so an unbounded key space (one per
-  organization, one per email fingerprint) cannot leak memory.
+- [x] T2 — Add `InMemoryRateLimiter`: per-key counter with a monotonic-clock window, evicting
+  expired keys so an unbounded key space (one per organization, one per email fingerprint) cannot
+  leak memory. `RedisRateLimiter` must gain its selection guard in this *same* commit: T1 left it
+  an unconditional `@Component` because a guard with no alternative bean would have left the
+  application with no `RateLimiter` at all, so a T2 that only adds the new class produces two
+  candidates and fails every context load.
+  **Amended during execution.** Selection is a property (`ledgerly.rate-limit.backend`), not a
+  Spring profile, and **Redis stays the default** rather than in-memory. Profiles here already
+  carry orthogonal meaning (`demo`, `prod`), so overloading one would tie the limiter backend to
+  the storage backend. Defaulting to Redis is the safer asymmetry: a multi-instance deployment
+  that omits the setting would silently give every instance a full quota, whereas a single-instance
+  one that omits it merely keeps a working Redis round trip. An unrecognised value refuses to start
+  (`RateLimiterBackendGuard`) rather than leaving the cost-bearing paths unguarded. The contract
+  asserts exact retry-after values rather than "throws with the same retry-after" — the port
+  returns a signed TTL and the callers own the exception, so equality is asserted where the
+  divergence would actually occur.
   **Test:** a shared test contract runs against *both* adapters and asserts identical results —
   Nth request inside the window succeeds, N+1th throws `RateLimitExceededException` with the same
   retry-after, and the window resets on expiry. The Redis run uses the existing Testcontainers
@@ -520,7 +539,10 @@ only the first *upload* pays a cold start. Documented in the README rather than 
 - [ ] T2 — Confirm pgvector on Render's managed Postgres: `V11__policy_document_and_chunk.sql`
   runs `CREATE EXTENSION IF NOT EXISTS vector`, which needs a privilege the platform may not
   grant to the default role. Verify before the first deploy rather than discovering it in a
-  failed Flyway migration.
+  failed Flyway migration. This is a hard requirement with no fallback: `policy_chunk.embedding`
+  is a `vector` column queried natively through `PGvector`, so a host without the extension does
+  not degrade M6's policy RAG, it cannot run the migration at all. If Render turns out not to
+  grant it, the answer is a different Postgres host — not a different database engine.
   **Test:** `CREATE EXTENSION IF NOT EXISTS vector;` succeeds against the provisioned database as
   the application role, and `SELECT extversion FROM pg_extension WHERE extname='vector';` returns
   a row.
