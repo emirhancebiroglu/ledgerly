@@ -40,9 +40,13 @@ local abbreviation like TL>",
   "total_minor": <integer, the final payable amount in minor units (cents/kuruş), e.g. 12.10 -> \
 1210. Never a float.>,
   "tax_minor": <integer, the sum of every printed VAT/sales-tax amount already included in \
-total_minor, in minor units. Never return a tax rate, subtotal or one tax rate when several are \
-printed; do not infer tax from a percentage when an invoice tax breakdown is available. Never a \
-float. 0 if the document is genuinely tax-exempt, never omitted.>,
+total_minor, in minor units. VAT/sales-tax means the consumption tax itself (VAT, KDV, TVA, MwSt, \
+IVA, GST, sales tax) — when the invoice prints both a standalone VAT-only line and a separate \
+combined line that adds VAT together with other charges (e.g. "Tax and Fees", "Vergi ve Fonlar", \
+excise, environmental or utility levies), use the VAT-only line, never the combined one, because \
+the combined line is not itself a tax rate applied to the total. Never return a tax rate, subtotal \
+or one tax rate when several are printed; do not infer tax from a percentage when an invoice tax \
+breakdown is available. Never a float. 0 if the document is genuinely tax-exempt, never omitted.>,
   "document_date": "<YYYY-MM-DD — the date the document was ISSUED or CUT, e.g. \\"Fatura Tarihi\\" \
 or \\"Invoice Date\\". NEVER the due date, order date, dispatch date or upload date, even if a \
 label like \\"Sipariş Tarihi\\" or \\"Son Ödeme Tarihi\\" is more prominent on the page.>",
