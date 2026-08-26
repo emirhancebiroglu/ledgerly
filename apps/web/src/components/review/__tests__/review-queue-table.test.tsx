@@ -8,6 +8,9 @@ const actionMocks = vi.hoisted(() => ({
   correctExpense: vi.fn(),
 }));
 vi.mock("@/lib/expense-actions", () => actionMocks);
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}));
 
 const categories = [
   { id: "cat-1", name: "Software" },

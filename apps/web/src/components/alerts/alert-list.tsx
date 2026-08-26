@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { BellOff, CircleCheck, Copy, TriangleAlert, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ function ctaFor(alert: Alert): { label: string; href: string } {
 }
 
 export function AlertList({ initialAlerts, categories }: AlertListProps) {
+  const router = useRouter();
   const [alerts, setAlerts] = useState(initialAlerts);
   const [filter, setFilter] = useState<FilterKey>("ALL");
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +85,10 @@ export function AlertList({ initialAlerts, categories }: AlertListProps) {
     if (!result.ok) {
       setAlerts(previous);
       setError(result.message);
+    } else {
+      // The sidebar's unread-alert count is read once by the server-rendered layout and does not
+      // otherwise learn this alert left the list until a hard reload.
+      router.refresh();
     }
   }
 
@@ -94,6 +100,8 @@ export function AlertList({ initialAlerts, categories }: AlertListProps) {
     const result = await markAlertRead(alert.id);
     if (!result.ok) {
       setAlerts((current) => current.map((a) => (a.id === alert.id ? { ...a, read: false } : a)));
+    } else {
+      router.refresh();
     }
   }
 
@@ -105,6 +113,8 @@ export function AlertList({ initialAlerts, categories }: AlertListProps) {
     if (!result.ok) {
       setAlerts(previous);
       setError(result.message);
+    } else {
+      router.refresh();
     }
   }
 
