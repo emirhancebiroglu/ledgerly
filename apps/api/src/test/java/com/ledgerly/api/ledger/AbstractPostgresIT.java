@@ -36,7 +36,10 @@ import org.testcontainers.utility.DockerImageName;
     })
 public abstract class AbstractPostgresIT {
 
-  static final PostgreSQLContainer<?> POSTGRES =
+  // Public so a context deliberately opting out of this class's Redis wiring (M9.9 T6's
+  // NoRedisBootIT) can still share the one Postgres container per JVM instead of starting a
+  // second, redundant one of its own.
+  public static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(
               DockerImageName.parse("pgvector/pgvector:pg17").asCompatibleSubstituteFor("postgres"))
           .withDatabaseName("ledgerly_test")
