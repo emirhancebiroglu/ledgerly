@@ -5,6 +5,39 @@ that replaced it.
 
 ---
 
+## 2026-08-26 — Rate-limit quotas read `PTTL` and round up, never `TTL` negated
+
+**Context.** M9.9 T2 added a second `RateLimiter` adapter and one shared contract both must pass.
+The contract's exact-value assertions immediately failed on Redis and passed in-process: with under
+a second left in a window, `TTL` reports whole seconds and returns `0`, so a rejection built as
+`-ttl` is `-0` — which is `0`. Both callers decide with `if (ttl < 0)`, so the request was
+**admitted**. One free request past the quota at the end of every window, on the two paths that
+spend money (document upload, policy upload) and the one that bounds credential stuffing.
+
+**Decision.** The script reads `PTTL` (milliseconds) and returns `math.max(1, math.ceil(ttl/1000))`,
+signed negative on rejection. `InMemoryRateLimiter` applies the identical rule.
+
+**Alternatives.** `return -math.max(ttl, 1)` on the existing `TTL` — fixes the admission with a
+smaller change, rejected because it leaves the two adapters disagreeing by a second on every
+mid-window rejection (Redis flooring, in-process rounding up), and that value becomes a client's
+`Retry-After` header. Have callers treat `0` as a rejection — rejected as fixing the symptom at
+every call site rather than the value at its source, and it would silently break the first caller
+that forgets.
+
+**Rationale.** The bug predates the port (the script moved verbatim through T1 from M9's original
+limiters) and survived a real-Redis integration test, because that test asserts `Retry-After: 60`
+at the top of a window — the one moment the two roundings agree and `TTL` is nowhere near zero. It
+took an adapter pair held to one contract with exact values to expose it. Rounding up is chosen
+over flooring because a client must never be told to retry before the window has actually closed.
+
+**Consequence.** Retry-after values are now one second larger mid-window than what Redis previously
+reported; no client contract depended on the old value. Any future limiter arithmetic must keep
+both adapters under the shared contract, and any assertion there stated as a range rather than an
+exact value should be treated as a gap — a range wide enough to accept both backends is wide enough
+to hide a disagreement between them.
+
+---
+
 ## 2026-08-26 — Replace Redis with in-process adapters for a single-instance deployment (M9.9)
 
 **Context.** This is not a newly discovered blocker — it is a deferred verification coming due.
@@ -24,9 +57,16 @@ rate limiting in `ai`. Both rate limiters fail *closed* (`RateLimitUnavailableEx
 every upload. Render's free tier has no managed Redis; its Key Value offering is paid-only.
 
 **Decision.** Extract a `RateLimiter` port and a `DocumentEventBroker` port, add in-process
-adapters as the default, and keep the Redis adapters behind a profile that `docker-compose.yml`
-continues to activate. Land it as its own milestone (M9.9) *before* M10, so deploy configuration
-is never verified in the same pass as a write-path code change.
+adapters alongside the Redis ones, and let a deployment select between them. Land it as its own
+milestone (M9.9) *before* M10, so deploy configuration is never verified in the same pass as a
+write-path code change.
+
+*Amended at T2:* selection is a property (`ledgerly.rate-limit.backend`), not a Spring profile, and
+**Redis remains the default** rather than in-process. Profiles here already carry orthogonal
+meaning (`demo`, `prod`), so overloading one would tie the limiter backend to the storage backend.
+Defaulting to Redis is the safer asymmetry: a multi-instance deployment that omits the setting
+would silently hand every instance a full quota, whereas a single-instance one that omits it merely
+keeps a working Redis round trip. Opting out of the shared counter has to be deliberate.
 
 **Alternatives.**
 - *Upstash Redis free tier* — rejected on a technical fact, not on cost: its free tier is

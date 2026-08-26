@@ -438,12 +438,22 @@ changes and deploy wiring must not be verified in the same pass.
   **Test:** existing `AuthRateLimiter`/`UploadRateLimiter` tests pass unchanged against the
   refactored classes — the seam is proven by *not* rewriting the tests that describe the behavior.
 
-- [ ] T2 — Add `InMemoryRateLimiter`, the default when no Redis profile is active: per-key counter
-  with a monotonic-clock window, evicting expired keys so an unbounded key space (one per
-  organization, one per email fingerprint) cannot leak memory. `RedisRateLimiter` must gain its
-  profile guard in this *same* commit: T1 left it an unconditional `@Component` because a guard
-  with no alternative bean would have left the application with no `RateLimiter` at all, so a T2
-  that only adds the new class produces two candidates and fails every context load.
+- [x] T2 — Add `InMemoryRateLimiter`: per-key counter with a monotonic-clock window, evicting
+  expired keys so an unbounded key space (one per organization, one per email fingerprint) cannot
+  leak memory. `RedisRateLimiter` must gain its selection guard in this *same* commit: T1 left it
+  an unconditional `@Component` because a guard with no alternative bean would have left the
+  application with no `RateLimiter` at all, so a T2 that only adds the new class produces two
+  candidates and fails every context load.
+  **Amended during execution.** Selection is a property (`ledgerly.rate-limit.backend`), not a
+  Spring profile, and **Redis stays the default** rather than in-memory. Profiles here already
+  carry orthogonal meaning (`demo`, `prod`), so overloading one would tie the limiter backend to
+  the storage backend. Defaulting to Redis is the safer asymmetry: a multi-instance deployment
+  that omits the setting would silently give every instance a full quota, whereas a single-instance
+  one that omits it merely keeps a working Redis round trip. An unrecognised value refuses to start
+  (`RateLimiterBackendGuard`) rather than leaving the cost-bearing paths unguarded. The contract
+  asserts exact retry-after values rather than "throws with the same retry-after" — the port
+  returns a signed TTL and the callers own the exception, so equality is asserted where the
+  divergence would actually occur.
   **Test:** a shared test contract runs against *both* adapters and asserts identical results —
   Nth request inside the window succeeds, N+1th throws `RateLimitExceededException` with the same
   retry-after, and the window resets on expiry. The Redis run uses the existing Testcontainers
