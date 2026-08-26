@@ -20,7 +20,20 @@ import org.testcontainers.utility.DockerImageName;
  * prone to connection timeouts under the resulting churn.
  */
 @Tag("integration")
-@SpringBootTest
+@SpringBootTest(
+    properties = {
+      // DocumentQueuePoller's fixedDelay fires once at startup regardless of the interval, and
+      // every IT context shares this one Postgres container with no cleanup between them — a
+      // Failsafe fork can hold several contexts alive at once under Spring's test context cache,
+      // each with its own scheduled poller thread still ticking. A poller that finds another
+      // context's PENDING document and claims it turns that document PROCESSING out from under
+      // whichever test created it, which reads as a flaky "expected PENDING but was PROCESSING"
+      // in a class that never touched the poller. Off by default: a test exercising the poller
+      // itself (DocumentStatusPipelineIT, ExpensePostingPipelineIT) overrides both properties
+      // explicitly via its own @TestPropertySource, which takes precedence over this default.
+      "ledgerly.document.queue.interval-seconds=3600",
+      "ledgerly.document.queue.initial-delay-seconds=3600"
+    })
 public abstract class AbstractPostgresIT {
 
   static final PostgreSQLContainer<?> POSTGRES =
