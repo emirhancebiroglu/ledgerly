@@ -611,12 +611,21 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   `<meta property="og:image" content="https://ledgerly-ruby-two.vercel.app/opengraph-image?...">`
   — absolute, real domain — and the endpoint itself returns `200 image/png`.
 
-- [ ] T4 — Deployment handoff document (`docs/deploy.md`): the exact click-path for every step a
+- [x] T4 — Deployment handoff document (`docs/deploy.md`): the exact click-path for every step a
   person must do by hand — connecting each repository, which secret goes into which platform's
   store, R2 bucket creation and its CORS rules, and the UptimeRobot monitor. Written so the
   deploy is reproducible from scratch, not remembered.
   **Test:** every environment variable that `render.yaml` marks `sync: false`, plus every Vercel
   variable, appears in the document with its source and destination stated.
+  **Written 2026-08-27**: covers R2 bucket + API token creation (CORS deliberately left empty —
+  `R2StorageClient` only ever calls R2 server-side, confirmed by grep, so no browser-origin CORS
+  rule is needed unless a future feature adds direct browser uploads), Sentry's three DSNs,
+  the full Render blueprint secret table (13 unique `sync: false` keys with source + destination
+  each), the `AI_BASE_URL`/CORS circularity between Render and Vercel (each needs the other's
+  URL, resolved with an explicit fill-in-after-first-deploy step), the UptimeRobot monitor
+  (`ledgerly-api` only, 5 min interval, reasoned why not `ledgerly-ai`), and Vercel's 6 variables
+  with the Production+Preview / Development double-entry quirk noted. Verified by independent
+  agent (grep-cross-checked every key against `render.yaml`): PASS.
 
 - [ ] T5 — Deploy: blueprint applied, secrets entered, first successful deploy of all three
   services. (Manual — the account holder does this; the tasks above exist so it is mechanical.)
