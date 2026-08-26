@@ -440,7 +440,10 @@ changes and deploy wiring must not be verified in the same pass.
 
 - [ ] T2 — Add `InMemoryRateLimiter`, the default when no Redis profile is active: per-key counter
   with a monotonic-clock window, evicting expired keys so an unbounded key space (one per
-  organization, one per email fingerprint) cannot leak memory.
+  organization, one per email fingerprint) cannot leak memory. `RedisRateLimiter` must gain its
+  profile guard in this *same* commit: T1 left it an unconditional `@Component` because a guard
+  with no alternative bean would have left the application with no `RateLimiter` at all, so a T2
+  that only adds the new class produces two candidates and fails every context load.
   **Test:** a shared test contract runs against *both* adapters and asserts identical results —
   Nth request inside the window succeeds, N+1th throws `RateLimitExceededException` with the same
   retry-after, and the window resets on expiry. The Redis run uses the existing Testcontainers
