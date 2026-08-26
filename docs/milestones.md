@@ -568,12 +568,21 @@ at 750 instance-hours/month across all free services — pinging two services ar
 (~730h, inside quota) and `ai` is left to sleep: browsing the seeded demo org is instant, and
 only the first *upload* pays a cold start. Documented in the README rather than hidden.
 
-- [ ] T1 — `render.yaml` blueprint: `api` and `ai` web services (Docker runtime, existing
+- [x] T1 — `render.yaml` blueprint: `api` and `ai` web services (Docker runtime, existing
   Dockerfiles) plus a managed Postgres with pgvector. Health check paths `/actuator/health` and
   `/health`. Every secret declared `sync: false` — never a literal value in the file. `api` gets
   `SPRING_PROFILES_ACTIVE=prod,demo` so R2 storage and the demo org are both active.
-  **Test:** `render.yaml` parses in Render's blueprint validation; `git grep` over it finds no
-  value for any of `JWT_SECRET`, `AI_SERVICE_TOKEN`, `AI_LLM_API_KEY`, `AI_EMBEDDING_API_KEY`,
+  Caught before it could break a build: `ai`'s Dockerfile `COPY`s paths relative to itself and
+  needs `dockerContext: ./apps/ai` (matching `docker-compose.yml`), not the repo root `api`'s
+  Dockerfile needs for its `docs/contracts`/demo-seed `COPY`s — getting these swapped 404s
+  mid-build. `RATE_LIMIT_BACKEND`/`DOCUMENT_EVENT_BROKER` set explicitly to `in-memory`: M9.9
+  defaults to `redis` when unset, and there is no Redis service in this blueprint at all.
+  **Found during independent verification:** `ai` had no `AI_CORS_ORIGINS` — `web`'s `/health`
+  page fetches `ai` directly from the browser, and without it `ai`'s default (`localhost:3000`
+  only) would block the response, reporting a healthy service as down. Added, `sync: false`,
+  alongside the existing `CORS_ALLOWED_ORIGINS` on `api`.
+  **Test:** `render.yaml` parses as valid YAML; `git grep` over it finds no value for any of
+  `JWT_SECRET`, `AI_SERVICE_TOKEN`, `AI_LLM_API_KEY`, `AI_EMBEDDING_API_KEY`,
   `R2_SECRET_ACCESS_KEY`.
 
 - [ ] T2 — Confirm pgvector on Render's managed Postgres: `V11__policy_document_and_chunk.sql`
