@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/money";
@@ -19,6 +20,7 @@ interface ReviewQueueTableProps {
 }
 
 export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTableProps) {
+  const router = useRouter();
   const [expenses, setExpenses] = useState(initialExpenses);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -86,6 +88,9 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
 
     if (result.ok && removed) {
       setAnnouncement(`${removed.expense.vendor ?? "Expense"} approved`);
+      // The sidebar's review-queue count is read once by the server-rendered layout and does not
+      // otherwise learn this row left the queue until a hard reload.
+      router.refresh();
     } else if (!result.ok && removed) {
       rollback(removed.expense, removed.index, result.message);
     }
@@ -108,6 +113,7 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
 
     if (result.ok && removed) {
       setAnnouncement(`${removed.expense.vendor ?? "Expense"} corrected and resolved`);
+      router.refresh();
     } else if (!result.ok && removed) {
       rollback(removed.expense, removed.index, result.message);
     }

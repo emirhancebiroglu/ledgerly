@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { uploadDocument, type UploadedDocument } from "@/lib/document-upload";
 import { useDocumentStatus } from "@/components/upload/use-document-status";
 import { DropZone } from "@/components/upload/drop-zone";
@@ -19,6 +20,7 @@ type FlowState =
   | { phase: "rejected"; filename: string; message: string };
 
 export function UploadFlow() {
+  const router = useRouter();
   const [flow, setFlow] = useState<FlowState>({ phase: "idle" });
   const trackingId = flow.phase === "tracking" ? flow.document.id : null;
   const { activity, failureReason, connection } = useDocumentStatus(trackingId);
@@ -46,6 +48,16 @@ export function UploadFlow() {
     terminalStage === "NEEDS_REVIEW" ||
     extractionNeedsReview ||
     failed;
+
+  // The sidebar's review-queue and unread-alert counts are read once by the server-rendered
+  // layout, which React Router does not re-run on a client-side navigation — an upload landing in
+  // NEEDS_REVIEW or tripping an alert would otherwise leave those counts stale until a hard
+  // reload. Refresh only fires once terminal flips true, not on every render.
+  useEffect(() => {
+    if (terminal) {
+      router.refresh();
+    }
+  }, [terminal, router]);
 
   return (
     <div className="mx-auto flex max-w-[640px] flex-col gap-5">
