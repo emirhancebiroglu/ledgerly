@@ -82,11 +82,13 @@ services:
     plan: free
     region: frankfurt
     dockerfilePath: ./apps/ai/Dockerfile
-    # Not repo root: unlike apps/api's Dockerfile (which COPYs apps/api/... and needs the
-    # monorepo root as context), apps/ai's Dockerfile COPYs requirements.txt/app/ as paths
-    # relative to itself — the same context docker-compose.yml already uses
-    # (context: ../apps/ai). Building this one from repo root would 404 on requirements.txt.
-    dockerContext: ./apps/ai
+    # Repo root, same as ledgerly-api: apps/ai's Dockerfile now also COPYs docs/contracts/,
+    # which lives outside apps/ai. Locally, docker-compose.yml instead bind-mounts
+    # ../docs/contracts read-only into the container (no image rebuild needed on a schema
+    # edit) — Render has no equivalent for a Blueprint-managed service, so the image bakes
+    # it in at build time here. requirements.txt/app/ are COPYd with an apps/ai/ prefix to
+    # match.
+    dockerContext: .
     healthCheckPath: /health
     envVars:
       # ai's Dockerfile CMD hardcodes `--port 8000` (uvicorn does not read PORT on its own), so

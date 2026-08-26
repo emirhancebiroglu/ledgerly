@@ -53,13 +53,11 @@ services:
 
   ai:
     build:
-      context: ../apps/ai
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: apps/ai/Dockerfile
     restart: unless-stopped
     ports:
       - "${AI_PORT:-8000}:8000"
-    volumes:
-      - ../docs/contracts:/docs/contracts:ro
     environment:
       AI_SERVICE_TOKEN: ${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN must be set}
       AI_RATE_LIMIT_REDIS_URL: redis://redis:6379/0
