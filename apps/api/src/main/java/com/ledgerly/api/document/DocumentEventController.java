@@ -12,10 +12,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.redis.connection.Message;
-import org.springframework.data.redis.connection.MessageListener;
-import org.springframework.data.redis.listener.ChannelTopic;
-import org.springframework.data.redis.listener.RedisMessageListenerContainer;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,11 +21,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * {@code GET /api/v1/documents/{id}/events} — ordered SSE replay of durable document activity,
- * with Redis used only to reduce live-delivery latency after the replay catches up.
+ * with the event broker used only to reduce live-delivery latency after the replay catches up.
  *
  * <p>A listener is registered before querying the durable history. Its messages are buffered until
  * that query is sent, so an event committed in the subscription/replay window cannot arrive ahead
- * of an older replay event or be lost in that race. A Redis outage can still defer a live event,
+ * of an older replay event or be lost in that race. A broker failure can still defer a live event,
  * but never erases it: the standard {@code Last-Event-ID} reconnection path replays PostgreSQL.
  */
 @RestController
@@ -42,7 +38,7 @@ public class DocumentEventController {
 
   private final DocumentUploadService documentUploadService;
   private final DocumentActivityService documentActivityService;
-  private final RedisMessageListenerContainer listenerContainer;
+  private final DocumentEventBroker broker;
   private final ObjectMapper objectMapper;
   private final ScheduledExecutorService heartbeatScheduler =
       Executors.newSingleThreadScheduledExecutor(
@@ -55,11 +51,11 @@ public class DocumentEventController {
   public DocumentEventController(
       DocumentUploadService documentUploadService,
       DocumentActivityService documentActivityService,
-      RedisMessageListenerContainer listenerContainer,
+      DocumentEventBroker broker,
       ObjectMapper objectMapper) {
     this.documentUploadService = documentUploadService;
     this.documentActivityService = documentActivityService;
-    this.listenerContainer = listenerContainer;
+    this.broker = broker;
     this.objectMapper = objectMapper;
   }
 
@@ -76,29 +72,38 @@ public class DocumentEventController {
 
     SseEmitter emitter = new SseEmitter(EMITTER_TIMEOUT_MILLIS);
     StreamSession session = new StreamSession(emitter, afterId);
-    ChannelTopic topic = new ChannelTopic(DocumentEventChannels.activityChannelFor(id));
-    MessageListener listener = (message, pattern) -> onMessage(session, message);
 
     var heartbeat =
         heartbeatScheduler.scheduleAtFixedRate(
             session::sendHeartbeat, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
+    DocumentEventBroker.Subscription subscription =
+        broker.subscribe(
+            DocumentEventChannels.activityChannelFor(id), payload -> onEvent(session, payload));
     Runnable unsubscribe =
         () -> {
-          listenerContainer.removeMessageListener(listener, topic);
+          subscription.close();
           heartbeat.cancel(false);
         };
     emitter.onCompletion(unsubscribe);
     emitter.onTimeout(unsubscribe);
     emitter.onError(throwable -> unsubscribe.run());
 
-    listenerContainer.addMessageListener(listener, topic);
-    session.replay(documentActivityService.replay(id, principal.organizationId(), afterId));
+    // Replay runs after the listener is registered, so an activity committed during the query is
+    // buffered rather than lost. It is also the first thing here that can throw — a failed history
+    // read would otherwise leave the subscription and heartbeat alive with no emitter to feed,
+    // leaking a listener per failed request.
+    try {
+      session.replay(documentActivityService.replay(id, principal.organizationId(), afterId));
+    } catch (RuntimeException e) {
+      unsubscribe.run();
+      throw e;
+    }
     return emitter;
   }
 
-  private void onMessage(StreamSession session, Message message) {
+  private void onEvent(StreamSession session, String payload) {
     try {
-      session.accept(objectMapper.readValue(message.getBody(), DocumentActivityResponse.class));
+      session.accept(objectMapper.readValue(payload, DocumentActivityResponse.class));
     } catch (Exception e) {
       log.warn("Failed to relay document activity event exceptionType={}", e.getClass().getSimpleName());
       session.completeWithError(e);
