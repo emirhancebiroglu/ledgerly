@@ -281,14 +281,6 @@ class DocumentStatusPipelineIT extends AbstractPostgresIT {
             100,
             5);
 
-    // The poller scans PENDING documents globally, oldest nextAttemptAt first, one batch at a
-    // time — it is not scoped to an organization, and should not be. Every IT sharing this
-    // database contributes to that queue, so on a full `verify` this document can sit outside
-    // the batch and never be dispatched, failing the assertions below for a reason that has
-    // nothing to do with dispatch rejection. Aging it to the front makes the test depend on the
-    // behavior it is describing rather than on how many documents other tests happened to leave.
-    makeRetryDue(documentId);
-
     rejectingPoller.processDueDocuments();
 
     Document released = documentRepository.findById(documentId).orElseThrow();
