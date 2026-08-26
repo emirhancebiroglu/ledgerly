@@ -599,12 +599,17 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   the application role, and `SELECT extversion FROM pg_extension WHERE extname='vector';` returns
   a row.
 
-- [ ] T3 — Vercel configuration for `web`: root directory `apps/web`, `API_URL` pointing at the
+- [x] T3 — Vercel configuration for `web`: root directory `apps/web`, `API_URL` pointing at the
   deployed `api`, `NEXT_PUBLIC_SITE_URL` at the Vercel domain (the OG image needs an absolute
   URL), and Sentry's `NEXT_PUBLIC_*` values present at *build* time, since they are inlined into
   the client bundle rather than read at startup.
-  **Test:** a production build on Vercel succeeds and the deployed page source contains a
-  non-empty `og:image` with an absolute URL on the real domain.
+  **Deployed 2026-08-27**: `ledgerly-ruby-two.vercel.app`. `API_URL`/`NEXT_PUBLIC_API_URL`/
+  `NEXT_PUBLIC_AI_URL` set to placeholder `localhost` values pending M10 T5's Render deploy
+  (real Render URLs don't exist yet) — tracked in `docs/deploy.md` (T4) as a follow-up once
+  T5 lands. `NEXT_PUBLIC_SITE_URL` set to the real Vercel domain and redeployed.
+  **Test confirmed:** production build succeeded; deployed page source contains
+  `<meta property="og:image" content="https://ledgerly-ruby-two.vercel.app/opengraph-image?...">`
+  — absolute, real domain — and the endpoint itself returns `200 image/png`.
 
 - [ ] T4 — Deployment handoff document (`docs/deploy.md`): the exact click-path for every step a
   person must do by hand — connecting each repository, which secret goes into which platform's
