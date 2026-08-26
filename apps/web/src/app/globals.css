@@ -117,6 +117,20 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /*
+   * AppShell's own root is `h-dvh overflow-hidden` with `main` the only `overflow-auto`
+   * descendant, so scrolling should live entirely inside `main`. Without html/body pinned to the
+   * same height and clipped, a tall `main` child can still make `document.documentElement`
+   * report a larger scrollHeight than the viewport in Chromium (observed: main's own scrollbar
+   * correctly bottoms out with real content left below it, while a second, unsynced native
+   * page-level scrollbar also appears — the two never agree, so reaching the end of one never
+   * reaches the end of the other). Pinning and clipping here removes html/body as a second
+   * scroll container entirely, leaving `main` the only one that can ever scroll.
+   */
+  html,
+  body {
+    @apply h-dvh overflow-hidden;
+  }
   body {
     @apply bg-background text-foreground;
   }
