@@ -52,4 +52,9 @@ npm-debug.log*
 # Real invoices for the M5 eval set — personal financial documents, never committed.
 # Their expected-output fixtures under apps/ai/evals/fixtures/real/ reference these by path and
 # are committed normally; only the source documents themselves stay local.
-invoices/
+#
+# Anchored to the repository root deliberately. Written as a bare `invoices/` it matched at any
+# depth, which also swallowed scripts/demo_seed/pdfs/invoices/ — the *synthetic* invoices the
+# demo profile seeds from. Those are generated, contain no real financial data, and must ship,
+# or the demo org cannot be seeded on any machine that did not generate them locally.
+/invoices/
