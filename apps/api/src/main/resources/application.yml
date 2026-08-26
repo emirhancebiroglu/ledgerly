@@ -57,6 +57,12 @@ ledgerly:
       bucket: ${R2_BUCKET:}
   document:
     max-bytes: ${DOCUMENT_MAX_BYTES:10485760}
+    # Where SSE fan-out is coordinated: "redis" (default) reaches a subscriber on any instance;
+    # "in-memory" only reaches one attached to the same process. Same asymmetry as
+    # ledgerly.rate-limit.backend and the same reason it defaults to redis — a multi-instance
+    # deployment that omits this loses cross-instance delivery silently, a single-instance one
+    # that omits it just keeps a working Redis round trip.
+    event-broker: ${DOCUMENT_EVENT_BROKER:redis}
     queue:
       # Upload persists PENDING work; a bounded poller later claims due rows atomically.
       interval-seconds: ${DOCUMENT_QUEUE_INTERVAL_SECONDS:5}

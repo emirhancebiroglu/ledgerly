@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
  * Pins which adapter each configuration value selects, mirroring {@code
@@ -39,18 +40,60 @@ class DocumentEventBrokerSelectionTest {
                     .isInstanceOf(RedisDocumentEventBroker.class));
   }
 
-  /**
-   * Documents today's state ahead of T4, which adds the in-process adapter: any value other than
-   * {@code redis} currently selects nothing. The consumers inject {@link DocumentEventBroker}
-   * directly, so this is a startup failure rather than a silently broker-less application — the
-   * same fail-fast shape {@code RateLimiterBackendGuard} enforces for rate limiting. T4 must add
-   * its adapter under this property, not a new one.
-   */
   @Test
-  void any_other_value_selects_no_broker_until_t4_adds_the_in_process_adapter() {
+  void the_in_process_backend_is_selected_explicitly() {
     contextRunner
         .withPropertyValues("ledgerly.document.event-broker=in-memory")
-        .run(context -> assertThat(context.getBeansOfType(DocumentEventBroker.class)).isEmpty());
+        .run(
+            context ->
+                assertThat(context.getBean(DocumentEventBroker.class))
+                    .isInstanceOf(InMemoryDocumentEventBroker.class));
+  }
+
+  /**
+   * Exactly one adapter must ever be active: two would make every injection point ambiguous and
+   * fail the context, and zero would leave the SSE and publisher paths with no broker at all.
+   */
+  @Test
+  void exactly_one_adapter_is_active_under_every_supported_value() {
+    contextRunner.run(
+        context -> assertThat(context.getBeansOfType(DocumentEventBroker.class)).hasSize(1));
+    contextRunner
+        .withPropertyValues("ledgerly.document.event-broker=in-memory")
+        .run(
+            context -> assertThat(context.getBeansOfType(DocumentEventBroker.class)).hasSize(1));
+  }
+
+  /**
+   * An unrecognised value matches neither {@code @ConditionalOnProperty}, which would otherwise
+   * leave the SSE and publisher paths with no broker at all. {@link DocumentEventBrokerGuard}
+   * turns that into a refusal to start, mirroring {@code RateLimiterBackendGuard} for the rate
+   * limiter (M9.9 T2).
+   */
+  @Test
+  void an_unrecognised_backend_value_refuses_to_start() {
+    contextRunner
+        .withUserConfiguration(DocumentEventBrokerGuard.class)
+        .withPropertyValues("ledgerly.document.event-broker=inmemory")
+        .run(
+            context ->
+                assertThat(context)
+                    .hasFailed()
+                    .getFailure()
+                    .rootCause()
+                    .hasMessageContaining("matches no event broker")
+                    .hasMessageContaining("inmemory"));
+  }
+
+  @Test
+  void the_guard_admits_every_supported_value() {
+    contextRunner
+        .withUserConfiguration(DocumentEventBrokerGuard.class)
+        .run(context -> assertThat(context).hasNotFailed());
+    contextRunner
+        .withUserConfiguration(DocumentEventBrokerGuard.class)
+        .withPropertyValues("ledgerly.document.event-broker=in-memory")
+        .run(context -> assertThat(context).hasNotFailed());
   }
 
   @Configuration(proxyBeanMethods = false)
@@ -64,8 +107,15 @@ class DocumentEventBrokerSelectionTest {
     RedisMessageListenerContainer redisMessageListenerContainer() {
       return Mockito.mock(RedisMessageListenerContainer.class);
     }
+
+    @Bean(name = "documentEventDispatchExecutor")
+    ThreadPoolTaskExecutor documentEventDispatchExecutor() {
+      ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+      executor.initialize();
+      return executor;
+    }
   }
 
-  @Import(RedisDocumentEventBroker.class)
+  @Import({RedisDocumentEventBroker.class, InMemoryDocumentEventBroker.class})
   static class Adapters {}
 }
