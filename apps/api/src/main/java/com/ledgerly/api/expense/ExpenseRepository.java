@@ -55,11 +55,11 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
   @Modifying
   @Query(
       value =
-          "INSERT INTO expense (id, organization_id, document_id, vendor, category_id, "
+          "INSERT INTO expense (id, organization_id, document_id, vendor, vendor_key, category_id, "
               + "ledger_transaction_id, amount_minor, currency, categorization_confidence, "
               + "citation, status, created_at) "
-              + "VALUES (:id, :organizationId, :documentId, :vendor, NULL, NULL, :amountMinor, "
-              + ":currency, 0, NULL, 'NEEDS_REVIEW', CURRENT_TIMESTAMP) "
+              + "VALUES (:id, :organizationId, :documentId, :vendor, :vendorKey, NULL, NULL, "
+              + ":amountMinor, :currency, 0, NULL, 'NEEDS_REVIEW', CURRENT_TIMESTAMP) "
               + "ON CONFLICT (document_id) DO NOTHING",
       nativeQuery = true)
   int insertUnclassifiedNeedsReview(
@@ -67,6 +67,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
       @Param("organizationId") UUID organizationId,
       @Param("documentId") UUID documentId,
       @Param("vendor") String vendor,
+      @Param("vendorKey") String vendorKey,
       @Param("amountMinor") long amountMinor,
       @Param("currency") String currency);
 
@@ -85,11 +86,16 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
   /** Exact duplicate candidates: same organization, same vendor (case/whitespace-insensitive),
    * same invoice number, excluding the candidate itself. Most recent first so a caller taking the
-   * first result gets a deterministic, newest-first choice among several matches. */
+   * first result gets a deterministic, newest-first choice among several matches.
+   *
+   * <p>Matches on {@code e.vendorKey} (written once, at insert time, by {@link
+   * Expense#normalizeVendor}) rather than recomputing case-folding in SQL — {@code LOWER()} here
+   * used to disagree with Java's {@code Locale.ROOT} folding for Turkish "İ", silently hiding
+   * every duplicate for such a vendor (see V29). */
   @Query(
       "SELECT e FROM Expense e WHERE e.organizationId = :organizationId "
           + "AND e.id <> :excludingId "
-          + "AND LOWER(TRIM(e.vendor)) = :vendorKey "
+          + "AND e.vendorKey = :vendorKey "
           + "AND e.invoiceNumber = :invoiceNumber "
           + "ORDER BY e.createdAt DESC")
   List<Expense> findConfirmedDuplicateCandidates(
@@ -105,7 +111,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
   @Query(
       "SELECT e FROM Expense e WHERE e.organizationId = :organizationId "
           + "AND e.id <> :excludingId "
-          + "AND LOWER(TRIM(e.vendor)) = :vendorKey "
+          + "AND e.vendorKey = :vendorKey "
           + "AND e.currency = :currency "
           + "AND e.amountMinor = :amountMinor "
           + "AND e.issueDate BETWEEN :windowStart AND :windowEnd "

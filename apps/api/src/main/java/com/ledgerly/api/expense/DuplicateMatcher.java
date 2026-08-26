@@ -27,7 +27,7 @@ public class DuplicateMatcher {
    * be persisted (its {@code id} excludes it from its own search) but is not required to be
    * committed for reads in the same transaction to see it. */
   public Optional<DuplicateMatch> findDuplicate(Expense candidate) {
-    String vendorKey = normalizeVendor(candidate.getVendor());
+    String vendorKey = candidate.getVendorKey();
     if (vendorKey == null) {
       return Optional.empty();
     }
@@ -60,13 +60,5 @@ public class DuplicateMatcher {
     return suspected.isEmpty()
         ? Optional.empty()
         : Optional.of(new DuplicateMatch(suspected.get(0).getId(), DuplicateMatchTier.SUSPECTED));
-  }
-
-  private static String normalizeVendor(String vendor) {
-    if (vendor == null) {
-      return null;
-    }
-    String trimmed = vendor.trim().toLowerCase(java.util.Locale.ROOT);
-    return trimmed.isEmpty() ? null : trimmed;
   }
 }

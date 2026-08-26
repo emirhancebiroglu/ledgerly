@@ -226,19 +226,20 @@ class DuplicateMatcherIT extends AbstractPostgresIT {
     try (PreparedStatement ps =
         connection.prepareStatement(
             "INSERT INTO expense (id, organization_id, document_id, category_id, vendor, "
-                + "amount_minor, currency, categorization_confidence, status, invoice_number, "
-                + "issue_date, created_at) "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?, 0.9, 'POSTED', ?, ?::date, ?)")) {
+                + "vendor_key, amount_minor, currency, categorization_confidence, status, "
+                + "invoice_number, issue_date, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0.9, 'POSTED', ?, ?::date, ?)")) {
       ps.setObject(1, id);
       ps.setObject(2, orgId);
       ps.setObject(3, insertDocument(connection, orgId));
       ps.setObject(4, categoryId);
       ps.setString(5, vendor);
-      ps.setLong(6, amountMinor);
-      ps.setString(7, currency);
-      ps.setString(8, invoiceNumber);
-      ps.setString(9, issueDate);
-      ps.setTimestamp(10, Timestamp.from(createdAt));
+      ps.setString(6, Expense.normalizeVendor(vendor));
+      ps.setLong(7, amountMinor);
+      ps.setString(8, currency);
+      ps.setString(9, invoiceNumber);
+      ps.setString(10, issueDate);
+      ps.setTimestamp(11, Timestamp.from(createdAt));
       ps.executeUpdate();
     }
     return id;
