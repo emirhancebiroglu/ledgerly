@@ -101,4 +101,40 @@ test.describe("expense detail", () => {
     expect(fieldsBox).not.toBeNull();
     expect(viewerBox!.y).toBeLessThan(fieldsBox!.y);
   });
+
+  test("the document preview scrolls with the page below the shell breakpoint, not sticking over the content beneath it", async ({
+    page,
+  }) => {
+    // A regression check for a real production bug: the preview Card was unconditionally
+    // `sticky top-6`, so on a single-column mobile layout it pinned to the viewport top as the
+    // page scrolled and visually overlapped whatever was stacked below it — nothing in the
+    // above test caught this, since that one only measures document order before any scrolling.
+    await page.setViewportSize({ width: 375, height: 1400 });
+    await login(page);
+    await page.goto("/expenses/exp-1");
+
+    const cardBeforeScroll = await page.locator("text=Source document").boundingBox();
+    expect(cardBeforeScroll).not.toBeNull();
+
+    // AppShell scrolls inside its own <main> (html/body are pinned h-dvh overflow-hidden, see
+    // globals.css) rather than at the window level — window.scrollY stays 0 no matter how far
+    // the page visibly scrolls, so the scroll container itself has to be measured directly.
+    const scrollContainer = page.locator("main");
+    await scrollContainer.evaluate((el) => el.scrollTo({ top: 5000 }));
+    // Sticky positioning re-renders synchronously with scroll; nothing here is async besides
+    // Playwright's own event loop turn.
+    await page.waitForTimeout(50);
+    const actualScrollDistance = await scrollContainer.evaluate((el) => el.scrollTop);
+    expect(actualScrollDistance).toBeGreaterThan(50);
+
+    const cardAfterScroll = await page.locator("text=Source document").boundingBox();
+    expect(cardAfterScroll).not.toBeNull();
+    // A sticky element pinned to the viewport keeps the same y after scrolling regardless of
+    // how far the page scrolled; a normally-flowing element moves up by (up to) the same
+    // distance the page scrolled. Requiring the card to have moved at least half as far as the
+    // page actually scrolled is generous to timing/rounding noise while still failing hard if
+    // the card stayed pinned (a sticky regression moves it 0px no matter how far the page goes).
+    const cardMovedBy = cardBeforeScroll!.y - cardAfterScroll!.y;
+    expect(cardMovedBy).toBeGreaterThan(actualScrollDistance / 2);
+  });
 });
