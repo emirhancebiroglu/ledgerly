@@ -129,7 +129,12 @@ management:
       exposure:
         include: health
       cors:
-        allowed-origins: http://localhost:3000
+        # Same origins as ledgerly.cors.allowed-origins above — actuator has its own, separate
+        # CORS mechanism (CorsConfig's bean only covers /api/**, not /actuator/**), but the
+        # browser-side /health page fetches this service's /actuator/health directly, so it
+        # needs the identical origin list or every deployed environment reports "Unreachable"
+        # regardless of the service's actual liveness.
+        allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
         allowed-methods: GET
   endpoint:
     health:
