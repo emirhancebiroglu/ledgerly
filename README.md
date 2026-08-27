@@ -8,7 +8,7 @@ categorizes it against your org's own expense policies, and the system posts a b
 double-entry ledger transaction — or routes it to a human review queue when it isn't confident
 enough to post silently.
 
-**Live demo:** _deploying — link goes here once M10 ships._
+**Live demo:** [ledgerly-ruby-two.vercel.app](https://ledgerly-ruby-two.vercel.app)
 **Demo account:** `demo@ledgerly.dev` / `ledgerly-demo-account-2026` (seeded, read-and-explore).
 
 ---
@@ -64,10 +64,21 @@ Written down deliberately, not discovered by a stranger:
   `StorageClient` — Cloudflare R2 in production, local disk elsewhere. Render's free/starter
   compute tier has no persistent disk guarantee outside the attached storage backend; this is a
   documented tradeoff, not an oversight (`docs/decisions.md`).
-- **Cold starts on the demo link.** `api` and `ai` run on Render's free tier, which sleeps after
-  15 minutes idle. The first request after a period of inactivity can take 30–60 seconds.
+- **Free-tier compute.** `api` and `ai` run on Render's free tier — both are kept warm by a
+  5-minute UptimeRobot heartbeat (Render sleeps a service after 15 minutes idle), but a genuinely
+  cold instance's first request can still take 30–60 seconds.
 - **Single-region, single-instance.** No horizontal scaling, no read replicas — this is a
   portfolio deployment sized for a demo, not for production load.
+
+## Screenshots
+
+<p>
+  <img src="docs/screenshots/dashboard.jpg" alt="Dashboard: monthly spend, category breakdown, spend-over-time chart, review queue count" width="49%">
+  <img src="docs/screenshots/expense-detail.jpg" alt="Expense detail: source invoice next to the extracted fields and the balanced double-entry ledger transaction it produced" width="49%">
+</p>
+
+Left: the multi-currency dashboard. Right: an expense detail page — the source document, the
+fields extracted from it, and the balanced ledger transaction it produced, side by side.
 
 ## Architecture
 
