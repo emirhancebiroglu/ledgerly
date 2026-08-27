@@ -659,10 +659,17 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   **Created 2026-08-27**: `ledgerly-api-1wuw.onrender.com/actuator/health`, 5-minute interval.
   First check landed as a one-time false "Down" — the monitor's first ping overlapped the
   service's own cold-start wake after the T5/T6 deploy, not a real outage; the very next check
-  reported Up and it has stayed Up since. Steady-state no-cold-start behavior (30+ minutes of
-  monitor-only traffic keeping the instance warm) not yet independently timed — the monitor's
-  own 5-minute cadence is what's supposed to guarantee this, since Render only spins down after
-  15 minutes idle.
+  reported Up and it has stayed Up since.
+  **Correction, same day (found during T8):** "only `ledgerly-api` needs a monitor" was wrong.
+  A real production upload got stuck at "Extracting document data" — `ledgerly-ai` had gone to
+  sleep (Render spins each service down independently after 15 minutes of *its own* idle time;
+  a warm `ledgerly-api` does nothing for `ledgerly-ai`), the synchronous extract call blocked
+  for the length of `ledgerly-ai`'s cold start, and that was long enough for the browser's SSE
+  connection to drop and the JWT to expire before extraction finished — a stuck-then-401
+  failure a single-monitor setup can't catch, since `ledgerly-api`'s own health check never
+  touches `ledgerly-ai`. Added a second UptimeRobot monitor on
+  `ledgerly-ai-rkmc.onrender.com/health`, same 5-minute interval. docs/deploy.md §4 corrected
+  to require both monitors from the start of any future from-scratch deploy.
 
 - [ ] T8 — End-to-end verification against production, in a browser, signed in as the demo
   account: dashboard, expenses list and detail, review queue, budgets, alerts, policies, and a

@@ -104,18 +104,20 @@ instance — `SELECT extversion FROM pg_extension WHERE extname = 'vector'` retu
 
 1. [uptimerobot.com](https://uptimerobot.com) → **Add New Monitor**.
 2. Monitor type: **HTTP(s)**.
-3. URL: `ledgerly-api`'s Render URL + `/actuator/health` (the same path `render.yaml` uses
-   as `healthCheckPath`), e.g. `https://ledgerly-api.onrender.com/actuator/health`.
-4. Monitoring interval: **5 minutes**.
-5. Only `ledgerly-api` needs a monitor — Render's own health check already restarts
-   `ledgerly-ai` on failure, and `ledgerly-ai` has no public consumer besides `ledgerly-api`
-   itself; `ledgerly-api`'s health check exercises the Postgres connection, so it's the one
-   monitor that reflects whether the whole backend is actually up. Add alert contacts
-   (email) on the monitor as wanted.
-
-Render's free plan spins services down after 15 minutes idle; the ping this monitor sends
-every 5 minutes is also what keeps `ledgerly-api` (and by extension the demo) from cold-
-starting on every visit.
+3. Create **two** monitors, one per service, both **5-minute** interval:
+   - `ledgerly-api`'s Render URL + `/actuator/health` (the same path `render.yaml` uses as
+     `healthCheckPath`), e.g. `https://ledgerly-api.onrender.com/actuator/health`.
+   - `ledgerly-ai`'s Render URL + `/health`, e.g. `https://ledgerly-ai.onrender.com/health`.
+4. Both are required, not just `ledgerly-api`: Render's free plan spins down each service
+   *independently* after 15 minutes of its own idle time — a warm `ledgerly-api` does nothing
+   to keep `ledgerly-ai` awake. `ledgerly-api` calls `ledgerly-ai` synchronously mid-request
+   during document extraction; if `ledgerly-ai` has gone to sleep, that call blocks for the
+   length of `ledgerly-ai`'s own cold start (up to a minute or more), which is long enough for
+   the browser's SSE connection watching the upload to drop and the demo user's JWT to expire
+   before the extraction ever finishes. This was caught by a real production upload landing in
+   this exact stuck-then-401 state with only `ledgerly-api` monitored — a single-monitor setup
+   masks it, since `ledgerly-api`'s own health check never touches `ledgerly-ai`. Add alert
+   contacts (email) on both monitors as wanted.
 
 ## 5. Vercel (`web`)
 
@@ -158,6 +160,6 @@ starting on every visit.
    `NEXT_PUBLIC_API_URL` / `NEXT_PUBLIC_AI_URL`.
 5. Back to Render: fill in `AI_BASE_URL` (ai's URL), `CORS_ALLOWED_ORIGINS` and
    `AI_CORS_ORIGINS` (the Vercel domain) on both services, redeploy.
-6. §4 UptimeRobot monitor on `ledgerly-api`.
+6. §4 UptimeRobot monitors on both `ledgerly-api` and `ledgerly-ai`.
 7. Smoke test: open the Vercel domain, sign up, upload a document, check `/health` shows
    both `api` and `ai` up.
