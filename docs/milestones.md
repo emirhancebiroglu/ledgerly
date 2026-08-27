@@ -671,11 +671,34 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   `ledgerly-ai-rkmc.onrender.com/health`, same 5-minute interval. docs/deploy.md §4 corrected
   to require both monitors from the start of any future from-scratch deploy.
 
-- [ ] T8 — End-to-end verification against production, in a browser, signed in as the demo
+- [x] T8 — End-to-end verification against production, in a browser, signed in as the demo
   account: dashboard, expenses list and detail, review queue, budgets, alerts, policies, and a
   real upload streaming through to a posted ledger entry.
   **Test:** every route loads with no console errors, the uploaded invoice reaches a terminal
   status, and the ledger entries it produced sum to zero.
+  **Verified 2026-08-27** via docs/e2e-production-checklist.md, run manually against
+  ledgerly-ruby-two.vercel.app. Found and fixed four independent production bugs along the way,
+  each caught only by this real end-to-end pass (none surfaced in `mvn verify`/`pytest`, since
+  every one was specific to the deployed environment):
+  1. `SPRING_PROFILES_ACTIVE: prod,demo` left as a standing value — `DocumentQueuePoller`
+     (`@Profile("!demo")`) was never created as a bean, so every real upload sat in `PENDING`
+     forever with nothing dispatching it. Fixed: `demo` removed from the standing profile list.
+  2. `management.endpoints.web.cors.allowed-origins` hardcoded to `http://localhost:3000` —
+     `/health`'s browser-side fetch to `/actuator/health` was rejected regardless of
+     `CORS_ALLOWED_ORIGINS`, reporting `api` "Unreachable" despite being healthy. Fixed to read
+     the same env var `/api/**`'s CORS config already used.
+  3. `ai`'s `/health` route was `@app.get`-only — FastAPI's `APIRoute` doesn't auto-add HEAD the
+     way Starlette's own `Route` does, so UptimeRobot's HEAD probes 405'd and it reported the
+     service permanently down. Fixed: `@app.api_route(methods=["GET", "HEAD"])`.
+  4. `ai`'s `rate_limit_redis_url` default was a real-looking Redis URL, not blank —
+     `select_rate_limiter` silently chose `RedisRateLimiter` whenever `AI_RATE_LIMIT_REDIS_URL`
+     was left unset (Render's free tier has no managed Redis), so every rate-limited call
+     (including `/extract`) failed closed with 503. Fixed: default changed to `""`.
+
+  After all four fixes, a real invoice uploaded through the deployed `web` app streamed through
+  `PENDING → PROCESSING → EXTRACTED`/`NEEDS_REVIEW` via live SSE with no manual refresh, no
+  console errors, and produced a balanced ledger transaction. Every authenticated route in
+  docs/e2e-production-checklist.md loaded clean.
 
 - [ ] T9 — README live link, demo credentials, and screenshots from the deployed system; then a
   60–90 second recording of the upload → extract → categorize → post loop.
