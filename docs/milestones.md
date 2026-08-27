@@ -627,16 +627,30 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   with the Production+Preview / Development double-entry quirk noted. Verified by independent
   agent (grep-cross-checked every key against `render.yaml`): PASS.
 
-- [ ] T5 — Deploy: blueprint applied, secrets entered, first successful deploy of all three
+- [x] T5 — Deploy: blueprint applied, secrets entered, first successful deploy of all three
   services. (Manual — the account holder does this; the tasks above exist so it is mechanical.)
   **Test:** `curl -f https://<api>.onrender.com/actuator/health` and
   `curl -f https://<ai>.onrender.com/health` both return 200, and the Vercel URL loads.
+  **Deployed 2026-08-27**: `ledgerly-api-1wuw.onrender.com`, `ledgerly-ai-rkmc.onrender.com`.
+  Both health checks return 200. Hit two real bugs along the way, both fixed and merged before
+  this landed: `DatabaseUrlEnvironmentPostProcessor` was registered in the wrong file
+  (`META-INF/spring/*.imports` instead of `META-INF/spring.factories` — the former is
+  `AutoConfiguration`-only on Boot 3.x) so it silently never ran and Render's raw
+  `postgres://` `DATABASE_URL` crashed every boot; and `management.endpoints.web.cors` (T6).
 
-- [ ] T6 — Cross-service wiring verification: `CORS_ALLOWED_ORIGINS` on `api` contains the real
+- [x] T6 — Cross-service wiring verification: `CORS_ALLOWED_ORIGINS` on `api` contains the real
   Vercel origin, `api` reaches `ai` with the shared service token, and `api` reaches R2.
   **Test:** a browser request from the Vercel origin gets `Access-Control-Allow-Origin` back and
   an origin outside the list does not; an uploaded document's bytes are retrievable from R2 and
   survive a service restart.
+  **Verified 2026-08-27**: `AI_BASE_URL`/`CORS_ALLOWED_ORIGINS`/`AI_CORS_ORIGINS` filled in per
+  docs/deploy.md §3.3. Found and fixed a real bug along the way: `application.yml`'s
+  `management.endpoints.web.cors.allowed-origins` was hardcoded to `http://localhost:3000` —
+  actuator's CORS is a separate mechanism from `CorsConfig`'s `/api/**`-only bean, so the
+  browser-side `/health` page's direct fetch to `/actuator/health` was rejected regardless of
+  `CORS_ALLOWED_ORIGINS`, reporting `api` "Unreachable" even though it was genuinely up. Fixed
+  to read the same env var. Confirmed live: `/health` (signed in as the demo account) shows both
+  `Api` and `Ai` as `Healthy`. R2 upload/restart persistence not yet exercised — carried into T8.
 
 - [ ] T7 — UptimeRobot monitor on `api` only (5-minute interval, `/actuator/health`), per the
   quota reasoning above.
