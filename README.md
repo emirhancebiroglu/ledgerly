@@ -80,8 +80,10 @@ Written down deliberately, not discovered by a stranger:
 Left: the multi-currency dashboard. Right: an expense detail page — the source document, the
 fields extracted from it, and the balanced ledger transaction it produced, side by side.
 
-**[Watch the full upload → extract → categorize → post loop](https://github.com/user-attachments/assets/7e88f554-9e71-4456-8968-0201b4f7e8b4)**
-(~90s, recorded against the live deploy above, no cuts).
+**The full upload → extract → categorize → post loop** (~90s, recorded against the live deploy
+above, no cuts):
+
+https://github.com/user-attachments/assets/7e88f554-9e71-4456-8968-0201b4f7e8b4
 
 ## Architecture
 
