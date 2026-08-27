@@ -269,8 +269,11 @@ class AnomalyRequestBody(BaseModel):
     correlation_id: str | None = Field(default=None, max_length=128)
 
 
-@app.get("/health")
+@app.api_route("/health", methods=["GET", "HEAD"])
 def health() -> dict:
+    # @app.get alone does not imply HEAD support — uptime monitors (e.g. UptimeRobot) probe
+    # with HEAD by default, and a GET-only route 405s every one of those checks, reporting the
+    # service permanently down despite it being healthy.
     return {"service": settings.service_name, "version": settings.service_version, "status": "UP"}
 
 

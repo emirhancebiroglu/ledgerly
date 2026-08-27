@@ -14,6 +14,14 @@ def test_health_returns_200_with_service_and_version():
     assert "version" in body
 
 
+def test_health_accepts_head_for_uptime_monitors():
+    # @app.get alone does not imply HEAD support in FastAPI/Starlette — UptimeRobot (and most
+    # uptime monitors) probe with HEAD by default, so a GET-only route reports a healthy
+    # service as permanently down with a 405.
+    response = client.head("/health")
+    assert response.status_code == 200
+
+
 def test_unknown_route_returns_404_json_no_traceback():
     response = client.get("/does-not-exist")
     assert response.status_code == 404
