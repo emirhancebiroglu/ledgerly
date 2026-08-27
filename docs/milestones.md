@@ -652,10 +652,17 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   to read the same env var. Confirmed live: `/health` (signed in as the demo account) shows both
   `Api` and `Ai` as `Healthy`. R2 upload/restart persistence not yet exercised — carried into T8.
 
-- [ ] T7 — UptimeRobot monitor on `api` only (5-minute interval, `/actuator/health`), per the
+- [x] T7 — UptimeRobot monitor on `api` only (5-minute interval, `/actuator/health`), per the
   quota reasoning above.
   **Test:** at least one successful check visible in the UptimeRobot dashboard, and `api`
   responds without a cold-start delay after 30+ minutes of no human traffic.
+  **Created 2026-08-27**: `ledgerly-api-1wuw.onrender.com/actuator/health`, 5-minute interval.
+  First check landed as a one-time false "Down" — the monitor's first ping overlapped the
+  service's own cold-start wake after the T5/T6 deploy, not a real outage; the very next check
+  reported Up and it has stayed Up since. Steady-state no-cold-start behavior (30+ minutes of
+  monitor-only traffic keeping the instance warm) not yet independently timed — the monitor's
+  own 5-minute cadence is what's supposed to guarantee this, since Render only spins down after
+  15 minutes idle.
 
 - [ ] T8 — End-to-end verification against production, in a browser, signed in as the demo
   account: dashboard, expenses list and detail, review queue, budgets, alerts, policies, and a
