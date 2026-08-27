@@ -700,10 +700,16 @@ only the first *upload* pays a cold start. Documented in the README rather than 
   console errors, and produced a balanced ledger transaction. Every authenticated route in
   docs/e2e-production-checklist.md loaded clean.
 
-- [ ] T9 — README live link, demo credentials, and screenshots from the deployed system; then a
+- [x] T9 — README live link, demo credentials, and screenshots from the deployed system; then a
   60–90 second recording of the upload → extract → categorize → post loop.
   **Test:** the README's live link resolves, and the recording shows the loop start to finish
   with no cuts hiding a failure or a retry.
+  **Done 2026-08-27**: README links `ledgerly-ruby-two.vercel.app`, carries dashboard and
+  expense-detail screenshots (`docs/screenshots/`), and links a ~93s uncut recording
+  (`docs/screenshots/ledgerly-demo.mp4`) of the full loop against the live deploy. Also fixed a
+  UI bug found while reviewing the flow for the recording: the review queue's Actions column
+  misaligned on rows with no Approve button (see `fix/review-queue-actions-column-alignment`,
+  merged).
 
 **Demo**
 ```bash
