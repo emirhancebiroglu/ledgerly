@@ -11,7 +11,13 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     service_token: SecretStr
     rate_limit_enabled: bool = True
-    rate_limit_redis_url: str = "redis://localhost:6379/0"
+    # Blank, not a local-dev-looking Redis URL: select_rate_limiter treats an empty/unset value
+    # as "select the in-process adapter" (see rate_limit.py) -- a non-empty default here would
+    # silently select RedisRateLimiter the moment AI_RATE_LIMIT_REDIS_URL is left unset, which is
+    # exactly what happened in production (no managed Redis on Render's free tier, every request
+    # failing closed with 503 "Rate limiting is temporarily unavailable"). docker-compose.yml
+    # sets this env var explicitly for local dev, so that path was never exercised there.
+    rate_limit_redis_url: str = ""
     rate_limit_max_requests: int = Field(default=30, gt=0)
     rate_limit_window_seconds: int = Field(default=60, gt=0)
 
