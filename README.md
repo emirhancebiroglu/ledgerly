@@ -80,6 +80,9 @@ Written down deliberately, not discovered by a stranger:
 Left: the multi-currency dashboard. Right: an expense detail page — the source document, the
 fields extracted from it, and the balanced ledger transaction it produced, side by side.
 
+**[Watch the full upload → extract → categorize → post loop](docs/screenshots/ledgerly-demo.mp4)**
+(~90s, recorded against the live deploy above, no cuts).
+
 ## Architecture
 
 ```
