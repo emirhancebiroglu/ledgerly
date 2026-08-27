@@ -36,7 +36,13 @@ services:
       - key: SERVER_PORT
         value: "8080"
       - key: SPRING_PROFILES_ACTIVE
-        value: prod,demo
+        value: prod
+        # demo runs once for the initial blueprint apply, then must be removed from this list
+        # by hand and the service redeployed — DemoSeedRunner (`@Profile("demo")`) is idempotent
+        # and safe to leave active indefinitely, but DocumentQueuePoller (`@Profile("!demo")`)
+        # is not created as a bean at all while demo is active, so every real (non-seed) upload
+        # sits in PENDING forever with no worker ever picking it up. Re-enable `demo` only for a
+        # one-time re-seed against a fresh database, never as a standing production value.
       - key: DATABASE_URL
         fromDatabase:
           name: ledgerly-postgres
