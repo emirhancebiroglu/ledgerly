@@ -54,6 +54,31 @@ describe("DocumentViewer", () => {
     });
   });
 
+  it("always offers an 'Open in new tab' escape hatch alongside the PDF frame", async () => {
+    // Some mobile Chrome builds have no PDF plugin, so the iframe falls back to a bare "Open"
+    // control that tries (and silently fails) to open the blob: URL in a new top-level browsing
+    // context — blob: URLs only resolve within the context that created them. This link, opened
+    // with target="_blank" from the same page, stays in a context where the URL is still valid.
+    const blob = new Blob(["fake-pdf-bytes"], { type: "application/pdf" });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(blob, { status: 200 })));
+    vi.stubGlobal("URL", {
+      ...URL,
+      createObjectURL: vi.fn().mockReturnValue("blob:mock-url"),
+      revokeObjectURL: vi.fn(),
+    });
+
+    render(
+      <DocumentViewer documentId="doc-1" contentType="application/pdf" filename="invoice.pdf" />,
+    );
+
+    await waitFor(() => {
+      const link = screen.getByRole("link", { name: "Open in new tab" });
+      expect(link).toHaveAttribute("href", "blob:mock-url");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener");
+    });
+  });
+
   it("shows an error state instead of crashing when the blob fetch fails", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 500 })));
 
