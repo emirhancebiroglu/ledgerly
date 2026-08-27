@@ -207,6 +207,33 @@ describe("ReviewQueueTable", () => {
     expect(screen.getByLabelText(/Correct category for Office Depot/)).toBeEnabled();
   });
 
+  it("reserves Approve's footprint on a row without it, so Correct… stays column-aligned with rows that have Approve", () => {
+    render(
+      <ReviewQueueTable
+        initialExpenses={[
+          expense({ id: "exp-1", categoryId: undefined as unknown as null }),
+          expense({ id: "exp-2" }),
+        ]}
+        categories={categories}
+      />,
+    );
+
+    // Every row's Actions cell must start with an "Approve"-shaped element in the same
+    // position — a real <button> where Approve applies, an aria-hidden placeholder of the
+    // identical text (same padding/text-size classes) where it doesn't — so the select that
+    // follows lines up across rows instead of the whole Actions column shifting left on a row
+    // missing the button.
+    const placeholder = screen.getByText("Approve", { selector: "span[aria-hidden='true']" });
+    const realButton = screen.getByRole("button", { name: "Approve" });
+
+    expect(placeholder.className).toContain("px-2.5");
+    expect(placeholder.className).toContain("py-1");
+    expect(placeholder.className).toContain("text-[11.5px]");
+    expect(realButton.className).toContain("px-2.5");
+    expect(realButton.className).toContain("py-1");
+    expect(realButton.className).toContain("text-[11.5px]");
+  });
+
   it("checkboxes are real inputs operable via keyboard/change events", () => {
     render(<ReviewQueueTable initialExpenses={[expense()]} categories={categories} />);
 

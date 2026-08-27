@@ -19,6 +19,10 @@ interface ReviewQueueTableProps {
   categories: Category[];
 }
 
+// Shared with the invisible placeholder that reserves Approve's footprint on a row without it —
+// keeping one definition means the two can never drift out of matching box dimensions again.
+const APPROVE_BUTTON_LAYOUT_CLASSES = "rounded-md px-2.5 py-1 text-[11.5px] font-semibold";
+
 export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTableProps) {
   const router = useRouter();
   const [expenses, setExpenses] = useState(initialExpenses);
@@ -188,12 +192,20 @@ export function ReviewQueueTable({ initialExpenses, categories }: ReviewQueueTab
                     `Confidence below threshold (${Math.round(expense.categorizationConfidence * 100)}%)`}
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {!requiresCategorySelection && (
+                  {requiresCategorySelection ? (
+                    // Reserves Approve's own footprint (same padding/text size, invisible and
+                    // unfocusable) so Correct… starts at the same x-position whether or not this
+                    // row has an Approve button — a row missing it otherwise shifted the whole
+                    // Actions column left, misaligning every column against the header.
+                    <span aria-hidden="true" className={`${APPROVE_BUTTON_LAYOUT_CLASSES} invisible`}>
+                      Approve
+                    </span>
+                  ) : (
                     <button
                       type="button"
                       onClick={() => approveOne(expense.id)}
                       disabled={pending.has(expense.id)}
-                      className="rounded-md bg-success-soft px-2.5 py-1 text-[11.5px] font-semibold text-success-foreground transition-all hover:-translate-y-px disabled:opacity-50"
+                      className={`${APPROVE_BUTTON_LAYOUT_CLASSES} bg-success-soft text-success-foreground transition-all hover:-translate-y-px disabled:opacity-50`}
                     >
                       Approve
                     </button>
