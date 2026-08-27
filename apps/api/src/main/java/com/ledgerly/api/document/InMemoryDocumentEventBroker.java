@@ -2,14 +2,9 @@ package com.ledgerly.api.document;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArraySet;
-import java.util.concurrent.atomic.AtomicBoolean;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -29,8 +24,6 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "ledgerly.document.event-broker", havingValue = "in-memory")
 public class InMemoryDocumentEventBroker implements DocumentEventBroker {
-
-  private static final Logger log = LoggerFactory.getLogger(InMemoryDocumentEventBroker.class);
 
   private final ThreadPoolTaskExecutor executor;
   private final Map<String, Set<Subscriber>> subscribersByChannel = new ConcurrentHashMap<>();
@@ -82,78 +75,23 @@ public class InMemoryDocumentEventBroker implements DocumentEventBroker {
   }
 
   /**
-   * One subscription's own FIFO run of the executor, so two payloads published back to back on the
-   * same channel are always delivered to this listener in that order — regardless of how the
-   * shared executor's threads happen to schedule two independently submitted tasks. {@link
-   * StreamSession#sendIfNew} drops any event whose id is not greater than the last one delivered,
-   * so out-of-order delivery here would silently discard a stage rather than merely delay it.
+   * One subscription's own {@link OrderedDispatcher}, so two payloads published back to back on
+   * the same channel are always delivered to this listener in that order regardless of how the
+   * shared executor's threads happen to schedule two independently submitted tasks.
    *
    * <p>Scoped to the subscription rather than the listener instance: the port's contract does not
    * say a listener is used for exactly one subscription, so ordering must not depend on that.
    */
   private static final class Subscriber {
-    private final DocumentEventListener listener;
-    private final ThreadPoolTaskExecutor executor;
-    private final Queue<String> pending = new ConcurrentLinkedQueue<>();
-    private final AtomicBoolean draining = new AtomicBoolean(false);
-    private final Logger log = LoggerFactory.getLogger(Subscriber.class);
-    private final String channel;
+    private final OrderedDispatcher dispatcher;
 
     private Subscriber(String channel, DocumentEventListener listener, ThreadPoolTaskExecutor executor) {
-      this.channel = channel;
-      this.listener = listener;
-      this.executor = executor;
+      this.dispatcher =
+          new OrderedDispatcher(listener::onEvent, executor, "channel=" + channel);
     }
 
     void deliver(String payload) {
-      pending.add(payload);
-      scheduleDrainIfIdle();
-    }
-
-    private void scheduleDrainIfIdle() {
-      // Only the caller that flips false->true schedules a drain; everyone else's payload is
-      // already guaranteed to be picked up by that drain's loop, since it re-checks the queue
-      // before releasing the flag. This is what keeps delivery single-threaded per subscriber
-      // without holding a lock across the blocking SSE write in deliverOne.
-      if (draining.compareAndSet(false, true)) {
-        executor.execute(this::drain);
-      }
-    }
-
-    /**
-     * The release-then-recheck shape below (rather than checking {@code pending} inside the loop
-     * and releasing only once it is empty) closes a real race: a payload can be queued by another
-     * thread strictly between this drain's last {@code poll()} returning {@code null} and {@code
-     * draining} being cleared. Left for "whoever queued it" to notice, two drains could believe
-     * themselves the sole owner at once — the exact single-threaded-per-subscriber property this
-     * class exists to guarantee. Looping rather than recursing after the recheck keeps this
-     * bounded under sustained traffic instead of growing one stack frame per re-acquisition.
-     */
-    private void drain() {
-      do {
-        try {
-          String payload;
-          while ((payload = pending.poll()) != null) {
-            deliverOne(payload);
-          }
-        } finally {
-          draining.set(false);
-        }
-      } while (!pending.isEmpty() && draining.compareAndSet(false, true));
-    }
-
-    private void deliverOne(String payload) {
-      try {
-        listener.onEvent(payload);
-      } catch (RuntimeException e) {
-        // Mirrors DocumentEventPublisher's own swallow-and-log: one broken subscriber must not
-        // affect delivery to the others on the same channel, and dispatch itself is already
-        // decoupled from the publishing transaction.
-        log.warn(
-            "Document event listener threw exceptionType={} channel={}",
-            e.getClass().getSimpleName(),
-            channel);
-      }
+      dispatcher.deliver(payload);
     }
   }
 }
