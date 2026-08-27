@@ -83,7 +83,7 @@ fields extracted from it, and the balanced ledger transaction it produced, side 
 **The full upload → extract → categorize → post loop** (~90s, recorded against the live deploy
 above, no cuts):
 
-https://github.com/user-attachments/assets/7e88f554-9e71-4456-8968-0201b4f7e8b4
+https://github.com/user-attachments/assets/c5c97c0c-c09e-4228-ba05-a27407d7bd85
 
 ## Architecture
 
