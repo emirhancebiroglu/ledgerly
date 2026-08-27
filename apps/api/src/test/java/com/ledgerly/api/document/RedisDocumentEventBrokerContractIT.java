@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Tag;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.listener.RedisMessageListenerContainer;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.testcontainers.utility.DockerImageName;
 
 /**
@@ -31,9 +32,23 @@ class RedisDocumentEventBrokerContractIT extends DocumentEventBrokerContract {
     connectionFactory.afterPropertiesSet();
     RedisMessageListenerContainer listenerContainer = new RedisMessageListenerContainer();
     listenerContainer.setConnectionFactory(connectionFactory);
+    // Mirrors RedisConfig's own dispatch executor: the ordering fix under test
+    // (RedisDocumentEventBroker routing each subscription through one OrderedDispatcher) depends
+    // on dispatch actually running on a pooled, multi-thread executor — matching production's
+    // shape, not a same-thread stand-in that would make the ordering bug this contract test
+    // exists to catch impossible to reproduce here.
+    ThreadPoolTaskExecutor dispatchExecutor = new ThreadPoolTaskExecutor();
+    dispatchExecutor.setCorePoolSize(4);
+    dispatchExecutor.setMaxPoolSize(32);
+    dispatchExecutor.setQueueCapacity(500);
+    dispatchExecutor.setThreadNamePrefix("test-document-event-dispatch-");
+    dispatchExecutor.initialize();
+    listenerContainer.setTaskExecutor(dispatchExecutor);
     listenerContainer.afterPropertiesSet();
     listenerContainer.start();
-    BROKER = new RedisDocumentEventBroker(new StringRedisTemplate(connectionFactory), listenerContainer);
+    BROKER =
+        new RedisDocumentEventBroker(
+            new StringRedisTemplate(connectionFactory), listenerContainer, dispatchExecutor);
   }
 
   @Override
