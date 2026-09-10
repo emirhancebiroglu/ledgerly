@@ -62,6 +62,10 @@ def reset_correlation_id(token: object) -> None:
     _correlation_id.reset(token)
 
 
+def current_correlation_id() -> str | None:
+    return _correlation_id.get()
+
+
 def _redact(message: str) -> str:
     """A last line of defense; request bodies are never intentionally logged."""
     redacted = _BEARER_TOKEN.sub("Bearer [REDACTED]", message)
