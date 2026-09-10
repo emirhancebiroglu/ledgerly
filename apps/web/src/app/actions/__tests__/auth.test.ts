@@ -49,6 +49,22 @@ describe("login action", () => {
     );
   });
 
+  it("uses the public demo credentials when the demo action is selected", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ accessToken: "a", refreshToken: "r" }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { login } = await import("@/app/actions/auth");
+
+    await expect(login(undefined, formData({ demo: "true" }))).rejects.toThrow("NEXT_REDIRECT:/dashboard");
+
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toEqual({
+      email: "demo@ledgerly.dev",
+      password: "ledgerly-demo-account-2026",
+    });
+  });
+
   it("redirects to the safe next path when provided", async () => {
     vi.stubGlobal(
       "fetch",

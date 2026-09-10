@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
+import { AlertCircle, Eye, EyeOff, LockKeyhole, Mail, Play } from "lucide-react";
 import { login, register } from "@/app/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +61,21 @@ export function AuthForm({ mode, next }: AuthFormProps) {
         </p>
       </header>
 
+      {!isRegister && (
+        <Button
+          className="mt-[26px] h-[46px] w-full rounded-lg border-[oklch(0.78_0.09_265)] bg-[oklch(0.96_0.025_265)] text-[13.5px] font-semibold text-[oklch(0.4_0.14_265)] hover:bg-[oklch(0.93_0.045_265)]"
+          form="auth-form"
+          formNoValidate
+          name="demo"
+          type="submit"
+          value="true"
+          variant="outline"
+        >
+          <Play aria-hidden="true" className="size-[15px] fill-current" />
+          Try the demo account
+        </Button>
+      )}
+
       <div className="mt-[26px] flex flex-col gap-2" aria-label="Single sign-on options">
         <SsoButton provider="google" />
         <SsoButton provider="sso" />
@@ -72,7 +87,7 @@ export function AuthForm({ mode, next }: AuthFormProps) {
         <span className="h-px flex-1 bg-[oklch(0.92_0.005_265)]" />
       </div>
 
-      <form action={action} className="flex flex-col gap-3.5" noValidate>
+      <form action={action} className="flex flex-col gap-3.5" id="auth-form" noValidate>
         {next && <input type="hidden" name="next" value={next} />}
         {isRegister && (
           <div className="grid grid-cols-1 gap-2.5 min-[390px]:grid-cols-2">

@@ -8,6 +8,11 @@ export interface AuthFormState {
   error?: string;
 }
 
+const DEMO_CREDENTIALS = {
+  email: "demo@ledgerly.dev",
+  password: "ledgerly-demo-account-2026",
+};
+
 async function parseAuthResponse(
   response: Response,
   persistentSession = true,
@@ -36,8 +41,9 @@ export async function login(
   _prevState: AuthFormState | undefined,
   formData: FormData,
 ): Promise<AuthFormState> {
-  const email = String(formData.get("email") ?? "");
-  const password = String(formData.get("password") ?? "");
+  const useDemoAccount = formData.get("demo") === "true";
+  const email = useDemoAccount ? DEMO_CREDENTIALS.email : String(formData.get("email") ?? "");
+  const password = useDemoAccount ? DEMO_CREDENTIALS.password : String(formData.get("password") ?? "");
   const remember = formData.get("remember") === "on";
 
   const response = await apiFetch("/api/v1/auth/login", {
