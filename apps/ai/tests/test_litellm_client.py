@@ -17,6 +17,7 @@ from litellm.exceptions import APIError, BadRequestError, RateLimitError
 from app.llm.client import LlmClient, LlmError, VisionPrompt
 from app.llm.litellm_client import LiteLlmClient
 from app.llm.resilient import NonRetryableLlmError, RetryableLlmError
+from app.observability import reset_correlation_id, set_correlation_id
 
 PDF_BYTES = b"%PDF-1.7\n" + b"0" * 512
 
@@ -238,6 +239,30 @@ def test_a_custom_api_base_is_forwarded_to_litellm(monkeypatch):
     client.complete("hello")
 
     assert captured["api_base"] == "https://opencode.ai/zen/go/v1"
+
+
+def test_opencode_go_uses_the_request_correlation_id_as_its_session(monkeypatch):
+    captured = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        return make_response("ok")
+
+    monkeypatch.setattr(litellm, "completion", fake_completion)
+    correlation_id = "b5e1dd02-8faa-48a0-a371-3ae6dcbb2e61"
+    token = set_correlation_id(correlation_id)
+    try:
+        client = LiteLlmClient(
+            model="anthropic/qwen3.7-plus",
+            api_key="k",
+            timeout_seconds=5,
+            api_base="https://opencode.ai/zen/go",
+        )
+        client.complete("extract this invoice")
+    finally:
+        reset_correlation_id(token)
+
+    assert captured["extra_headers"] == {"x-opencode-session": correlation_id}
 
 
 def test_a_pdf_is_sent_natively_when_the_provider_supports_it(monkeypatch):

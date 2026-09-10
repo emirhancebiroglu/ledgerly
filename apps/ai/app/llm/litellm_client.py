@@ -21,6 +21,7 @@ from litellm.exceptions import (
 from app.llm.client import LlmClient, VisionPrompt
 from app.llm.pdf_to_images import render_pdf_pages_to_png
 from app.llm.resilient import NonRetryableLlmError, RetryableLlmError
+from app.observability import current_correlation_id
 
 # Failures worth retrying: the request never reached a stable answer.
 _RETRYABLE_EXCEPTIONS = (Timeout, RateLimitError, ServiceUnavailableError, APIConnectionError)
@@ -94,6 +95,14 @@ class LiteLlmClient(LlmClient):
             "timeout": self._timeout_seconds,
             "api_base": self._api_base,
         }
+        correlation_id = current_correlation_id()
+        if (
+            self._api_base is not None
+            and self._api_base.rstrip("/").startswith("https://opencode.ai/zen/go")
+            and correlation_id is not None
+        ):
+            # Go routes and caches a request conversation by this stable, request-scoped identifier.
+            completion_kwargs["extra_headers"] = {"x-opencode-session": correlation_id}
         if self._thinking_enabled is not None:
             # LiteLLM's Anthropic adapter does not advertise Qwen's compatible `thinking` field.
             # This explicit allow-list forwards Qwen's documented toggle through OpenCode Go.
